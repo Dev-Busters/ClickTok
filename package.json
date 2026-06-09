@@ -1,0 +1,21 @@
+{
+  "name": "clicktok",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "client",
+    "party",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n client,party -c cyan,magenta \"pnpm --filter client dev\" \"pnpm --filter party dev\"",
+    "dev:client": "pnpm --filter client dev",
+    "dev:party": "pnpm --filter party dev",
+    "build": "pnpm --filter client build",
+    "typecheck": "pnpm --filter client typecheck && pnpm --filter party typecheck",
+    "test": "echo \"No tests yet\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
