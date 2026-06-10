@@ -1,12 +1,40 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useGameStore } from "../store";
-import { GameScreen } from "../components/GameScreen";
+import { useGameLoop } from "../hooks/useGameLoop";
+import { useTrendRoom } from "../hooks/useTrendRoom";
+import { useGameStore, type IdleReport } from "../store";
+import { HomeFeed } from "../screens/HomeFeed";
+import { Discover } from "../screens/Discover";
+import { Profile } from "../screens/Profile";
 import { BottomNav } from "../navigation/BottomNav";
+import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
+
+const DEFAULT_TREND = "dancing";
+const WELCOME_BACK_THRESHOLD_SEC = 60;
 
 export function Shell() {
   const activeTab = useGameStore(s => s.activeTab);
   const openSheet = useGameStore(s => s.openSheet);
   const setSheet = useGameStore(s => s.setSheet);
+  const trendTopic = useGameStore(s => s.trendTopic);
+  const setTrend = useGameStore(s => s.setTrend);
+  const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
+
+  const [idleReport, setIdleReport] = useState<IdleReport | null>(null);
+
+  useEffect(() => {
+    if (!trendTopic) setTrend(DEFAULT_TREND);
+  }, [trendTopic, setTrend]);
+
+  useEffect(() => {
+    const report = applyIdleIncome(Date.now());
+    if (report && report.elapsedSec > WELCOME_BACK_THRESHOLD_SEC) {
+      setIdleReport(report);
+    }
+  }, [applyIdleIncome]);
+
+  useGameLoop();
+  useTrendRoom(trendTopic);
 
   return (
     <div
@@ -25,22 +53,22 @@ export function Shell() {
       }}
     >
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {activeTab === 'home' && <GameScreen />}
-        {activeTab === 'discover' && (
-          <PlaceholderScreen title="DISCOVER" subtitle="TRENDS & LEADERBOARD — COMING SOON" />
-        )}
+        {activeTab === 'home' && <HomeFeed />}
+        {activeTab === 'discover' && <Discover />}
         {activeTab === 'inbox' && (
           <PlaceholderScreen title="INBOX" subtitle="NOTIFICATIONS — COMING SOON" />
         )}
-        {activeTab === 'profile' && (
-          <PlaceholderScreen title="PROFILE" subtitle="CHANNEL MANAGEMENT — COMING SOON" />
-        )}
+        {activeTab === 'profile' && <Profile />}
       </div>
 
       <BottomNav />
 
       {openSheet === 'create' && (
         <CreateSheetPlaceholder onClose={() => setSheet(null)} />
+      )}
+
+      {idleReport && (
+        <WelcomeBackSheet report={idleReport} onDismiss={() => setIdleReport(null)} />
       )}
     </div>
   );

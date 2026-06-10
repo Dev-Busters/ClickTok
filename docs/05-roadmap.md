@@ -88,11 +88,22 @@ Goal: a stable, persistent store and the TikTok navigation frame, with current g
   > minimal dismissible Create-sheet placeholder when `openSheet === 'create'` — `activeTab`
   > never becomes `"create"` in practice, but the type is kept per `03` §7.
 
-- [ ] **0.8 — Relocate current gameplay into screens.** Move today's clicker (tap + StatsBar +
+- [x] **0.8 — Relocate current gameplay into screens.** Move today's clicker (tap + StatsBar +
   UpgradeShop) onto the appropriate screens: posting/stats on **Home**, upgrades on **Profile**
   (channel management). Leaderboard moves to **Discover**. Keep them working.
   **Refs:** `06` §3,5,6. **DoD:** every existing feature reachable via the new nav; typecheck;
   preview verified.
+  > note: added `screens/HomeFeed`, `screens/Discover`, `screens/Profile` (each a plain
+  > `index.tsx`, just relocating existing components — no gear/software/skills split or profile
+  > header polish, that's `1.1`/`1.2`/`1.4`). HomeFeed keeps the old top bar (handle/wordmark/
+  > LIVE/trend) per `06` §3; Discover/Profile get a minimal matching header (mono `@handle` or
+  > chroma title + hairline) so they aren't blank when `Leaderboard`/`UpgradeShop` render little
+  > or nothing. Global concerns (idle income + Welcome Back sheet, `useGameLoop`,
+  > `useTrendRoom`, default-trend init) moved from the old `GameScreen` up into `Shell` since
+  > they must run regardless of active tab; `GameScreen.tsx` deleted (fully superseded).
+  > Also fixed unrelated dev-server tooling: `vite.config.ts` now reads `server.port` from
+  > `process.env.PORT` (falls back to 5173) and `.claude/launch.json` uses `autoPort: true`,
+  > since a stale process was squatting on port 3000.
 
 **Phase 0 exit criteria:** TikTok 5-tab shell, persistent save with idle income, sliced store,
 coins economy — and the original clicker fully playable inside the new frame.
