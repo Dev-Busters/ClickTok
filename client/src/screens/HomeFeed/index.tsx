@@ -1,6 +1,7 @@
 import { useGameStore } from "../../store";
 import { StatsBar } from "../../components/StatsBar";
 import { TapButton } from "../../components/TapButton";
+import { LiveReadinessPanel } from "../../components/LiveReadinessPanel";
 
 export function HomeFeed() {
   const handle = useGameStore(s => s.handle);
@@ -49,6 +50,7 @@ export function HomeFeed() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px', paddingBottom: '32px', width: '100%' }}>
         <StatsBar />
         <TapButton />
+        <LiveReadinessPanel />
       </div>
     </div>
   );

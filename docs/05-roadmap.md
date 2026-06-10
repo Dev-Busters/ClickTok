@@ -149,16 +149,31 @@ Goal: flesh out the incremental engine and the meta→run stat bridge (data only
   > `followerConversion`; Stagecraft/Monetization/Network levels are stored but only consumed by
   > the meta→run bridge (1.3+).
 
-- [ ] **1.3 — Meta→run param preview.** Implement `features/livestream/computeRunParams()` (`04` §6) as
+- [x] **1.3 — Meta→run param preview.** Implement `features/livestream/computeRunParams()` (`04` §6) as
   a pure function. Add a read-only "LIVE readiness" panel (on Home or Create) showing projected
   start viewers / gift rate for the active trend, proving the bridge works before runs exist.
   **Refs:** `04` §6, `03` §5. **DoD:** panel numbers change when you buy gear / level skills /
   change trend; unit-sanity matches the worked example in `04` §6.
+  > note: `features/livestream/computeRunParams.ts` takes a `RunParamsMeta` (followers,
+  > followerConversion, skillLevels, ownedUpgrades) + topic + optional `trendHeat` (defaults 0,
+  > since `socialSlice.trendsAvailable`/`heat` is task 3.1 — `trendTopic` has no heat yet, so
+  > `topicMatch` is currently always 1). `reactions` = `["hype_dance", ...unlocked via owned
+  > upgrades' unlocksReaction]`; `modifiers` is always `[]` (`rollModifiers` is task 2.7). Added
+  > `components/LiveReadinessPanel.tsx`, rendered on Home below `TapButton` per `06` §3, showing
+  > start viewers + gift rate/hype decay/flop floor. Verified against the `04` §6 worked example
+  > via a synthetic save (F=10000, cha=5/8, mon=3, stg=4, DSLR+Gimbal owned) — numbers matched and
+  > updated live after leveling Charisma.
 
-- [ ] **1.4 — Profile screen polish.** Build the TikTok-style profile header (avatar, @handle,
+- [x] **1.4 — Profile screen polish.** Build the TikTok-style profile header (avatar, @handle,
   followers/likes/coins/diamonds counts, bio line) above the gear/software/skills sections.
   **Refs:** `06` §6. **DoD:** profile resembles a TikTok profile; all currencies shown via
   `formatCount`; preview screenshot.
+  > note: added `components/ProfileHeader.tsx` — circular avatar (gradient generated from a hash
+  > of `handle`, initials overlay), `@handle`, bio line "becoming the algorithm", and a TikTok-style
+  > stat row (Following · Followers · Likes · Coins 🪙 · Diamonds 💎, all via `formatCount`).
+  > "Following" has no backing field in `03` (we don't track followed accounts), so it's a static
+  > cosmetic `0` purely for TikTok-faithful layout per `06` §6. Replaces the old plain `@handle` top
+  > bar on Profile.
 
 - [~] **1.5 — Catalog/passive videos. DEFERRED — DO NOT BUILD FOR MVP.** (Decision 2026-06-09:
   cut to reduce loop complexity; passive income is covered by `passiveCoinsPerSec` from gear.)
