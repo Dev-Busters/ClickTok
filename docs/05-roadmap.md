@@ -63,9 +63,13 @@ Goal: a stable, persistent store and the TikTok navigation frame, with current g
   > verified end-to-end by temporarily setting `passiveCoinsPerSec` + an old `lastSeenAt` in
   > localStorage.
 
-- [ ] **0.6 — Tab model + UI slice.** Add `navigation/tabs.ts` (`Tab` type) and `uiSlice`
+- [x] **0.6 — Tab model + UI slice.** Add `navigation/tabs.ts` (`Tab` type) and `uiSlice`
   (`activeTab`, `setTab`, `openSheet`). Default tab `home`.
   **Refs:** `03` §7. **DoD:** typecheck; `setTab` updates state.
+  > note: implemented `uiSlice` exactly per `03` §7, including `setSheet` (the action needed to
+  > drive `openSheet`). Not yet wired into any UI — `activeTab`/`openSheet` will be consumed by
+  > the Shell/BottomNav/sheets in 0.7/0.8. Verified via temporary `window.useGameStore` debug hook
+  > in `main.tsx` (added, tested, then reverted).
 
 - [ ] **0.7 — App Shell + Bottom Nav.** Build `app/Shell.tsx` (phone-frame container + active screen
   switch + `BottomNav`) and `navigation/BottomNav.tsx` (5 TikTok tabs: Home, Discover, ＋, Inbox,
