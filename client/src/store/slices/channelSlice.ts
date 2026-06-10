@@ -13,6 +13,8 @@ export type ChannelSlice = {
   passiveFollowersPerSec: number;
   multiplier: number;
 
+  lastSeenAt: number; // ms epoch, for idle income (04 § Idle)
+
   setHandle: (handle: string) => void;
   tap: () => void;
   tick: (dt: number) => void;
@@ -32,6 +34,8 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   tapPower: 1,
   passiveFollowersPerSec: 0,
   multiplier: 1,
+
+  lastSeenAt: Date.now(),
 
   setHandle: (handle) => set({ handle }),
 

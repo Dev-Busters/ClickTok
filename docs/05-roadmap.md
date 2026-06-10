@@ -40,10 +40,16 @@ Goal: a stable, persistent store and the TikTok navigation frame, with current g
   > (added `features/skills/types.ts`, `features/channel/types.ts`,
   > `features/livestream/types.ts`) with no-op actions so `FullState` matches `03` §8 now.
 
-- [ ] **0.4 — Persistence.** Add Zustand `persist` (key `clicktok-save`), `partialize` to durable
+- [x] **0.4 — Persistence.** Add Zustand `persist` (key `clicktok-save`), `partialize` to durable
   slices, `SAVE_VERSION=1`, and a `migrate` stub. Add `lastSeenAt`.
   **Refs:** `02` §4, `03` §9. **DoD:** refresh the page → progress (handle, currencies, upgrades)
   survives; verify in preview by buying an upgrade then reloading.
+  > note: `upgrades`/`tapPower`/`passiveFollowersPerSec`/`comments` are persisted under their
+  > current (pre-`03`) names from `channelSlice`/`upgradesSlice` (per the 0.3 note, the
+  > `postPower`/`addCurrency`/`spend`/`ownedUpgrades` rename is deferred to 0.5/1.1). `lastSeenAt`
+  > is recomputed to `Date.now()` in `partialize` on every persist (per `02` §4 "update on save");
+  > `applyIdleIncome` itself is task 0.5. `trendTopic`/`leaderboard`/run/ui state excluded as
+  > ephemeral/server-owned.
 
 - [ ] **0.5 — Idle income + Welcome Back.** Implement `applyIdleIncome(now)` (`04` §2), call it on
   load, and show a "Welcome back — you earned X" sheet when `elapsedSec > 60`.
