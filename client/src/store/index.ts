@@ -35,6 +35,7 @@ export const useGameStore = create<FullState>()(
         comments: state.comments,
         tapPower: state.tapPower,
         passiveFollowersPerSec: state.passiveFollowersPerSec,
+        passiveCoinsPerSec: state.passiveCoinsPerSec,
         multiplier: state.multiplier,
         lastSeenAt: Date.now(),
         upgrades: state.upgrades,
@@ -47,3 +48,4 @@ export const useGameStore = create<FullState>()(
 
 export type { UpgradeId, Upgrade } from "./slices/upgradesSlice";
 export type { LeaderboardEntry } from "./slices/socialSlice";
+export type { IdleReport } from "./slices/channelSlice";

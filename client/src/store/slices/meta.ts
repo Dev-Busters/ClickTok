@@ -6,8 +6,8 @@ import type { Upgrade } from "./upgradesSlice";
 export const SAVE_VERSION = 1;
 
 // Persisted (partialize) — durable slices only:
-//   handle, wallet, comments, tapPower, passiveFollowersPerSec, multiplier,
-//   lastSeenAt, upgrades, skillLevels, videos
+//   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
+//   multiplier, lastSeenAt, upgrades, skillLevels, videos
 // Excluded: run* (ephemeral), social* (server-owned), ui* (session)
 export type PersistedV1 = {
   version: 1;
@@ -16,6 +16,7 @@ export type PersistedV1 = {
   comments: number;
   tapPower: number;
   passiveFollowersPerSec: number;
+  passiveCoinsPerSec: number;
   multiplier: number;
   lastSeenAt: number;
   upgrades: Upgrade[];

@@ -1,22 +1,34 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useTrendRoom } from "../hooks/useTrendRoom";
-import { useGameStore } from "../store";
+import { useGameStore, type IdleReport } from "../store";
 import { TapButton } from "./TapButton";
 import { StatsBar } from "./StatsBar";
 import { UpgradeShop } from "./UpgradeShop";
 import { Leaderboard } from "./Leaderboard";
+import { WelcomeBackSheet } from "./WelcomeBackSheet";
 
 const DEFAULT_TREND = "dancing";
+const WELCOME_BACK_THRESHOLD_SEC = 60;
 
 export function GameScreen() {
   const handle = useGameStore(s => s.handle);
   const trendTopic = useGameStore(s => s.trendTopic);
   const setTrend = useGameStore(s => s.setTrend);
+  const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
+
+  const [idleReport, setIdleReport] = useState<IdleReport | null>(null);
 
   useEffect(() => {
     if (!trendTopic) setTrend(DEFAULT_TREND);
   }, [trendTopic, setTrend]);
+
+  useEffect(() => {
+    const report = applyIdleIncome(Date.now());
+    if (report && report.elapsedSec > WELCOME_BACK_THRESHOLD_SEC) {
+      setIdleReport(report);
+    }
+  }, [applyIdleIncome]);
 
   useGameLoop();
   useTrendRoom(trendTopic);
@@ -69,6 +81,10 @@ export function GameScreen() {
       </div>
 
       <div style={{ height: '48px' }} />
+
+      {idleReport && (
+        <WelcomeBackSheet report={idleReport} onDismiss={() => setIdleReport(null)} />
+      )}
     </div>
   );
 }

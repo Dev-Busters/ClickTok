@@ -51,10 +51,17 @@ Goal: a stable, persistent store and the TikTok navigation frame, with current g
   > `applyIdleIncome` itself is task 0.5. `trendTopic`/`leaderboard`/run/ui state excluded as
   > ephemeral/server-owned.
 
-- [ ] **0.5 — Idle income + Welcome Back.** Implement `applyIdleIncome(now)` (`04` §2), call it on
+- [x] **0.5 — Idle income + Welcome Back.** Implement `applyIdleIncome(now)` (`04` §2), call it on
   load, and show a "Welcome back — you earned X" sheet when `elapsedSec > 60`.
   **Refs:** `04` §2, `02` §4. **DoD:** set `lastSeenAt` back a few minutes (or wait), reload → idle
   coins granted + sheet shows.
+  > note: added `passiveCoinsPerSec` (per `03` §1, default 0, persisted) to `channelSlice` —
+  > `applyIdleIncome(now)` reads it per the `04` §2 formula exactly. No gear/upgrade currently
+  > contributes to it (full gear catalog with `passiveCoinsAdd` is task 1.1), so today's idle
+  > grants are 0 coins/followers until 1.1 lands; the formula, persistence, and "Welcome Back"
+  > sheet (`WelcomeBackSheet.tsx`, shown in `GameScreen` when `elapsedSec > 60`) are wired and
+  > verified end-to-end by temporarily setting `passiveCoinsPerSec` + an old `lastSeenAt` in
+  > localStorage.
 
 - [ ] **0.6 — Tab model + UI slice.** Add `navigation/tabs.ts` (`Tab` type) and `uiSlice`
   (`activeTab`, `setTab`, `openSheet`). Default tab `home`.
