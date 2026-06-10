@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import { BALANCE } from "../../features/economy/balance";
+import type { ChoiceEffectId } from "../../features/livestream/choices";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
 import { MAX_FEED_EVENTS, spawnFeedEvent, spawnGiftEvent } from "../../features/livestream/events";
 import { REACTION_CATALOG } from "../../features/livestream/reactions";
@@ -26,6 +27,8 @@ export type RunSlice = {
   flopTimer: number;         // seconds spent under flopFloor
   giftRateBoostUntil: number; // clockSec until which `shoutout` doubles gift spawn rate
   gainsBoostUntil: number;     // clockSec until which `go_off` triples collected gains
+  giftsCollected: number;      // count of gifts tapped this run (for results)
+  lastResult: RunResult | null; // most recent endRun() output, for the results screen
 
   startRun: (topic: string) => void;     // compute params from meta, go live
   runTick: (dt: number) => void;         // the run loop step (engine)
@@ -61,6 +64,8 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   flopTimer: 0,
   giftRateBoostUntil: 0,
   gainsBoostUntil: 0,
+  giftsCollected: 0,
+  lastResult: null,
 
   // 04 §6: compute run params from current meta state, then go live.
   startRun: (topic) => {
@@ -83,6 +88,8 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       flopTimer: 0,
       giftRateBoostUntil: 0,
       gainsBoostUntil: 0,
+      giftsCollected: 0,
+      lastResult: null,
     });
   },
 
@@ -156,7 +163,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   // 04 §7: tap a gift to collect it. Value scales with monetization + hype
   // (and `go_off`'s ×3 gains window).
   collectGift: (eventId) => {
-    const { events, hype, collected, clockSec, gainsBoostUntil, skillLevels } = get();
+    const { events, hype, collected, clockSec, gainsBoostUntil, skillLevels, giftsCollected } = get();
     const event = events.find(e => e.id === eventId);
     if (!event || event.type !== "gift" || event.resolved || !event.giftTier) return;
 
@@ -176,6 +183,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
         coins: collected.coins + coins,
         diamonds: collected.diamonds + diamonds,
       },
+      giftsCollected: giftsCollected + 1,
     });
   },
 
@@ -191,8 +199,77 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     });
   },
 
-  // Phase 2.5 — choice events don't exist yet.
-  resolveChoice: () => {},
+  // 04 §8/§9-adjacent: resolve a comment/sponsor choice prompt. Effect
+  // magnitudes are anchored to existing run formulas — see `choices.ts`.
+  resolveChoice: (eventId, choiceIndex) => {
+    const { phase, events, hype, viewers, wallet, collected, clockSec, gainsBoostUntil, skillLevels } = get();
+    if (phase !== "live") return;
+
+    const event = events.find(e => e.id === eventId);
+    if (!event || !event.choices || event.resolved) return;
+    const choice = event.choices[choiceIndex];
+    if (!choice) return;
+
+    const remaining = events.filter(e => e.id !== eventId);
+    const gainsMult = clockSec < gainsBoostUntil ? 3 : 1;
+
+    switch (choice.apply as ChoiceEffectId) {
+      case "sponsor_accept": {
+        // Same payout shape as `collectGift`, at the "galaxy" tier — a big
+        // one-time bag in exchange for a viewer dip (01 §5.2).
+        const valueBonus = 1 + BALANCE.run.monetizationGiftPerLevel * skillLevels.monetization;
+        const hypeBonus = 1 + hype / 100;
+        const coins = Math.round(BALANCE.run.giftCoinValue.galaxy * valueBonus * hypeBonus * gainsMult);
+        set({
+          events: remaining,
+          viewers: viewers * 0.92,
+          collected: { ...collected, coins: collected.coins + coins },
+        });
+        break;
+      }
+
+      case "sponsor_decline":
+        set({ events: remaining, hype: clamp(hype + 5, 0, 100) });
+        break;
+
+      case "drama_clapback":
+        set({ events: remaining, hype: clamp(hype + 10, 0, 100), viewers: viewers * 0.95 });
+        break;
+
+      case "drama_classy": {
+        const followersGain = Math.round(viewers * 0.1) * gainsMult;
+        set({
+          events: remaining,
+          hype: clamp(hype + 3, 0, 100),
+          wallet: {
+            ...wallet,
+            followers: wallet.followers + followersGain,
+            totalFollowers: wallet.totalFollowers + followersGain,
+          },
+        });
+        break;
+      }
+
+      case "shoutout_fan": {
+        const followersGain = Math.round(viewers * 0.05) * gainsMult;
+        set({
+          events: remaining,
+          hype: clamp(hype + 2, 0, 100),
+          wallet: {
+            ...wallet,
+            followers: wallet.followers + followersGain,
+            totalFollowers: wallet.totalFollowers + followersGain,
+          },
+        });
+        break;
+      }
+
+      case "shoutout_skip":
+      default:
+        set({ events: remaining });
+        break;
+    }
+  },
 
   // 04 §9: reaction effects, gated by cooldown and the run's unlocked loadout.
   useReaction: (id) => {
@@ -254,22 +331,70 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     }
   },
 
-  // Stops the run and surfaces basic stats. Reward conversion (`scoreRun`,
-  // 04 §10) and the results sheet are task 2.6 — rewards are zero here.
+  // 04 §10: scoreRun — convert run performance + collected gifts into meta
+  // currencies, grant them to the wallet, and surface a result for the
+  // results screen.
   endRun: (reason) => {
-    const { peakViewers, hype } = get();
+    const { params, peakViewers, hype, collected, giftsCollected, wallet } = get();
+    if (!params) throw new Error("endRun called with no active run params");
 
-    set({ phase: "results" });
+    const { scoring } = BALANCE;
+    const hypeBonus = 1 + hype * scoring.hypeBonusCoeff;
+    const base = peakViewers * hypeBonus * params.trendMultiplier;
+    const fullFollowers = Math.round(base * params.followerConversion * scoring.followerYieldCoeff);
 
-    return {
+    let followers: number;
+    let coins: number;
+    let diamonds: number;
+    let likes: number;
+
+    if (reason === "flop") {
+      // Flop payout: just the collected gifts + 30% of computed followers —
+      // not zero, but no completion/peak-viewer bonuses (04 §10).
+      followers = Math.round(fullFollowers * 0.3);
+      coins = collected.coins;
+      diamonds = collected.diamonds;
+      likes = collected.likes;
+    } else {
+      followers = fullFollowers;
+      coins = collected.coins + Math.round(base * 0.5);
+      diamonds = collected.diamonds + scoring.completionDiamondBase;
+      likes = collected.likes + Math.round(peakViewers * 2);
+    }
+
+    const ratio = peakViewers / params.startViewers;
+    let grade: RunResult["grade"];
+    if (reason === "flop") grade = "FLOP";
+    else if (ratio >= 3 && hype >= 80) grade = "S";
+    else if (ratio >= 2) grade = "A";
+    else if (ratio >= 1.3) grade = "B";
+    else if (ratio >= 0.9) grade = "C";
+    else grade = "D";
+
+    const result: RunResult = {
       reason,
       peakViewers,
       finalHype: hype,
-      giftsCollected: 0,
-      rewards: { followers: 0, coins: 0, diamonds: 0, likes: 0 },
-      grade: "FLOP",
+      giftsCollected,
+      rewards: { followers, coins, diamonds, likes },
+      grade,
     };
+
+    set({
+      phase: "results",
+      lastResult: result,
+      wallet: {
+        ...wallet,
+        followers: wallet.followers + followers,
+        totalFollowers: wallet.totalFollowers + followers,
+        coins: wallet.coins + coins,
+        diamonds: wallet.diamonds + diamonds,
+        likes: wallet.likes + likes,
+      },
+    });
+
+    return result;
   },
 
-  returnToChannel: () => set({ phase: "idle", params: null }),
+  returnToChannel: () => set({ phase: "idle", params: null, lastResult: null }),
 });

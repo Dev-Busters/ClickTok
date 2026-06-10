@@ -12,7 +12,64 @@ const TIER_LABEL: Record<string, string> = {
 
 function FeedItem({ event }: { event: RunEvent }) {
   const collectGift = useGameStore(s => s.collectGift);
+  const resolveChoice = useGameStore(s => s.resolveChoice);
   const ttl = event.expiresAt - event.spawnedAt;
+
+  if (event.choices && event.choices.length > 0) {
+    const accent = event.type === "sponsor" ? "var(--gold)" : "var(--cyan)";
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0 }}
+        style={{
+          alignSelf: "stretch",
+          pointerEvents: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: "6px",
+          padding: "8px 10px",
+          background: "rgba(255,255,255,0.05)",
+          border: `1px solid ${accent}`,
+          borderRadius: "4px",
+        }}
+      >
+        <div style={{ fontFamily: "var(--font-ui)", fontSize: "12px", color: "var(--text)" }}>
+          {event.text}
+        </div>
+        <div style={{ display: "flex", gap: "6px" }}>
+          {event.choices.map((choice, i) => (
+            <motion.button
+              key={choice.label}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => resolveChoice(event.id, i)}
+              style={{
+                flex: 1,
+                fontFamily: "var(--font-mono)",
+                fontSize: "10px",
+                letterSpacing: "0.08em",
+                color: accent,
+                background: "rgba(0,0,0,0.3)",
+                border: `1px solid ${accent}`,
+                borderRadius: "4px",
+                padding: "6px 8px",
+                cursor: "pointer",
+              }}
+            >
+              {choice.label}
+            </motion.button>
+          ))}
+        </div>
+        <motion.div
+          initial={{ width: "100%" }}
+          animate={{ width: "0%" }}
+          transition={{ duration: ttl, ease: "linear" }}
+          style={{ height: "2px", background: accent }}
+        />
+      </motion.div>
+    );
+  }
 
   if (event.type === "gift" && event.giftTier) {
     return (

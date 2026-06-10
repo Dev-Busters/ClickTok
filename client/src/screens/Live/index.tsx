@@ -19,6 +19,15 @@ function formatTimer(sec: number): string {
   return `${m}:${String(r).padStart(2, '0')}`;
 }
 
+const GRADE_COLOR: Record<string, string> = {
+  S: 'var(--gold)',
+  A: 'var(--cyan)',
+  B: 'var(--text)',
+  C: 'var(--dim)',
+  D: 'var(--dim)',
+  FLOP: 'var(--red)',
+};
+
 export function Live() {
   useRunLoop();
 
@@ -30,6 +39,7 @@ export function Live() {
   const hype = useGameStore(s => s.hype);
   const clockSec = useGameStore(s => s.clockSec);
   const collected = useGameStore(s => s.collected);
+  const lastResult = useGameStore(s => s.lastResult);
   const endRun = useGameStore(s => s.endRun);
   const returnToChannel = useGameStore(s => s.returnToChannel);
   const setTab = useGameStore(s => s.setTab);
@@ -153,6 +163,17 @@ export function Live() {
           <div className="chroma" style={{ fontFamily: 'var(--font-display)', fontSize: '32px', letterSpacing: '0.06em', color: 'var(--text)' }}>
             STREAM ENDED
           </div>
+          {lastResult && (
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '64px',
+              lineHeight: 1,
+              color: GRADE_COLOR[lastResult.grade] ?? 'var(--text)',
+              textShadow: `0 0 24px ${GRADE_COLOR[lastResult.grade] ?? 'var(--text)'}`,
+            }}>
+              {lastResult.grade}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '32px' }}>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: 'var(--cyan)' }}>{formatCount(peakViewers)}</div>
@@ -162,7 +183,45 @@ export function Live() {
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: hypeColor(hype) }}>{Math.round(hype)}</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.18em' }}>FINAL HYPE</div>
             </div>
+            {lastResult && (
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: 'var(--gold)' }}>{lastResult.giftsCollected}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.18em' }}>GIFTS</div>
+              </div>
+            )}
           </div>
+          {lastResult && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              padding: '14px 20px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid var(--dim)',
+              borderRadius: '4px',
+              minWidth: '220px',
+            }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.18em', marginBottom: '2px' }}>
+                REWARDS
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text)' }}>
+                <span>👥 Followers</span>
+                <span>+{formatCount(lastResult.rewards.followers)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)' }}>
+                <span>🪙 Coins</span>
+                <span>+{formatCount(lastResult.rewards.coins)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--cyan)' }}>
+                <span>💎 Diamonds</span>
+                <span>+{formatCount(lastResult.rewards.diamonds)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text)' }}>
+                <span>❤️ Likes</span>
+                <span>+{formatCount(lastResult.rewards.likes)}</span>
+              </div>
+            </div>
+          )}
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleBack}

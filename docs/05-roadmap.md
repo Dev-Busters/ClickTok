@@ -249,15 +249,36 @@ Goal: a fully playable LIVE run. This is the headline feature — good to build 
   > driving against the `04`§9 formulas (exact match, including the `go_off` + gift-collect
   > interaction).
 
-- [ ] **2.5 — Choice events.** Implement comment/sponsor `choices` and `resolveChoice` (effects keyed
+- [x] **2.5 — Choice events.** Implement comment/sponsor `choices` and `resolveChoice` (effects keyed
   per `04`). A few authored choice events with distinct outcomes.
   **Refs:** `03` §5, `04` §8. **DoD:** choice prompts appear, options apply different effects.
+  > note: `04` doesn't define choice-effect formulas (§8 is `rollModifiers`, task 2.7), so effect
+  > magnitudes are implementation choices anchored to existing run formulas — see
+  > `features/livestream/choices.ts`. Added a 4th `spawnFeedEvent` category (`"choice"`, weight 13,
+  > rebalancing comment/troll/hype_wave to 60/16/11) that picks from `CHOICE_EVENT_POOL` and spawns
+  > a `comment`/`sponsor`-typed `RunEvent` with `choices` populated (8s TTL). Three authored
+  > scenarios per `01` §5.2: a sponsor ping (`sponsor_accept` = `collectGift`-style payout at the
+  > "galaxy" tier + viewers ×0.92, vs `sponsor_decline` = +5 hype) and two comment choices
+  > (`drama_clapback`/`drama_classy`, `shoutout_fan`/`shoutout_skip`) using hype deltas in the
+  > 04 §9 reaction range and follower grants as a fraction of viewers (like `pin_comment`).
+  > `LiveFeed.tsx` renders any event with `choices` as a card with one button per option.
 
-- [ ] **2.6 — End + results + rewards.** Implement `endRun(reason)` → `scoreRun` (`04` §10): convert to
+- [x] **2.6 — End + results + rewards.** Implement `endRun(reason)` → `scoreRun` (`04` §10): convert to
   meta currencies, grant them, show a results sheet (peak viewers, gifts, followers gained, grade).
   Return to Home after.
   **Refs:** `03` §5, `04` §10, `06` §7. **DoD:** ending a run grants the right rewards (matches
   formula), results sheet shows the breakdown + grade; followers/coins persist after.
+  > note: `endRun` now implements `04` §10 exactly, granting `rewards` straight to `wallet`
+  > (followers/totalFollowers/coins/diamonds/likes) and storing the output as a new ephemeral
+  > `lastResult: RunResult | null` field (deviation from `03`§5, by analogy to 2.4's
+  > `gainsBoostUntil` — needed so the results screen can show the breakdown). On `"flop"`, only
+  > `collected.*` + 30% of the full computed followers are granted (no peak-viewer/completion
+  > bonuses), per the §10 "flop payout" note. Added a `giftsCollected` counter (incremented in
+  > `collectGift`) for the results display. Extended the existing `phase === "results"` overlay in
+  > `screens/Live` (built in 2.2) — rather than the unused `openSheet: "runResults"` sheet — with
+  > the grade badge (color-coded), a gifts-collected stat, and a rewards breakdown
+  > (followers/coins/diamonds/likes). "Return to Home after" is via the existing "BACK TO CHANNEL"
+  > button (`returnToChannel()` + `setTab('home')`, from 2.2/2.3).
 
 - [ ] **2.7 — Run modifiers + post-run boon.** Roll `RunModifier`s at start and show them; implement
   the 1-of-3 boon pick on a successful run (`01` §5.5).

@@ -1,5 +1,6 @@
 import { BALANCE } from "../economy/balance";
 import { weightedPick } from "../../lib/math";
+import { CHOICE_EVENT_POOL } from "./choices";
 import type { GiftTier, RunEvent } from "./types";
 
 export const GIFT_ICON: Record<GiftTier, string> = {
@@ -14,18 +15,22 @@ export const MAX_FEED_EVENTS = 20;
 
 const GIFT_TTL_SEC = 6;
 
-type FeedEventType = "comment" | "troll" | "hype_wave";
+type FeedEventType = "comment" | "troll" | "hype_wave" | "choice";
 
-const FEED_EVENT_TTL_SEC: Record<FeedEventType, number> = {
+const FEED_EVENT_TTL_SEC: Record<Exclude<FeedEventType, "choice">, number> = {
   comment: 6,
   troll: 9,
   hype_wave: 4,
 };
 
+// Choice prompts get longer to read + decide.
+const CHOICE_TTL_SEC = 8;
+
 const FEED_EVENT_WEIGHTS: Record<FeedEventType, number> = {
-  comment: 70,
-  troll: 18,
-  hype_wave: 12,
+  comment: 60,
+  troll: 16,
+  hype_wave: 11,
+  choice: 13,
 };
 
 const COMMENT_POOL = [
@@ -83,11 +88,24 @@ export function spawnGiftEvent(clockSec: number, giftQuality: number): RunEvent 
   };
 }
 
-// Spawns one of comment/troll/hype_wave. Avoids stacking a second hype wave
-// while one is already active in the feed.
+// Spawns one of comment/troll/hype_wave/choice. Avoids stacking a second hype
+// wave while one is already active in the feed.
 export function spawnFeedEvent(clockSec: number, hasActiveWave: boolean): RunEvent {
   let type = weightedPick(FEED_EVENT_WEIGHTS);
   if (type === "hype_wave" && hasActiveWave) type = "comment";
+
+  if (type === "choice") {
+    const template = pickFrom(CHOICE_EVENT_POOL);
+    return {
+      id: crypto.randomUUID(),
+      type: template.type,
+      spawnedAt: clockSec,
+      expiresAt: clockSec + CHOICE_TTL_SEC,
+      resolved: false,
+      text: template.text,
+      choices: template.choices,
+    };
+  }
 
   const base = {
     id: crypto.randomUUID(),
