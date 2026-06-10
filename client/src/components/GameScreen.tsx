@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useTrendRoom } from "../hooks/useTrendRoom";
 import { useGameStore } from "../store/gameStore";
@@ -6,7 +7,6 @@ import { StatsBar } from "./StatsBar";
 import { UpgradeShop } from "./UpgradeShop";
 import { Leaderboard } from "./Leaderboard";
 
-// Default trend topic — in the future this will rotate on a server schedule
 const DEFAULT_TREND = "dancing";
 
 export function GameScreen() {
@@ -14,38 +14,61 @@ export function GameScreen() {
   const trendTopic = useGameStore(s => s.trendTopic);
   const setTrend = useGameStore(s => s.setTrend);
 
-  // Boot into default trend on mount
-  if (!trendTopic) setTrend(DEFAULT_TREND);
+  useEffect(() => {
+    if (!trendTopic) setTrend(DEFAULT_TREND);
+  }, [trendTopic, setTrend]);
 
   useGameLoop();
   useTrendRoom(trendTopic);
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center overflow-y-auto">
-      {/* Top bar — TikTok nav style */}
-      <div className="w-full max-w-sm flex items-center justify-between px-4 pt-safe pt-4 pb-2">
-        <div className="text-white/40 text-sm">
-          <span className="text-white font-bold">@{handle}</span>
+    <div style={{ minHeight: '100svh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', overflowX: 'hidden' }}>
+
+      {/* Top bar */}
+      <div style={{ width: '100%', maxWidth: '384px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 16px 14px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }}>
+          @{handle}
+        </span>
+
+        <div
+          className="chroma"
+          style={{ fontFamily: 'var(--font-display)', fontSize: '26px', letterSpacing: '0.05em', color: 'var(--text)' }}
+        >
+          CLICKTOK
         </div>
-        <div className="text-2xl font-black tracking-tight">
-          <span className="text-white">Click</span>
-          <span className="text-[#fe2c55]">Tok</span>
-        </div>
-        <div className="text-white/40 text-sm w-16 text-right">
-          {trendTopic && <span className="text-[#fe2c55] text-xs">#{trendTopic}</span>}
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{
+              width: '7px', height: '7px', borderRadius: '50%',
+              background: 'var(--red)',
+              boxShadow: '0 0 8px var(--red)',
+              animation: 'dot-pulse 1.6s ease-in-out infinite',
+            }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red)', letterSpacing: '0.18em' }}>LIVE</span>
+          </div>
+          {trendTopic && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)' }}>
+              #{trendTopic}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Main tap zone */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 py-8 w-full">
+      {/* Hairline rule */}
+      <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', marginBottom: '16px' }}>
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px', paddingBottom: '16px', width: '100%' }}>
         <StatsBar />
         <TapButton />
         <Leaderboard />
         <UpgradeShop />
       </div>
 
-      {/* Bottom padding for mobile */}
-      <div className="h-8" />
+      <div style={{ height: '48px' }} />
     </div>
   );
 }

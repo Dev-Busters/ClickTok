@@ -11,35 +11,103 @@ export function UpgradeShop() {
 
   if (available.length === 0) {
     return (
-      <div className="text-white/40 text-sm text-center py-8">
-        All upgrades purchased — you are the algorithm. 👑
+      <div style={{
+        textAlign: 'center',
+        padding: '32px 0',
+        fontFamily: 'var(--font-mono)',
+        fontSize: '11px',
+        color: 'var(--dim)',
+        letterSpacing: '0.12em',
+      }}>
+        ALL UPGRADES ACQUIRED — YOU ARE THE ALGORITHM
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-sm px-4 flex flex-col gap-2">
-      <h2 className="text-white/60 text-xs font-bold tracking-widest uppercase mb-1">Upgrades</h2>
-      {available.map(u => {
+    <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.2em' }}>
+          UPGRADE CATALOG
+        </span>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)' }}>
+          {available.length}
+        </span>
+      </div>
+
+      {available.map((u, idx) => {
         const canAfford = followers >= u.cost;
         return (
           <motion.button
             key={u.id}
-            whileTap={{ scale: 0.97 }}
+            whileTap={{ scale: 0.985 }}
             onClick={() => canAfford && buyUpgrade(u.id as UpgradeId)}
-            className={`flex items-center justify-between rounded-2xl px-4 py-3 border transition-all ${
-              canAfford
-                ? "bg-white/10 border-white/20 hover:bg-white/15 cursor-pointer"
-                : "bg-white/5 border-white/5 opacity-50 cursor-not-allowed"
-            }`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              width: '100%',
+              textAlign: 'left',
+              padding: '13px 14px',
+              background: canAfford ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.015)',
+              border: `1px solid ${canAfford ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)'}`,
+              cursor: canAfford ? 'pointer' : 'not-allowed',
+              opacity: canAfford ? 1 : 0.4,
+            }}
           >
-            <div className="flex flex-col items-start gap-0.5">
-              <span className="text-white font-bold text-sm">{u.name}</span>
-              <span className="text-white/50 text-xs">{u.description}</span>
+            {/* Index */}
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '30px',
+              color: canAfford ? 'var(--red)' : 'var(--dim)',
+              lineHeight: 1,
+              width: '34px',
+              flexShrink: 0,
+            }}>
+              {String(idx + 1).padStart(2, '0')}
             </div>
-            <div className={`text-sm font-black tabular-nums ml-3 shrink-0 ${canAfford ? "text-[#fe2c55]" : "text-white/30"}`}>
-              {formatCount(u.cost)}
-              <span className="text-[10px] ml-0.5 opacity-70">👥</span>
+
+            {/* Name + description */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+              <div style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '19px',
+                color: 'var(--text)',
+                lineHeight: 1,
+                letterSpacing: '0.03em',
+              }}>
+                {u.name.toUpperCase()}
+              </div>
+              <div style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '10px',
+                color: 'var(--dim)',
+                letterSpacing: '0.04em',
+              }}>
+                {u.description}
+              </div>
+            </div>
+
+            {/* Cost */}
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+              <div style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '22px',
+                color: canAfford ? 'var(--cyan)' : 'var(--dim)',
+                lineHeight: 1,
+              }}>
+                {formatCount(u.cost)}
+              </div>
+              <div style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                color: 'var(--dim)',
+                letterSpacing: '0.1em',
+              }}>
+                FOLLOWERS
+              </div>
             </div>
           </motion.button>
         );

@@ -1,20 +1,71 @@
 @import "tailwindcss";
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-body {
-  margin: 0;
-  background: #000;
-  color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* TikTok brand tokens */
 :root {
-  --tt-red: #fe2c55;
-  --tt-cyan: #25f4ee;
-  --tt-dark: #121212;
+  --red: #ff1f4b;
+  --cyan: #25f4ee;
+  --bg: #070708;
+  --bg2: #0e0d10;
+  --text: #e8e4d8;
+  --dim: #48453e;
+  --gold: #f5a623;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-ui: 'Rajdhani', sans-serif;
+}
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+::placeholder {
+  color: var(--dim);
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+
+/* Chromatic aberration text effect */
+.chroma {
+  text-shadow: -2px 0 var(--red), 2px 0 var(--cyan);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 24px rgba(255,31,75,0.45), 0 0 70px rgba(255,31,75,0.12); }
+  50%       { box-shadow: 0 0 40px rgba(255,31,75,0.75), 0 0 110px rgba(255,31,75,0.22); }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.cursor-blink { animation: blink 1s step-end infinite; }
+
+/* CRT scanlines — fixed overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.045) 2px,
+    rgba(0,0,0,0.045) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
 }
