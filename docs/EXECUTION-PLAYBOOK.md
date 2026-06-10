@@ -13,8 +13,9 @@ implementer models (they follow `CLAUDE.md` + `docs/05-roadmap.md`).
 3. Paste the **task prompt** (template below), naming the exact task number.
 4. Let it work. It reads `CLAUDE.md` + only the docs the task references, implements, runs
    `pnpm typecheck`, and verifies in the browser preview.
-5. When it's done: skim its summary/screenshot, then tell it **"commit this"** (one commit per
-   task = clean rollback points).
+5. When it's done: skim its summary/screenshot. It commits its own task (the prompt tells it to),
+   so you get one commit per task = clean rollback points. If something looks wrong, tell it to fix
+   it (or `git reset --hard HEAD~1` to throw the task away and retry fresh).
 6. Close the session. Start a fresh one for the next task.
 
 That's it. Repeat down `docs/05-roadmap.md`.
@@ -42,8 +43,9 @@ Read CLAUDE.md, then implement Task 0.1 from docs/05-roadmap.md.
 Read only the docs that task references. Follow docs/03-data-model.md for types and
 docs/04-economy-formulas.md for numbers EXACTLY — do not invent design or balance.
 When done: run `pnpm typecheck`, verify visible behavior in the browser preview if it
-renders anything, check the task's box in docs/05-roadmap.md, and give me a one-line
-summary. If the spec is ambiguous or something's missing, STOP and ask me instead of guessing.
+renders anything, check the task's box in docs/05-roadmap.md, commit with a message like
+`feat(task 0.1): <short summary>`, and give me a one-line summary. If the spec is
+ambiguous or something's missing, STOP and ask me instead of guessing.
 ```
 
 Generic version (let it auto-pick): replace the first line with *"…implement the next unchecked
