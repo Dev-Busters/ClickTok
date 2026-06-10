@@ -8,6 +8,11 @@
 >
 > Legend: `[ ]` todo · `[x]` done · **Refs** = which docs to read · **DoD** = acceptance criteria.
 > Each task is sized to be doable by a small model in one focused session.
+>
+> **🏁 MVP BETA = tasks through 2.7, plus 3.1.** (Full Phase 0 + Phase 1 + Phase 2 + trends.)
+> That's the cut where the game is shareable: persistent TikTok shell, full meta progression, the
+> complete LIVE roguelike loop, and trend selection. Inbox stays a placeholder; juice (3.3),
+> prestige (3.4), deep balance (3.5), and multiplayer (Phase 4) come after beta feedback.
 
 ---
 
@@ -100,9 +105,14 @@ Goal: flesh out the incremental engine and the meta→run stat bridge (data only
 
 - [ ] **1.1 — Upgrade catalog (full).** Implement `features/upgrades/catalog.ts` from `04` §4 (gear +
   software, with `requires` gating and run-stat effects). Rework `UpgradeShop` into two categories
-  with lock states.
-  **Refs:** `03` §2, `04` §4, `06` §6. **DoD:** all upgrades buyable when unlocked; locked ones show
-  requirements; `recomputeStats` reflects effects; typecheck + preview.
+  with lock states. **⚠ BREAKING SAVE CHANGE:** this replaces the legacy `upgrades: Upgrade[]`
+  array (persisted since 0.4) with `ownedUpgrades: Record<string, boolean>` per `03` §2. You MUST
+  bump `SAVE_VERSION` to 2 in `store/slices/meta.ts` and add a `migrate` step: map old purchased
+  upgrades to roughly-equivalent new ids (`better_lighting`→`ring_light`, `ring_light`→`usb_mic`,
+  others → refund their coin cost), and update `partialize` in `store/index.ts`. Old saves must
+  load without crashing.
+  **Refs:** `03` §2, `04` §4, `06` §6, `02` §4. **DoD:** all upgrades buyable when unlocked; locked
+  ones show requirements; stats recompute; an old-version save loads cleanly; typecheck + preview.
 
 - [ ] **1.2 — Creator Skills.** Implement `skillsSlice` + `features/skills/catalog.ts` (`04` §5) and a
   Skills section on Profile with level-up buttons and cost display.
