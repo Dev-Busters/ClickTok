@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { BALANCE } from "../features/economy/balance";
+import type { Wallet } from "../features/economy/types";
 
 // --- Upgrade catalog ---
 export type UpgradeId =
@@ -38,9 +40,7 @@ export type GameState = {
   // Channel identity
   handle: string;
   // Core currencies
-  followers: number;
-  totalFollowers: number; // all-time (never decreases)
-  likes: number;
+  wallet: Wallet;
   comments: number;
   // Derived stats (recomputed from upgrades)
   tapPower: number;
@@ -78,9 +78,13 @@ function computeStats(upgrades: Upgrade[]) {
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
   handle: "",
-  followers: 0,
-  totalFollowers: 0,
-  likes: 0,
+  wallet: {
+    followers: 0,
+    totalFollowers: 0,
+    coins: 0,
+    diamonds: 0,
+    likes: 0,
+  },
   comments: 0,
   tapPower: 1,
   passiveFollowersPerSec: 0,
@@ -92,33 +96,44 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   setHandle: (handle) => set({ handle }),
 
   tap: () => {
-    const { tapPower, multiplier, followers, totalFollowers, likes } = get();
-    const gained = Math.floor(tapPower * multiplier);
+    const { tapPower, multiplier, wallet } = get();
+    const postPower = tapPower;
+    const followerConversion = 1; // no software/skills yet (Phase 1)
+    const coinsGain = postPower * BALANCE.postCoinConversion * multiplier;
+    const followersGain = postPower * BALANCE.postFollowerConversion * followerConversion * multiplier;
+    const likesGain = postPower * BALANCE.postLikeConversion * multiplier;
     set({
-      followers: followers + gained,
-      totalFollowers: totalFollowers + gained,
-      likes: likes + Math.floor(gained * 0.3),
+      wallet: {
+        ...wallet,
+        coins: wallet.coins + coinsGain,
+        followers: wallet.followers + followersGain,
+        totalFollowers: wallet.totalFollowers + followersGain,
+        likes: wallet.likes + likesGain,
+      },
     });
   },
 
   tick: (dt) => {
-    const { passiveFollowersPerSec, multiplier, followers, totalFollowers, comments } = get();
+    const { passiveFollowersPerSec, multiplier, wallet, comments } = get();
     const gained = passiveFollowersPerSec * multiplier * dt;
     if (gained === 0) return;
     set({
-      followers: followers + gained,
-      totalFollowers: totalFollowers + gained,
+      wallet: {
+        ...wallet,
+        followers: wallet.followers + gained,
+        totalFollowers: wallet.totalFollowers + gained,
+      },
       comments: comments + gained * 0.05 * dt,
     });
   },
 
   buyUpgrade: (id) => {
-    const { upgrades, followers } = get();
+    const { upgrades, wallet } = get();
     const upgrade = upgrades.find(u => u.id === id);
-    if (!upgrade || upgrade.purchased || followers < upgrade.cost) return;
+    if (!upgrade || upgrade.purchased || wallet.coins < upgrade.cost) return;
     const updated = upgrades.map(u => u.id === id ? { ...u, purchased: true } : u);
     const stats = computeStats(updated);
-    set({ upgrades: updated, followers: followers - upgrade.cost, ...stats });
+    set({ upgrades: updated, wallet: { ...wallet, coins: wallet.coins - upgrade.cost }, ...stats });
   },
 
   setTrend: (topic) => set({ trendTopic: topic }),

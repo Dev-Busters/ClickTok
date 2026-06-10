@@ -19,7 +19,7 @@ Goal: a stable, persistent store and the TikTok navigation frame, with current g
   `BALANCE` object exactly as in `04-economy-formulas.md` §0. No logic yet.
   **Refs:** `04` §0. **DoD:** typecheck passes; `BALANCE` importable.
 
-- [ ] **0.2 — Currency rename + wallet.** Introduce the `Wallet` shape (`03` §1). Migrate the store
+- [x] **0.2 — Currency rename + wallet.** Introduce the `Wallet` shape (`03` §1). Migrate the store
   so upgrades cost **coins**, not followers; add `coins`, `diamonds` (followers/likes already
   exist). Posting grants coins+followers+likes per `04` §1 (keep the existing tap feel). Update
   `StatsBar`/`UpgradeShop` to read coins for costs.

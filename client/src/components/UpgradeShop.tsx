@@ -4,7 +4,7 @@ import { formatCount } from "../lib/format";
 
 export function UpgradeShop() {
   const upgrades = useGameStore(s => s.upgrades);
-  const followers = useGameStore(s => s.followers);
+  const coins = useGameStore(s => s.wallet.coins);
   const buyUpgrade = useGameStore(s => s.buyUpgrade);
 
   const available = upgrades.filter(u => !u.purchased);
@@ -38,7 +38,7 @@ export function UpgradeShop() {
       </div>
 
       {available.map((u, idx) => {
-        const canAfford = followers >= u.cost;
+        const canAfford = coins >= u.cost;
         return (
           <motion.button
             key={u.id}
@@ -106,7 +106,7 @@ export function UpgradeShop() {
                 color: 'var(--dim)',
                 letterSpacing: '0.1em',
               }}>
-                FOLLOWERS
+                COINS
               </div>
             </div>
           </motion.button>

@@ -2,8 +2,9 @@ import { useGameStore } from "../store/gameStore";
 import { formatCount } from "../lib/format";
 
 export function StatsBar() {
-  const followers = useGameStore(s => s.followers);
-  const likes = useGameStore(s => s.likes);
+  const followers = useGameStore(s => s.wallet.followers);
+  const coins = useGameStore(s => s.wallet.coins);
+  const likes = useGameStore(s => s.wallet.likes);
   const comments = useGameStore(s => s.comments);
   const passiveFollowersPerSec = useGameStore(s => s.passiveFollowersPerSec);
   const multiplier = useGameStore(s => s.multiplier);
@@ -52,6 +53,8 @@ export function StatsBar() {
         background: 'rgba(255,255,255,0.02)',
       }}>
         <HudStat label="LIKES" value={formatCount(likes)} color="var(--red)" />
+        <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.07)' }} />
+        <HudStat label="COINS" value={formatCount(coins)} color="var(--cyan)" />
         <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.07)' }} />
         <HudStat label="COMMENTS" value={formatCount(comments)} color="var(--text)" />
         {multiplier > 1 && (

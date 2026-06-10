@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "../store/gameStore";
 import { formatCount } from "../lib/format";
+import { BALANCE } from "../features/economy/balance";
 
 type Floater = { id: number; x: number; y: number; value: number };
 
@@ -19,7 +20,7 @@ export function TapButton() {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const value = Math.floor(tapPower * multiplier);
+    const value = Math.floor(tapPower * BALANCE.postFollowerConversion * multiplier);
     setFloaters(prev => [...prev.slice(-10), { id: nextId++, x, y, value }]);
   }, [tap, tapPower, multiplier]);
 

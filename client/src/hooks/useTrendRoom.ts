@@ -8,8 +8,8 @@ const PARTY_HOST = import.meta.env.VITE_PARTYKIT_HOST ?? "localhost:1999";
 export function useTrendRoom(topic: string | null) {
   const socketRef = useRef<PartySocket | null>(null);
   const handle = useGameStore(s => s.handle);
-  const followers = useGameStore(s => s.followers);
-  const likes = useGameStore(s => s.likes);
+  const followers = useGameStore(s => s.wallet.followers);
+  const likes = useGameStore(s => s.wallet.likes);
   const setLeaderboard = useGameStore(s => s.setLeaderboard);
 
   // Connect / reconnect when topic changes
