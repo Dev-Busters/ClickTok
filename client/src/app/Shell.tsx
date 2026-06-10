@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useTrendRoom } from "../hooks/useTrendRoom";
 import { useGameStore, type IdleReport } from "../store";
 import { HomeFeed } from "../screens/HomeFeed";
 import { Discover } from "../screens/Discover";
 import { Profile } from "../screens/Profile";
+import { Live } from "../screens/Live";
+import { CreateSheet } from "../screens/Create";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
 
@@ -16,6 +17,7 @@ export function Shell() {
   const activeTab = useGameStore(s => s.activeTab);
   const openSheet = useGameStore(s => s.openSheet);
   const setSheet = useGameStore(s => s.setSheet);
+  const phase = useGameStore(s => s.phase);
   const trendTopic = useGameStore(s => s.trendTopic);
   const setTrend = useGameStore(s => s.setTrend);
   const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
@@ -52,19 +54,25 @@ export function Shell() {
         overflow: 'hidden',
       }}
     >
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {activeTab === 'home' && <HomeFeed />}
-        {activeTab === 'discover' && <Discover />}
-        {activeTab === 'inbox' && (
-          <PlaceholderScreen title="INBOX" subtitle="NOTIFICATIONS — COMING SOON" />
-        )}
-        {activeTab === 'profile' && <Profile />}
-      </div>
+      {phase === 'live' || phase === 'results' ? (
+        <Live />
+      ) : (
+        <>
+          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+            {activeTab === 'home' && <HomeFeed />}
+            {activeTab === 'discover' && <Discover />}
+            {activeTab === 'inbox' && (
+              <PlaceholderScreen title="INBOX" subtitle="NOTIFICATIONS — COMING SOON" />
+            )}
+            {activeTab === 'profile' && <Profile />}
+          </div>
 
-      <BottomNav />
+          <BottomNav />
 
-      {openSheet === 'create' && (
-        <CreateSheetPlaceholder onClose={() => setSheet(null)} />
+          {openSheet === 'create' && (
+            <CreateSheet onClose={() => setSheet(null)} />
+          )}
+        </>
       )}
 
       {idleReport && (
@@ -97,63 +105,6 @@ function PlaceholderScreen({ title, subtitle }: { title: string; subtitle: strin
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--dim)', letterSpacing: '0.12em' }}>
         {subtitle}
       </div>
-    </div>
-  );
-}
-
-function CreateSheetPlaceholder({ onClose }: { onClose: () => void }) {
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        display: 'flex',
-        alignItems: 'flex-end',
-        zIndex: 100,
-      }}
-    >
-      <motion.div
-        onClick={e => e.stopPropagation()}
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        style={{
-          width: '100%',
-          background: 'var(--bg2)',
-          borderTop: '1px solid var(--dim)',
-          padding: '28px 24px',
-          textAlign: 'center',
-        }}
-      >
-        <div
-          className="chroma"
-          style={{ fontFamily: 'var(--font-display)', fontSize: '28px', letterSpacing: '0.06em', color: 'var(--text)', marginBottom: '8px' }}
-        >
-          CREATE
-        </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--dim)', letterSpacing: '0.12em', marginBottom: '24px' }}>
-          POST / GO LIVE — COMING SOON
-        </div>
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={onClose}
-          style={{
-            width: '100%',
-            padding: '14px',
-            fontFamily: 'var(--font-display)',
-            fontSize: '18px',
-            letterSpacing: '0.12em',
-            color: '#000',
-            background: 'var(--cyan)',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          CLOSE
-        </motion.button>
-      </motion.div>
     </div>
   );
 }

@@ -186,17 +186,33 @@ Goal: flesh out the incremental engine and the meta→run stat bridge (data only
 
 Goal: a fully playable LIVE run. This is the headline feature — good to build live on stream.
 
-- [ ] **2.1 — Run state + start.** Implement `runSlice` skeleton (`03` §5) and `startRun(topic)`:
+- [x] **2.1 — Run state + start.** Implement `runSlice` skeleton (`03` §5) and `startRun(topic)`:
   compute params via `computeRunParams`, set phase `live`, init viewers/hype/timer. Add a "Go LIVE"
   action in the Create (＋) sheet that transitions to the **Live** screen.
   **Refs:** `03` §5, `04` §6, `06` §4,7. **DoD:** pressing Go LIVE opens the Live screen with correct
   starting viewers; typecheck.
+  > note: built `screens/Create/index.tsx` (per `02` target structure) replacing the old Create
+  > sheet placeholder — POST closes the sheet and switches to Home, GO LIVE shows projected start
+  > viewers via `computeRunParams` (reusing the trend topic, defaulting to `"trending"`) and calls
+  > `startRun`. Added `screens/Live/index.tsx`; `Shell` renders it full-screen (hides `BottomNav`)
+  > whenever `phase === 'live' || phase === 'results'`. `hype` has no spec'd initial value, so
+  > `startRun` seeds it at **50** (the neutral point where `targetViewers === startViewers` per
+  > `04` §7).
 
-- [ ] **2.2 — Run loop engine.** Implement `hooks/useRunLoop.ts` + `runTick(dt)` per `04` §7: hype
+- [x] **2.2 — Run loop engine.** Implement `hooks/useRunLoop.ts` + `runTick(dt)` per `04` §7: hype
   decay, viewer easing toward hype-driven target, timer, flop detection, cooldown ticks. No events
   yet — just the meters moving and the stream ending on timer/flop.
   **Refs:** `04` §7, `02` §5. **DoD:** viewers/hype/timer animate live; stream auto-ends at 0s or on
   sustained flop; meters visible on Live screen.
+  > note: `useRunLoop` (mounted by `screens/Live`) uses a 100ms fixed-step accumulator per `02` §5.
+  > `runTick` implements the `04` §7 formulas exactly (no troll drain / event spawn — Phase 2.3).
+  > `endRun` now transitions `phase` → `"results"` and returns a `RunResult` with real
+  > `peakViewers`/`finalHype`, but `giftsCollected`/`rewards`/`grade` are placeholders (zero /
+  > `"FLOP"`) since `scoreRun` (`04` §10) and reward granting are task 2.6's job. Added
+  > `returnToChannel()` (not in `03` §5) — a small `RunSlice` action used by the Live screen's
+  > "Back to Channel" button to reset `phase` → `"idle"`; 2.6's results sheet can reuse it. Added
+  > `components/ProgressBar.tsx` (06 §8 shared primitive) for the hype meter and `lib/math.ts`
+  > (`clamp`, per `02` target structure).
 
 - [ ] **2.3 — Event spawner + feed UI.** Spawn `RunEvent`s on the schedule (`04` §7) and render the
   scrolling LIVE feed (comments, gifts, trolls, hype waves). Implement `collectGift` (tap to
