@@ -71,11 +71,17 @@ Goal: a stable, persistent store and the TikTok navigation frame, with current g
   > the Shell/BottomNav/sheets in 0.7/0.8. Verified via temporary `window.useGameStore` debug hook
   > in `main.tsx` (added, tested, then reverted).
 
-- [ ] **0.7 — App Shell + Bottom Nav.** Build `app/Shell.tsx` (phone-frame container + active screen
+- [x] **0.7 — App Shell + Bottom Nav.** Build `app/Shell.tsx` (phone-frame container + active screen
   switch + `BottomNav`) and `navigation/BottomNav.tsx` (5 TikTok tabs: Home, Discover, ＋, Inbox,
   Profile). Onboarding still gates entry. Render placeholders for empty screens.
   **Refs:** `06` §1–2. **DoD:** can switch all 5 tabs in preview; bottom nav matches TikTok layout;
   screenshot looks like a TikTok shell.
+  > note: `App.tsx` now renders `Shell` (instead of `GameScreen` directly) after the onboarding
+  > gate. Home tab renders the existing `GameScreen` unchanged (relocation into Home/Profile/
+  > Discover screens is task 0.8); Discover/Inbox/Profile render a shared `PlaceholderScreen`.
+  > Per `06` §2, the ＋ button calls `setSheet('create')` (not `setTab`) and Shell renders a
+  > minimal dismissible Create-sheet placeholder when `openSheet === 'create'` — `activeTab`
+  > never becomes `"create"` in practice, but the type is kept per `03` §7.
 
 - [ ] **0.8 — Relocate current gameplay into screens.** Move today's clicker (tap + StatsBar +
   UpgradeShop) onto the appropriate screens: posting/stats on **Home**, upgrades on **Profile**

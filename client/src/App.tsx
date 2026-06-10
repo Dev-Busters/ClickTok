@@ -1,6 +1,6 @@
 import { useGameStore } from "./store";
 import { OnboardingScreen } from "./components/OnboardingScreen";
-import { GameScreen } from "./components/GameScreen";
+import { Shell } from "./app/Shell";
 
 function App() {
   const handle = useGameStore(s => s.handle);
@@ -16,7 +16,7 @@ function App() {
           zIndex: 9998,
         }}
       />
-      {handle ? <GameScreen /> : <OnboardingScreen />}
+      {handle ? <Shell /> : <OnboardingScreen />}
     </>
   );
 }
