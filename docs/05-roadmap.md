@@ -214,16 +214,40 @@ Goal: a fully playable LIVE run. This is the headline feature — good to build 
   > `components/ProgressBar.tsx` (06 §8 shared primitive) for the hype meter and `lib/math.ts`
   > (`clamp`, per `02` target structure).
 
-- [ ] **2.3 — Event spawner + feed UI.** Spawn `RunEvent`s on the schedule (`04` §7) and render the
+- [x] **2.3 — Event spawner + feed UI.** Spawn `RunEvent`s on the schedule (`04` §7) and render the
   scrolling LIVE feed (comments, gifts, trolls, hype waves). Implement `collectGift` (tap to
   collect), gift tier rolls (`04` §7), troll viewer/hype drain, hype-wave ride.
   **Refs:** `03` §5, `04` §7,§8, `06` §7. **DoD:** feed scrolls; tapping gifts adds coins/diamonds;
   trolls drain until dismissed; riding a wave boosts hype/viewers; preview verified.
+  > note: added `features/livestream/events.ts` — gifts spawn on their own Poisson process at
+  > `params.giftRate`/sec (per `04`§6's "gifts/sec baseline"), independent of `eventIntervalSec`
+  > (which spawns comment/troll/hype_wave). Gift tier rolled via new `lib/math.ts` `weightedPick`
+  > against `BALANCE.run.giftWeights`, shifted toward higher tiers by `giftQuality` per `04`§7.
+  > Troll drain = `trollHypeDrainPerSec` hype/sec + `trollViewerDrainPerSec` × viewers/sec, per
+  > active troll; for 2.3 trolls are "dismissed" by a passive 9s TTL expiry (early removal via
+  > `clapback` lands in 2.4). Added `rideWave(eventId)` to `RunSlice` (deviation from `03`§5, by
+  > analogy to 2.2's `returnToChannel`) for the hype-wave tap interaction —
+  > viewers ×= `1 + hypeWaveViewerBoost`. Comment/troll text pools, spawn weights
+  > (comment 70/troll 18/hype_wave 12), and event TTLs (gift 6s, comment 6s, troll 9s,
+  > hype_wave 4s) are implementation choices not specified in `04` — tunable later. Added
+  > `components/LiveFeed.tsx` (06§7 feed + hype-wave banner) and wired into `screens/Live`. Also
+  > fixed a pre-existing float-drift bug in 2.2's `runTick` (timer-end check `>= durationSec` →
+  > `>= durationSec - 1e-6`; a 100ms accumulator never reaches `durationSec` exactly, so the run
+  > never ended via the 180s timer).
 
-- [ ] **2.4 — Reactions / hotbar.** Render the reaction hotbar from the run's unlocked `reactions`;
+- [x] **2.4 — Reactions / hotbar.** Render the reaction hotbar from the run's unlocked `reactions`;
   implement `useReaction` with cooldowns and effects (`04` §9).
   **Refs:** `03` §5, `04` §9, `06` §7. **DoD:** each reaction fires its effect, shows cooldown; only
   unlocked reactions appear; preview verified.
+  > note: added `features/livestream/reactions.ts` (`REACTION_CATALOG`, `REACTION_ICON`) and
+  > `components/ReactionHotbar.tsx`, rendering only `params.reactions`, disabled while on
+  > cooldown. Added ephemeral `RunSlice` fields `giftRateBoostUntil`/`gainsBoostUntil` (deviation
+  > from `03`§5) for `shoutout`'s ×2 gift-rate window and `go_off`'s ×3 gains window.
+  > `pin_comment`'s follower grant (`viewers × 0.5`) writes directly to
+  > `wallet.followers`/`totalFollowers`, since `RunSlice.collected` (`03`§5) has no `followers`
+  > field. All five reaction effects verified end-to-end via manual `runTick`/`useReaction`
+  > driving against the `04`§9 formulas (exact match, including the `go_off` + gift-collect
+  > interaction).
 
 - [ ] **2.5 — Choice events.** Implement comment/sponsor `choices` and `resolveChoice` (effects keyed
   per `04`). A few authored choice events with distinct outcomes.

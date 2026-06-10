@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { useGameStore } from "../../store";
 import { useRunLoop } from "../../hooks/useRunLoop";
 import { ProgressBar } from "../../components/ProgressBar";
+import { LiveFeed } from "../../components/LiveFeed";
+import { ReactionHotbar } from "../../components/ReactionHotbar";
 import { formatCount } from "../../lib/format";
 
 function hypeColor(hype: number): string {
@@ -27,6 +29,7 @@ export function Live() {
   const peakViewers = useGameStore(s => s.peakViewers);
   const hype = useGameStore(s => s.hype);
   const clockSec = useGameStore(s => s.clockSec);
+  const collected = useGameStore(s => s.collected);
   const endRun = useGameStore(s => s.endRun);
   const returnToChannel = useGameStore(s => s.returnToChannel);
   const setTab = useGameStore(s => s.setTab);
@@ -103,15 +106,31 @@ export function Live() {
         <ProgressBar value={hype} color={hypeColor(hype)} label="HYPE" />
       </div>
 
-      {/* Stage */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* Stage + live feed */}
+      <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
           width: '120px',
           height: '120px',
           borderRadius: '50%',
           border: '2px dashed rgba(255,255,255,0.08)',
         }} />
+        {phase === 'live' && <LiveFeed />}
       </div>
+
+      {/* Collected ticker */}
+      {phase === 'live' && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', padding: '0 16px 4px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--gold)' }}>
+            🪙 {formatCount(collected.coins)}
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--cyan)' }}>
+            💎 {formatCount(collected.diamonds)}
+          </span>
+        </div>
+      )}
+
+      {/* Reaction hotbar */}
+      {phase === 'live' && <ReactionHotbar />}
 
       {/* Results overlay */}
       {phase === 'results' && (
