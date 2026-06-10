@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
 import type { Wallet } from "../../features/economy/types";
+import { UPGRADE_CATALOG } from "../../features/upgrades/catalog";
 import type { FullState } from "../index";
 
 export type IdleReport = { elapsedSec: number; coins: number; followers: number };
@@ -10,18 +11,19 @@ export type ChannelSlice = {
   wallet: Wallet;
   comments: number;
 
-  // Derived stats (recomputed from upgrades)
+  // Derived stats (recomputed by recomputeStats() from upgrades/skills)
   tapPower: number;
   passiveFollowersPerSec: number;
-  passiveCoinsPerSec: number; // idle income (04 §2); wired up by gear's passiveCoinsAdd in 1.1
+  passiveCoinsPerSec: number; // idle income (04 §2)
   multiplier: number;
+  followerConversion: number; // posts → followers conversion factor (04 §1)
 
   lastSeenAt: number; // ms epoch, for idle income (04 § Idle)
 
   setHandle: (handle: string) => void;
   tap: () => void;
   tick: (dt: number) => void;
-  getStats: () => { tapPower: number; passiveFollowersPerSec: number; multiplier: number };
+  recomputeStats: () => void; // recompute tapPower/passive/multiplier/followerConversion
   applyIdleIncome: (now: number) => IdleReport | null;
 };
 
@@ -39,15 +41,15 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   passiveFollowersPerSec: 0,
   passiveCoinsPerSec: 0,
   multiplier: 1,
+  followerConversion: 1,
 
   lastSeenAt: Date.now(),
 
   setHandle: (handle) => set({ handle }),
 
   tap: () => {
-    const { tapPower, multiplier, wallet } = get();
+    const { tapPower, multiplier, followerConversion, wallet } = get();
     const postPower = tapPower;
-    const followerConversion = 1; // no software/skills yet (Phase 1)
     const coinsGain = postPower * BALANCE.postCoinConversion * multiplier;
     const followersGain = postPower * BALANCE.postFollowerConversion * followerConversion * multiplier;
     const likesGain = postPower * BALANCE.postLikeConversion * multiplier;
@@ -76,9 +78,34 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     });
   },
 
-  getStats: () => {
-    const { tapPower, passiveFollowersPerSec, multiplier } = get();
-    return { tapPower, passiveFollowersPerSec, multiplier };
+  // 04 §1/§2: postPower/multiplier/followerConversion/passiveCoinsPerSec from
+  // owned gear+software effects and Charisma/Editing skill levels.
+  recomputeStats: () => {
+    const { ownedUpgrades, skillLevels } = get();
+
+    let postPowerAdd = 0;
+    let postPowerMult = 1;
+    let passiveCoinsAdd = 0;
+    let multiplierMult = 1;
+    let followerConversionAdd = 0;
+
+    for (const def of UPGRADE_CATALOG) {
+      if (!ownedUpgrades[def.id]) continue;
+      const e = def.effect;
+      if (e.postPowerAdd) postPowerAdd += e.postPowerAdd;
+      if (e.postPowerMult) postPowerMult *= e.postPowerMult;
+      if (e.passiveCoinsAdd) passiveCoinsAdd += e.passiveCoinsAdd;
+      if (e.multiplierMult) multiplierMult *= e.multiplierMult;
+      if (e.followerConversionAdd) followerConversionAdd += e.followerConversionAdd;
+    }
+
+    const charismaPostBonus = skillLevels.charisma * 1;
+    const tapPower = (BALANCE.basePostPower + postPowerAdd + charismaPostBonus) * postPowerMult;
+    const multiplier = multiplierMult;
+    const followerConversion = 1 + followerConversionAdd + skillLevels.editing * 0.05;
+    const passiveCoinsPerSec = passiveCoinsAdd * multiplier;
+
+    set({ tapPower, multiplier, followerConversion, passiveCoinsPerSec });
   },
 
   applyIdleIncome: (now) => {

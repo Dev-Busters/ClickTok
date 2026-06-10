@@ -1,65 +1,38 @@
 import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
-import { UPGRADE_CATALOG } from "../features/upgrades/catalog";
-import type { UpgradeCategory, UpgradeDef } from "../features/upgrades/types";
+import { SKILL_CATALOG } from "../features/skills/catalog";
 
-function requirementLabel(def: UpgradeDef): string | null {
-  const req = def.requires;
-  if (!req) return null;
-  const parts: string[] = [];
-  if (req.followers !== undefined) {
-    parts.push(`${formatCount(req.followers)} followers`);
-  }
-  if (req.upgrades) {
-    for (const id of req.upgrades) {
-      const reqDef = UPGRADE_CATALOG.find(u => u.id === id);
-      parts.push(reqDef ? reqDef.name : id);
-    }
-  }
-  return parts.join(", ");
-}
-
-export function UpgradeShop() {
-  return (
-    <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <UpgradeCategorySection category="gear" title="GEAR" />
-      <UpgradeCategorySection category="software" title="SOFTWARE" />
-    </div>
-  );
-}
-
-function UpgradeCategorySection({ category, title }: { category: UpgradeCategory; title: string }) {
-  const ownedUpgrades = useGameStore(s => s.ownedUpgrades);
+export function SkillsPanel() {
+  const skillLevels = useGameStore(s => s.skillLevels);
   const wallet = useGameStore(s => s.wallet);
-  const isUpgradeUnlocked = useGameStore(s => s.isUpgradeUnlocked);
-  const buyUpgrade = useGameStore(s => s.buyUpgrade);
-
-  const items = UPGRADE_CATALOG.filter(u => u.category === category);
+  const skillCost = useGameStore(s => s.skillCost);
+  const levelSkill = useGameStore(s => s.levelSkill);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.2em' }}>
-          {title}
+          SKILLS
         </span>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
       </div>
 
-      {items.map((def, idx) => {
-        const owned = !!ownedUpgrades[def.id];
-        const unlocked = isUpgradeUnlocked(def.id);
-        const canAfford = (Object.entries(def.cost) as [keyof typeof wallet, number][])
-          .every(([currency, amount]) => wallet[currency] >= amount);
-        const buyable = unlocked && !owned && canAfford;
-        const dimmed = owned || !unlocked;
+      {SKILL_CATALOG.map((def, idx) => {
+        const level = skillLevels[def.id];
+        const maxed = level >= def.maxLevel;
+        const locked = !maxed && def.requires?.followers !== undefined && wallet.followers < def.requires.followers;
+        const cost = skillCost(def.id);
+        const canAfford = !maxed && !locked && wallet.coins >= cost;
+        const buyable = canAfford;
+        const dimmed = maxed || locked;
 
         return (
           <motion.button
             key={def.id}
             whileTap={buyable ? { scale: 0.985 } : undefined}
-            onClick={() => buyable && buyUpgrade(def.id)}
+            onClick={() => buyable && levelSkill(def.id)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -88,13 +61,27 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
             {/* Name + description */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
               <div style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '19px',
-                color: 'var(--text)',
-                lineHeight: 1,
-                letterSpacing: '0.03em',
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: '8px',
               }}>
-                {def.name.toUpperCase()}
+                <div style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '19px',
+                  color: 'var(--text)',
+                  lineHeight: 1,
+                  letterSpacing: '0.03em',
+                }}>
+                  {def.name.toUpperCase()}
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  color: 'var(--cyan)',
+                  letterSpacing: '0.1em',
+                }}>
+                  LV {level}/{def.maxLevel}
+                </div>
               </div>
               <div style={{
                 fontFamily: 'var(--font-mono)',
@@ -104,7 +91,7 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
               }}>
                 {def.description}
               </div>
-              {!owned && !unlocked && (
+              {locked && (
                 <div style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '9px',
@@ -112,31 +99,31 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
                   letterSpacing: '0.08em',
                   marginTop: '2px',
                 }}>
-                  REQUIRES {requirementLabel(def)?.toUpperCase()}
+                  REQUIRES {formatCount(def.requires!.followers!).toUpperCase()} FOLLOWERS
                 </div>
               )}
             </div>
 
-            {/* Cost / owned state */}
+            {/* Cost / maxed state */}
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-              {owned ? (
+              {maxed ? (
                 <div style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '10px',
                   color: 'var(--cyan)',
                   letterSpacing: '0.18em',
                 }}>
-                  OWNED
+                  MAXED
                 </div>
               ) : (
                 <>
                   <div style={{
                     fontFamily: 'var(--font-display)',
                     fontSize: '22px',
-                    color: canAfford && unlocked ? 'var(--cyan)' : 'var(--dim)',
+                    color: canAfford ? 'var(--cyan)' : 'var(--dim)',
                     lineHeight: 1,
                   }}>
-                    {formatCount(def.cost.coins ?? 0)}
+                    {formatCount(cost)}
                   </div>
                   <div style={{
                     fontFamily: 'var(--font-mono)',
@@ -146,17 +133,6 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
                   }}>
                     COINS
                   </div>
-                  {def.cost.diamonds !== undefined && (
-                    <div style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '10px',
-                      color: canAfford && unlocked ? 'var(--gold)' : 'var(--dim)',
-                      letterSpacing: '0.1em',
-                      marginTop: '2px',
-                    }}>
-                      +{formatCount(def.cost.diamonds)} 💎
-                    </div>
-                  )}
                 </>
               )}
             </div>

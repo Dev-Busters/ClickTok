@@ -114,7 +114,7 @@ coins economy — and the original clicker fully playable inside the new frame.
 
 Goal: flesh out the incremental engine and the meta→run stat bridge (data only; runs come Phase 2).
 
-- [ ] **1.1 — Upgrade catalog (full).** Implement `features/upgrades/catalog.ts` from `04` §4 (gear +
+- [x] **1.1 — Upgrade catalog (full).** Implement `features/upgrades/catalog.ts` from `04` §4 (gear +
   software, with `requires` gating and run-stat effects). Rework `UpgradeShop` into two categories
   with lock states. **⚠ BREAKING SAVE CHANGE:** this replaces the legacy `upgrades: Upgrade[]`
   array (persisted since 0.4) with `ownedUpgrades: Record<string, boolean>` per `03` §2. You MUST
@@ -124,11 +124,30 @@ Goal: flesh out the incremental engine and the meta→run stat bridge (data only
   load without crashing.
   **Refs:** `03` §2, `04` §4, `06` §6, `02` §4. **DoD:** all upgrades buyable when unlocked; locked
   ones show requirements; stats recompute; an old-version save loads cleanly; typecheck + preview.
+  > note: `04` §4 doesn't specify per-item `requires`, so each category is gated **linearly**
+  > (owning the previous gear/software item unlocks the next; the first item in each category is
+  > unlocked from the start) — this adds lock states without inventing new balance numbers. Added
+  > `recomputeStats()` to `channelSlice` (per `03` §1) implementing `04` §1/§2: `tapPower`
+  > (postPower), `multiplier`, new `followerConversion` field, and `passiveCoinsPerSec` are now
+  > derived from `ownedUpgrades` + `skillLevels.charisma`/`editing` and recomputed after
+  > `buyUpgrade`/`levelSkill`/on store rehydration (`onRehydrateStorage`). `tap()` now reads
+  > `followerConversion` from state instead of hardcoding `1`. Kept `tapPower`/`tap`/`comments`/
+  > `passiveFollowersPerSec` field names as-is (pre-`03`, per the 0.3 note) — full rename to
+  > `postPower`/`post()` is deferred; `passiveFollowersPerSec` no longer has any upgrade feeding
+  > it in the new catalog (no `UpgradeEffect` field maps to it) so it's effectively frozen at its
+  > current/migrated value. Migration v1→v2 maps `better_lighting`→`ring_light`,
+  > `ring_light`→`usb_mic`, refunds coin cost of any other purchased legacy upgrade, and verified
+  > end-to-end via a synthetic v1 `clicktok-save` in the preview.
 
-- [ ] **1.2 — Creator Skills.** Implement `skillsSlice` + `features/skills/catalog.ts` (`04` §5) and a
+- [x] **1.2 — Creator Skills.** Implement `skillsSlice` + `features/skills/catalog.ts` (`04` §5) and a
   Skills section on Profile with level-up buttons and cost display.
   **Refs:** `03` §3, `04` §5, `06` §6. **DoD:** can level skills with coins; costs escalate; follower
   gates enforced; stats recompute.
+  > note: added `components/SkillsPanel.tsx`, rendered below `UpgradeShop` on Profile (the
+  > Gear/Software/Skills pill-tab layout from `06` §6 is task 1.4's profile polish). Level-up
+  > calls `recomputeStats()` so Charisma/Editing immediately affect `tapPower`/
+  > `followerConversion`; Stagecraft/Monetization/Network levels are stored but only consumed by
+  > the meta→run bridge (1.3+).
 
 - [ ] **1.3 — Meta→run param preview.** Implement `features/livestream/computeRunParams()` (`04` §6) as
   a pure function. Add a read-only "LIVE readiness" panel (on Home or Create) showing projected

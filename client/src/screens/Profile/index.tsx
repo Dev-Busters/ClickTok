@@ -1,5 +1,6 @@
 import { useGameStore } from "../../store";
 import { UpgradeShop } from "../../components/UpgradeShop";
+import { SkillsPanel } from "../../components/SkillsPanel";
 
 export function Profile() {
   const handle = useGameStore(s => s.handle);
@@ -20,6 +21,12 @@ export function Profile() {
       </div>
 
       <UpgradeShop />
+
+      <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', margin: '20px 0' }}>
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
+      </div>
+
+      <SkillsPanel />
     </div>
   );
 }

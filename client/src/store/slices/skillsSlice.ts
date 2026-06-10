@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
+import { SKILL_CATALOG } from "../../features/skills/catalog";
 import type { SkillId } from "../../features/skills/types";
 
 export type SkillsSlice = {
@@ -16,9 +17,33 @@ const INITIAL_SKILL_LEVELS: Record<SkillId, number> = {
   network: 0,
 };
 
-// Stub: skill catalog + leveling logic land in task 1.2.
-export const createSkillsSlice: StateCreator<FullState, [], [], SkillsSlice> = () => ({
+export const createSkillsSlice: StateCreator<FullState, [], [], SkillsSlice> = (set, get) => ({
   skillLevels: { ...INITIAL_SKILL_LEVELS },
-  levelSkill: () => false,
-  skillCost: () => Infinity,
+
+  skillCost: (id) => {
+    const def = SKILL_CATALOG.find(s => s.id === id);
+    if (!def) return Infinity;
+    const level = get().skillLevels[id];
+    if (level >= def.maxLevel) return Infinity;
+    return Math.round(def.baseCost * Math.pow(def.costGrowth, level));
+  },
+
+  levelSkill: (id) => {
+    const def = SKILL_CATALOG.find(s => s.id === id);
+    if (!def) return false;
+    const { skillLevels, wallet } = get();
+    const level = skillLevels[id];
+    if (level >= def.maxLevel) return false;
+    if (def.requires?.followers !== undefined && wallet.followers < def.requires.followers) return false;
+
+    const cost = Math.round(def.baseCost * Math.pow(def.costGrowth, level));
+    if (wallet.coins < cost) return false;
+
+    set({
+      skillLevels: { ...skillLevels, [id]: level + 1 },
+      wallet: { ...wallet, coins: wallet.coins - cost },
+    });
+    get().recomputeStats();
+    return true;
+  },
 });

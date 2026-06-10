@@ -37,15 +37,18 @@ export const useGameStore = create<FullState>()(
         passiveFollowersPerSec: state.passiveFollowersPerSec,
         passiveCoinsPerSec: state.passiveCoinsPerSec,
         multiplier: state.multiplier,
+        followerConversion: state.followerConversion,
         lastSeenAt: Date.now(),
-        upgrades: state.upgrades,
+        ownedUpgrades: state.ownedUpgrades,
         skillLevels: state.skillLevels,
         videos: state.videos,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.recomputeStats();
+      },
     },
   ),
 );
 
-export type { UpgradeId, Upgrade } from "./slices/upgradesSlice";
 export type { LeaderboardEntry } from "./slices/socialSlice";
 export type { IdleReport } from "./slices/channelSlice";
