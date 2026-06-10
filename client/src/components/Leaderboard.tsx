@@ -1,4 +1,4 @@
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 
 const RANK_COLORS = ['var(--gold)', 'rgba(232,228,216,0.55)', '#a07040'];

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from "../store";
 
 export function OnboardingScreen() {
   const [input, setInput] = useState("");

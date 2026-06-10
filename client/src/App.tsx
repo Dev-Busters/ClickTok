@@ -1,4 +1,4 @@
-import { useGameStore } from "./store/gameStore";
+import { useGameStore } from "./store";
 import { OnboardingScreen } from "./components/OnboardingScreen";
 import { GameScreen } from "./components/GameScreen";
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import PartySocket from "partysocket";
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from "../store";
 import type { ClientMessage, ServerMessage } from "../party/types";
 
 const PARTY_HOST = import.meta.env.VITE_PARTYKIT_HOST ?? "localhost:1999";

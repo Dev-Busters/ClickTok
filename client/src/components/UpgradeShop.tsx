@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useGameStore, type UpgradeId } from "../store/gameStore";
+import { useGameStore, type UpgradeId } from "../store";
 import { formatCount } from "../lib/format";
 
 export function UpgradeShop() {

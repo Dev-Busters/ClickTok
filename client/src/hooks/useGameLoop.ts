@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from "../store";
 
 export function useGameLoop() {
   const tick = useGameStore(s => s.tick);

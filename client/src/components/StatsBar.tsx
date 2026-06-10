@@ -1,4 +1,4 @@
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 
 export function StatsBar() {

@@ -1,6 +1,5 @@
-import { create } from "zustand";
-import { BALANCE } from "../features/economy/balance";
-import type { Wallet } from "../features/economy/types";
+import type { StateCreator } from "zustand";
+import type { FullState } from "../index";
 
 // --- Upgrade catalog ---
 export type UpgradeId =
@@ -36,34 +35,12 @@ const BASE_UPGRADES: Upgrade[] = [
   { id: "super_fans", name: "Super Fans", description: "×2 all income", cost: 20000, purchased: false, multiplierBonus: 2 },
 ];
 
-export type GameState = {
-  // Channel identity
-  handle: string;
-  // Core currencies
-  wallet: Wallet;
-  comments: number;
-  // Derived stats (recomputed from upgrades)
-  tapPower: number;
-  passiveFollowersPerSec: number;
-  multiplier: number;
-  // Upgrades
+export type UpgradesSlice = {
   upgrades: Upgrade[];
-  // Trend session
-  trendTopic: string | null;
-  leaderboard: Array<{ id: string; handle: string; followers: number; rank: number }>;
-};
-
-type GameActions = {
-  setHandle: (handle: string) => void;
-  tap: () => void;
-  tick: (dt: number) => void;
   buyUpgrade: (id: UpgradeId) => void;
-  setTrend: (topic: string) => void;
-  setLeaderboard: (entries: GameState["leaderboard"]) => void;
-  getStats: () => { tapPower: number; passiveFollowersPerSec: number; multiplier: number };
 };
 
-function computeStats(upgrades: Upgrade[]) {
+export function computeStats(upgrades: Upgrade[]) {
   let tapPower = 1;
   let passiveFollowersPerSec = 0;
   let multiplier = 1;
@@ -76,56 +53,8 @@ function computeStats(upgrades: Upgrade[]) {
   return { tapPower, passiveFollowersPerSec, multiplier };
 }
 
-export const useGameStore = create<GameState & GameActions>((set, get) => ({
-  handle: "",
-  wallet: {
-    followers: 0,
-    totalFollowers: 0,
-    coins: 0,
-    diamonds: 0,
-    likes: 0,
-  },
-  comments: 0,
-  tapPower: 1,
-  passiveFollowersPerSec: 0,
-  multiplier: 1,
+export const createUpgradesSlice: StateCreator<FullState, [], [], UpgradesSlice> = (set, get) => ({
   upgrades: BASE_UPGRADES.map(u => ({ ...u })),
-  trendTopic: null,
-  leaderboard: [],
-
-  setHandle: (handle) => set({ handle }),
-
-  tap: () => {
-    const { tapPower, multiplier, wallet } = get();
-    const postPower = tapPower;
-    const followerConversion = 1; // no software/skills yet (Phase 1)
-    const coinsGain = postPower * BALANCE.postCoinConversion * multiplier;
-    const followersGain = postPower * BALANCE.postFollowerConversion * followerConversion * multiplier;
-    const likesGain = postPower * BALANCE.postLikeConversion * multiplier;
-    set({
-      wallet: {
-        ...wallet,
-        coins: wallet.coins + coinsGain,
-        followers: wallet.followers + followersGain,
-        totalFollowers: wallet.totalFollowers + followersGain,
-        likes: wallet.likes + likesGain,
-      },
-    });
-  },
-
-  tick: (dt) => {
-    const { passiveFollowersPerSec, multiplier, wallet, comments } = get();
-    const gained = passiveFollowersPerSec * multiplier * dt;
-    if (gained === 0) return;
-    set({
-      wallet: {
-        ...wallet,
-        followers: wallet.followers + gained,
-        totalFollowers: wallet.totalFollowers + gained,
-      },
-      comments: comments + gained * 0.05 * dt,
-    });
-  },
 
   buyUpgrade: (id) => {
     const { upgrades, wallet } = get();
@@ -135,12 +64,4 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const stats = computeStats(updated);
     set({ upgrades: updated, wallet: { ...wallet, coins: wallet.coins - upgrade.cost }, ...stats });
   },
-
-  setTrend: (topic) => set({ trendTopic: topic }),
-  setLeaderboard: (leaderboard) => set({ leaderboard }),
-
-  getStats: () => {
-    const { tapPower, passiveFollowersPerSec, multiplier } = get();
-    return { tapPower, passiveFollowersPerSec, multiplier };
-  },
-}));
+});

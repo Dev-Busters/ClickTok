@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 import { BALANCE } from "../features/economy/balance";
 

@@ -26,12 +26,19 @@ Goal: a stable, persistent store and the TikTok navigation frame, with current g
   **Refs:** `03` §1, `04` §1, `04` §4. **DoD:** can post to earn coins, buy an upgrade with coins;
   typecheck passes; no runtime errors in preview.
 
-- [ ] **0.3 — Slice split.** Refactor `store/gameStore.ts` into slices under `store/slices/`
+- [x] **0.3 — Slice split.** Refactor `store/gameStore.ts` into slices under `store/slices/`
   (`channelSlice`, `upgradesSlice`, `skillsSlice` stub, `uiSlice`, `runSlice` stub, `socialSlice`,
   `catalogSlice` stub) combined in `store/index.ts`. Keep the exported hook name `useGameStore` and
   preserve all current behavior. Move shared types per `03`.
   **Refs:** `02` §3, `03`. **DoD:** game plays identically; typecheck passes; components import from
   `store/index.ts`.
+  > note: `channelSlice`/`upgradesSlice`/`socialSlice` keep their current (pre-`03`) field names and
+  > shapes (e.g. `tap`/`tapPower`, `upgrades: Upgrade[]`, `trendTopic`) to preserve behavior exactly —
+  > full alignment with `03` §1/§2/§6 (postPower/post, addCurrency/spend/applyIdleIncome, full
+  > upgrade catalog, activeTrend) happens in their dedicated tasks (0.4/0.5, 1.1, 3.1). New stub
+  > slices (`skillsSlice`, `catalogSlice`, `runSlice`, `uiSlice`) match `03`'s shapes/types
+  > (added `features/skills/types.ts`, `features/channel/types.ts`,
+  > `features/livestream/types.ts`) with no-op actions so `FullState` matches `03` §8 now.
 
 - [ ] **0.4 — Persistence.** Add Zustand `persist` (key `clicktok-save`), `partialize` to durable
   slices, `SAVE_VERSION=1`, and a `migrate` stub. Add `lastSeenAt`.

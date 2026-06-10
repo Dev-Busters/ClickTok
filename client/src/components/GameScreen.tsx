@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useTrendRoom } from "../hooks/useTrendRoom";
-import { useGameStore } from "../store/gameStore";
+import { useGameStore } from "../store";
 import { TapButton } from "./TapButton";
 import { StatsBar } from "./StatsBar";
 import { UpgradeShop } from "./UpgradeShop";
