@@ -7,11 +7,14 @@ import { createCatalogSlice, type CatalogSlice } from "./slices/catalogSlice";
 import { createRunSlice, type RunSlice } from "./slices/runSlice";
 import { createSocialSlice, type SocialSlice } from "./slices/socialSlice";
 import { createUiSlice, type UiSlice } from "./slices/uiSlice";
+import { createInboxSlice, type InboxSlice } from "./slices/inboxSlice";
 import { SAVE_VERSION, migrate, type PersistedState } from "./slices/meta";
 
+// 3.2 adds InboxSlice to FullState — not part of 03 §8's canonical FullState
+// type (predates the Inbox), same precedent as RunSlice/SocialSlice additions.
 export type FullState =
   ChannelSlice & UpgradesSlice & SkillsSlice & CatalogSlice &
-  RunSlice & SocialSlice & UiSlice;
+  RunSlice & SocialSlice & UiSlice & InboxSlice;
 
 export const useGameStore = create<FullState>()(
   persist<FullState, [], [], PersistedState>(
@@ -23,6 +26,7 @@ export const useGameStore = create<FullState>()(
       ...createRunSlice(set, get, api),
       ...createSocialSlice(set, get, api),
       ...createUiSlice(set, get, api),
+      ...createInboxSlice(set, get, api),
     }),
     {
       name: "clicktok-save",
@@ -38,10 +42,14 @@ export const useGameStore = create<FullState>()(
         passiveCoinsPerSec: state.passiveCoinsPerSec,
         multiplier: state.multiplier,
         followerConversion: state.followerConversion,
+        boonMultiplier: state.boonMultiplier,
         lastSeenAt: Date.now(),
         ownedUpgrades: state.ownedUpgrades,
         skillLevels: state.skillLevels,
         videos: state.videos,
+        notifications: state.notifications,
+        lastDailyClaimAt: state.lastDailyClaimAt,
+        milestonesReached: state.milestonesReached,
       }),
       onRehydrateStorage: () => (state) => {
         state?.recomputeStats();

@@ -6,9 +6,9 @@ const RANK_COLORS = ['var(--gold)', 'rgba(232,228,216,0.55)', '#a07040'];
 export function Leaderboard() {
   const leaderboard = useGameStore(s => s.leaderboard);
   const myHandle = useGameStore(s => s.handle);
-  const trendTopic = useGameStore(s => s.trendTopic);
+  const activeTrend = useGameStore(s => s.activeTrend);
 
-  if (!trendTopic || leaderboard.length === 0) return null;
+  if (!activeTrend || leaderboard.length === 0) return null;
 
   return (
     <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px' }}>
@@ -22,7 +22,7 @@ export function Leaderboard() {
           TRENDING
         </span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)' }}>
-          #{trendTopic}
+          #{activeTrend}
         </span>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
       </div>

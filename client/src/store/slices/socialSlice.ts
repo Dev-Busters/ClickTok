@@ -1,19 +1,26 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
+import { generateTrends, type TrendInfo } from "../../features/social/trends";
 
 export type LeaderboardEntry = { id: string; handle: string; followers: number; rank: number };
 
 export type SocialSlice = {
-  trendTopic: string | null;
+  activeTrend: string | null;
+  trendsAvailable: TrendInfo[];
   leaderboard: LeaderboardEntry[];
-  setTrend: (topic: string) => void;
+  setActiveTrend: (topic: string) => void;
   setLeaderboard: (entries: LeaderboardEntry[]) => void;
+  setTrends: (trends: TrendInfo[]) => void;
 };
 
+const INITIAL_TRENDS = generateTrends();
+
 export const createSocialSlice: StateCreator<FullState, [], [], SocialSlice> = (set) => ({
-  trendTopic: null,
+  activeTrend: INITIAL_TRENDS[0]?.topic ?? "trending",
+  trendsAvailable: INITIAL_TRENDS,
   leaderboard: [],
 
-  setTrend: (topic) => set({ trendTopic: topic }),
+  setActiveTrend: (topic) => set({ activeTrend: topic }),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
+  setTrends: (trendsAvailable) => set({ trendsAvailable }),
 });

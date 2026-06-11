@@ -5,7 +5,7 @@ import { LiveReadinessPanel } from "../../components/LiveReadinessPanel";
 
 export function HomeFeed() {
   const handle = useGameStore(s => s.handle);
-  const trendTopic = useGameStore(s => s.trendTopic);
+  const activeTrend = useGameStore(s => s.activeTrend);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
@@ -33,9 +33,9 @@ export function HomeFeed() {
             }} />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red)', letterSpacing: '0.18em' }}>LIVE</span>
           </div>
-          {trendTopic && (
+          {activeTrend && (
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)' }}>
-              #{trendTopic}
+              #{activeTrend}
             </span>
           )}
         </div>

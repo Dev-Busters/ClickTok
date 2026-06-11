@@ -17,6 +17,7 @@ export type ChannelSlice = {
   passiveCoinsPerSec: number; // idle income (04 §2)
   multiplier: number;
   followerConversion: number; // posts → followers conversion factor (04 §1)
+  boonMultiplier: number; // permanent ×income from "Algorithm Favor" boon (2.7)
 
   lastSeenAt: number; // ms epoch, for idle income (04 § Idle)
 
@@ -42,6 +43,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   passiveCoinsPerSec: 0,
   multiplier: 1,
   followerConversion: 1,
+  boonMultiplier: 1,
 
   lastSeenAt: Date.now(),
 
@@ -65,6 +67,11 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   },
 
   tick: (dt) => {
+    // 3.2: runs every frame (the meta loop always calls tick()), so this is
+    // the single integration point that catches totalFollowers crossing a
+    // milestone from any source (taps, passive income, idle income, runs).
+    get().checkMilestones();
+
     const { passiveFollowersPerSec, multiplier, wallet, comments } = get();
     const gained = passiveFollowersPerSec * multiplier * dt;
     if (gained === 0) return;
@@ -81,7 +88,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   // 04 §1/§2: postPower/multiplier/followerConversion/passiveCoinsPerSec from
   // owned gear+software effects and Charisma/Editing skill levels.
   recomputeStats: () => {
-    const { ownedUpgrades, skillLevels } = get();
+    const { ownedUpgrades, skillLevels, boonMultiplier } = get();
 
     let postPowerAdd = 0;
     let postPowerMult = 1;
@@ -101,7 +108,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
 
     const charismaPostBonus = skillLevels.charisma * 1;
     const tapPower = (BALANCE.basePostPower + postPowerAdd + charismaPostBonus) * postPowerMult;
-    const multiplier = multiplierMult;
+    const multiplier = multiplierMult * boonMultiplier;
     const followerConversion = 1 + followerConversionAdd + skillLevels.editing * 0.05;
     const passiveCoinsPerSec = passiveCoinsAdd * multiplier;
 

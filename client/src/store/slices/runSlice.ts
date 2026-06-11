@@ -3,9 +3,27 @@ import type { FullState } from "../index";
 import { BALANCE } from "../../features/economy/balance";
 import type { ChoiceEffectId } from "../../features/livestream/choices";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
-import { MAX_FEED_EVENTS, spawnFeedEvent, spawnGiftEvent } from "../../features/livestream/events";
+import {
+  MAX_FEED_EVENTS,
+  spawnCrashEvent,
+  spawnFeedEvent,
+  spawnGiftEvent,
+  spawnViralWaveEvent,
+  type FeedEventType,
+} from "../../features/livestream/events";
+import { applyModifiers, hasModifier, MODIFIER_EFFECTS, rollModifiers } from "../../features/livestream/modifiers";
 import { REACTION_CATALOG } from "../../features/livestream/reactions";
+import {
+  BOON_ALGORITHM_FAVOR_MULT,
+  BOON_DIAMOND_CACHE_AMOUNT,
+  BOON_HYPE_CARRYOVER_BONUS,
+  BOON_LIST,
+  type BoonDef,
+  type BoonId,
+} from "../../features/livestream/boons";
+import { getTrendHeat } from "../../features/social/trends";
 import { clamp } from "../../lib/math";
+import { formatCount } from "../../lib/format";
 import type {
   ReactionId,
   RunEvent,
@@ -29,6 +47,10 @@ export type RunSlice = {
   gainsBoostUntil: number;     // clockSec until which `go_off` triples collected gains
   giftsCollected: number;      // count of gifts tapped this run (for results)
   lastResult: RunResult | null; // most recent endRun() output, for the results screen
+  crashAtSec: number | null;     // 2.7: scheduled `shadowban_risk` crash time, or null
+  viralWaveAtSec: number | null; // 2.7: scheduled `viral_moment` wave time, or null
+  pendingHypeBoost: number;      // 2.7: `hype_carryover` boon, applied to next run's start hype
+  boonChoices: BoonDef[] | null; // 2.7: 1-of-3 post-run boon pick, shown on a successful run
 
   startRun: (topic: string) => void;     // compute params from meta, go live
   runTick: (dt: number) => void;         // the run loop step (engine)
@@ -37,6 +59,7 @@ export type RunSlice = {
   resolveChoice: (eventId: string, choiceIndex: number) => void;
   useReaction: (id: ReactionId) => void;
   endRun: (reason: "voluntary" | "timer" | "flop") => RunResult;
+  applyBoon: (id: BoonId) => void;       // 2.7: apply the chosen post-run boon
   returnToChannel: () => void;           // dismiss results, back to phase "idle"
 };
 
@@ -66,14 +89,33 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   gainsBoostUntil: 0,
   giftsCollected: 0,
   lastResult: null,
+  crashAtSec: null,
+  viralWaveAtSec: null,
+  pendingHypeBoost: 0,
+  boonChoices: null,
 
-  // 04 §6: compute run params from current meta state, then go live.
+  // 04 §6: compute run params from current meta state, roll/apply modifiers
+  // (04 §8), then go live.
   startRun: (topic) => {
-    const { wallet, followerConversion, skillLevels, ownedUpgrades } = get();
-    const params = computeRunParams(
+    const { wallet, followerConversion, skillLevels, ownedUpgrades, trendsAvailable, pendingHypeBoost } = get();
+    const trendHeat = getTrendHeat(trendsAvailable, topic);
+    const baseParams = computeRunParams(
       { followers: wallet.followers, followerConversion, skillLevels, ownedUpgrades },
       topic,
+      trendHeat,
     );
+    const modifiers = rollModifiers();
+    const params = applyModifiers(baseParams, modifiers);
+
+    let crashAtSec: number | null = null;
+    if (hasModifier(modifiers, "shadowban_risk") && Math.random() < MODIFIER_EFFECTS.shadowbanChance) {
+      crashAtSec = 20 + Math.random() * Math.max(1, params.durationSec - 40);
+    }
+
+    let viralWaveAtSec: number | null = null;
+    if (hasModifier(modifiers, "viral_moment")) {
+      viralWaveAtSec = 15 + Math.random() * Math.max(1, params.durationSec - 30);
+    }
 
     set({
       phase: "live",
@@ -81,7 +123,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       clockSec: 0,
       viewers: params.startViewers,
       peakViewers: params.startViewers,
-      hype: INITIAL_HYPE,
+      hype: clamp(INITIAL_HYPE + pendingHypeBoost, 0, 100),
       events: [],
       cooldowns: { ...INITIAL_COOLDOWNS },
       collected: { coins: 0, diamonds: 0, likes: 0 },
@@ -90,14 +132,20 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       gainsBoostUntil: 0,
       giftsCollected: 0,
       lastResult: null,
+      boonChoices: null,
+      pendingHypeBoost: 0,
+      crashAtSec,
+      viralWaveAtSec,
     });
   },
 
   // 04 §7: hype decay, troll drain, viewer easing, event spawn/expiry, flop/timer end.
+  // 2.7: modifiers skew event weights (tough_crowd/trending_sound) and trigger the
+  // scheduled shadowban crash / viral wave.
   runTick: (dt) => {
     const {
       phase, params, clockSec, hype, viewers, peakViewers, cooldowns, flopTimer,
-      events, giftRateBoostUntil,
+      events, giftRateBoostUntil, crashAtSec, viralWaveAtSec,
     } = get();
     if (phase !== "live" || !params) return;
 
@@ -107,7 +155,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     let liveEvents = events.filter(e => e.expiresAt > newClockSec);
     const activeTrolls = liveEvents.filter(e => e.type === "troll").length;
 
-    const newHype = clamp(
+    let newHype = clamp(
       hype - params.hypeDecayPerSec * dt - activeTrolls * BALANCE.run.trollHypeDrainPerSec * dt,
       0, 100,
     );
@@ -116,7 +164,6 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     let newViewers = viewers + (targetViewers - viewers) * 0.5 * dt;
     newViewers -= activeTrolls * BALANCE.run.trollViewerDrainPerSec * newViewers * dt;
     newViewers = Math.max(0, newViewers);
-    const newPeakViewers = Math.max(peakViewers, newViewers);
 
     const newCooldowns = { ...cooldowns };
     for (const id of Object.keys(newCooldowns) as ReactionId[]) {
@@ -129,16 +176,46 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       liveEvents = [...liveEvents, spawnGiftEvent(newClockSec, params.giftQuality)];
     }
 
+    // 04 §8: tough_crowd → more trolls; trending_sound → more hype waves.
+    const weightMultipliers: Partial<Record<FeedEventType, number>> = {};
+    if (hasModifier(params.modifiers, "tough_crowd")) {
+      weightMultipliers.troll = MODIFIER_EFFECTS.toughCrowdTrollFreqMult;
+    }
+    if (hasModifier(params.modifiers, "trending_sound")) {
+      weightMultipliers.hype_wave = MODIFIER_EFFECTS.trendingSoundWaveFreqMult;
+    }
+
     // Comments/trolls/hype-waves spawn on the general `eventIntervalSec` schedule.
     if (Math.random() < dt / params.eventIntervalSec) {
       const hasActiveWave = liveEvents.some(e => e.type === "hype_wave");
-      liveEvents = [...liveEvents, spawnFeedEvent(newClockSec, hasActiveWave)];
+      liveEvents = [...liveEvents, spawnFeedEvent(newClockSec, hasActiveWave, weightMultipliers)];
+    }
+
+    // 2.7 shadowban_risk: fire the scheduled mid-stream crash once.
+    let newCrashAtSec = crashAtSec;
+    if (newCrashAtSec !== null && newClockSec >= newCrashAtSec) {
+      newViewers *= MODIFIER_EFFECTS.shadowbanViewerMult;
+      newHype = clamp(newHype - MODIFIER_EFFECTS.shadowbanHypeLoss, 0, 100);
+      liveEvents = [...liveEvents, spawnCrashEvent(newClockSec)];
+      newCrashAtSec = null;
+    }
+
+    // 2.7 viral_moment: fire the guaranteed wave once, avoiding stacking with
+    // a wave that's already active in the feed.
+    let newViralWaveAtSec = viralWaveAtSec;
+    if (newViralWaveAtSec !== null && newClockSec >= newViralWaveAtSec) {
+      const hasActiveWave = liveEvents.some(e => e.type === "hype_wave");
+      if (!hasActiveWave) {
+        liveEvents = [...liveEvents, spawnViralWaveEvent(newClockSec)];
+        newViralWaveAtSec = null;
+      }
     }
 
     if (liveEvents.length > MAX_FEED_EVENTS) {
       liveEvents = liveEvents.slice(liveEvents.length - MAX_FEED_EVENTS);
     }
 
+    const newPeakViewers = Math.max(peakViewers, newViewers);
     const newFlopTimer = newViewers < params.flopFloor ? flopTimer + dt : 0;
 
     set({
@@ -149,6 +226,8 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       cooldowns: newCooldowns,
       flopTimer: newFlopTimer,
       events: liveEvents,
+      crashAtSec: newCrashAtSec,
+      viralWaveAtSec: newViralWaveAtSec,
     });
 
     if (newFlopTimer >= BALANCE.run.flopGraceSec) {
@@ -161,9 +240,9 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   },
 
   // 04 §7: tap a gift to collect it. Value scales with monetization + hype
-  // (and `go_off`'s ×3 gains window).
+  // (and `go_off`'s ×3 gains window). 2.7: `tough_crowd` pays out more.
   collectGift: (eventId) => {
-    const { events, hype, collected, clockSec, gainsBoostUntil, skillLevels, giftsCollected } = get();
+    const { events, hype, collected, clockSec, gainsBoostUntil, skillLevels, giftsCollected, params } = get();
     const event = events.find(e => e.id === eventId);
     if (!event || event.type !== "gift" || event.resolved || !event.giftTier) return;
 
@@ -171,7 +250,10 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     const valueBonus = 1 + BALANCE.run.monetizationGiftPerLevel * skillLevels.monetization;
     const hypeBonus = 1 + hype / 100;
     const gainsMult = clockSec < gainsBoostUntil ? 3 : 1;
-    const mult = valueBonus * hypeBonus * gainsMult;
+    const toughCrowdMult = hasModifier(params?.modifiers ?? [], "tough_crowd")
+      ? MODIFIER_EFFECTS.toughCrowdGiftValueMult
+      : 1;
+    const mult = valueBonus * hypeBonus * gainsMult * toughCrowdMult;
 
     const coins = Math.round(BALANCE.run.giftCoinValue[tier] * mult);
     const diamonds = Math.round(BALANCE.run.giftDiamondValue[tier] * mult);
@@ -188,21 +270,36 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   },
 
   // 04 §7: tap a hype-wave banner before it expires for a viewer surge.
+  // 2.7: `trending_sound` makes waves hit harder; the `viral_moment` wave
+  // (flagged via `event.amount === 1`) is bigger still and grants hype.
   rideWave: (eventId) => {
-    const { events, viewers } = get();
+    const { events, viewers, hype, params } = get();
     const event = events.find(e => e.id === eventId);
     if (!event || event.type !== "hype_wave" || event.resolved) return;
 
+    let boost = BALANCE.run.hypeWaveViewerBoost;
+    let hypeGain = 0;
+
+    if (hasModifier(params?.modifiers ?? [], "trending_sound")) {
+      boost *= MODIFIER_EFFECTS.trendingSoundWaveStrengthMult;
+    }
+    if (event.amount === 1) {
+      boost *= MODIFIER_EFFECTS.viralWaveBoostMult;
+      hypeGain = MODIFIER_EFFECTS.viralWaveHypeGain;
+    }
+
     set({
       events: events.filter(e => e.id !== eventId),
-      viewers: viewers * (1 + BALANCE.run.hypeWaveViewerBoost),
+      viewers: viewers * (1 + boost),
+      hype: clamp(hype + hypeGain, 0, 100),
     });
   },
 
   // 04 §8/§9-adjacent: resolve a comment/sponsor choice prompt. Effect
   // magnitudes are anchored to existing run formulas — see `choices.ts`.
+  // 2.7: `tough_crowd` also boosts the sponsor payout.
   resolveChoice: (eventId, choiceIndex) => {
-    const { phase, events, hype, viewers, wallet, collected, clockSec, gainsBoostUntil, skillLevels } = get();
+    const { phase, events, hype, viewers, wallet, collected, clockSec, gainsBoostUntil, skillLevels, params } = get();
     if (phase !== "live") return;
 
     const event = events.find(e => e.id === eventId);
@@ -219,7 +316,10 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
         // one-time bag in exchange for a viewer dip (01 §5.2).
         const valueBonus = 1 + BALANCE.run.monetizationGiftPerLevel * skillLevels.monetization;
         const hypeBonus = 1 + hype / 100;
-        const coins = Math.round(BALANCE.run.giftCoinValue.galaxy * valueBonus * hypeBonus * gainsMult);
+        const toughCrowdMult = hasModifier(params?.modifiers ?? [], "tough_crowd")
+          ? MODIFIER_EFFECTS.toughCrowdGiftValueMult
+          : 1;
+        const coins = Math.round(BALANCE.run.giftCoinValue.galaxy * valueBonus * hypeBonus * gainsMult * toughCrowdMult);
         set({
           events: remaining,
           viewers: viewers * 0.92,
@@ -333,7 +433,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
 
   // 04 §10: scoreRun — convert run performance + collected gifts into meta
   // currencies, grant them to the wallet, and surface a result for the
-  // results screen.
+  // results screen. 2.7: on a non-FLOP grade, offer the 1-of-3 boon pick.
   endRun: (reason) => {
     const { params, peakViewers, hype, collected, giftsCollected, wallet } = get();
     if (!params) throw new Error("endRun called with no active run params");
@@ -383,6 +483,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     set({
       phase: "results",
       lastResult: result,
+      boonChoices: grade !== "FLOP" ? BOON_LIST : null,
       wallet: {
         ...wallet,
         followers: wallet.followers + followers,
@@ -393,8 +494,35 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       },
     });
 
+    // 3.2: every completed run lands a result notification in the Inbox.
+    get().pushNotification({
+      type: "run_result",
+      title: `Stream ended — Grade ${grade}`,
+      body: `Peak ${formatCount(peakViewers)} viewers · +${formatCount(followers)} 👥, +${formatCount(coins)} 🪙, +${formatCount(diamonds)} 💎, +${formatCount(likes)} ❤️`,
+    });
+
     return result;
   },
 
-  returnToChannel: () => set({ phase: "idle", params: null, lastResult: null }),
+  // 01 §5.5: post-run "1 of 3" boon pick. Magnitudes/ids are implementation
+  // choices (`features/livestream/boons.ts`) — `04` doesn't spec this.
+  applyBoon: (id) => {
+    const { wallet, boonMultiplier } = get();
+    switch (id) {
+      case "diamond_cache":
+        set({ wallet: { ...wallet, diamonds: wallet.diamonds + BOON_DIAMOND_CACHE_AMOUNT }, boonChoices: null });
+        break;
+
+      case "hype_carryover":
+        set({ pendingHypeBoost: BOON_HYPE_CARRYOVER_BONUS, boonChoices: null });
+        break;
+
+      case "algorithm_favor":
+        set({ boonMultiplier: boonMultiplier * BOON_ALGORITHM_FAVOR_MULT, boonChoices: null });
+        get().recomputeStats();
+        break;
+    }
+  },
+
+  returnToChannel: () => set({ phase: "idle", params: null, lastResult: null, boonChoices: null }),
 });

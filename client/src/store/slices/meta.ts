@@ -1,13 +1,16 @@
 import type { Wallet } from "../../features/economy/types";
 import type { VideoPost } from "../../features/channel/types";
 import type { SkillId } from "../../features/skills/types";
+import type { InboxNotification } from "../../features/inbox/types";
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
 //   multiplier, followerConversion, lastSeenAt, ownedUpgrades, skillLevels, videos
 // Excluded: run* (ephemeral), social* (server-owned), ui* (session)
+// 3.2 adds inbox state (notifications, lastDailyClaimAt, milestonesReached) —
+// see PersistedV3 below; this is durable history, not session/ephemeral.
 export type PersistedV2 = {
   version: 2;
   handle: string;
@@ -18,13 +21,23 @@ export type PersistedV2 = {
   passiveCoinsPerSec: number;
   multiplier: number;
   followerConversion: number;
+  boonMultiplier: number;
   lastSeenAt: number;
   ownedUpgrades: Record<string, boolean>;
   skillLevels: Record<SkillId, number>;
   videos: VideoPost[];
 };
 
-export type PersistedState = PersistedV2;
+// 3.2: adds inbox state — notification log, daily-claim timestamp, and the
+// set of follower milestones already notified.
+export type PersistedV3 = Omit<PersistedV2, "version"> & {
+  version: 3;
+  notifications: InboxNotification[];
+  lastDailyClaimAt: number | null;
+  milestonesReached: number[];
+};
+
+export type PersistedState = PersistedV3;
 
 // v1 shape (pre-1.1): persisted a flat `upgrades: Upgrade[]` with `purchased`/`cost`.
 type PersistedV1Upgrade = { id: string; purchased: boolean; cost: number };
@@ -43,7 +56,7 @@ const V1_TO_V2_UPGRADE_MAP: Record<string, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -67,6 +80,21 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       version: 2,
       ownedUpgrades,
       wallet: { ...v1.wallet, coins: v1.wallet.coins + refund },
+      // v1 saves predate the "Algorithm Favor" boon (2.7) — default to no bonus.
+      boonMultiplier: v1.boonMultiplier ?? 1,
+    };
+  }
+
+  if (version < 3) {
+    const v2 = state as PersistedV2;
+    state = {
+      ...v2,
+      version: 3,
+      // v2 saves predate the Inbox (3.2) — start with an empty notification
+      // log, no daily claim yet, and no milestones notified yet.
+      notifications: [],
+      lastDailyClaimAt: null,
+      milestonesReached: [],
     };
   }
 

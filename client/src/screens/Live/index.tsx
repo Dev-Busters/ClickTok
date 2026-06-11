@@ -40,7 +40,9 @@ export function Live() {
   const clockSec = useGameStore(s => s.clockSec);
   const collected = useGameStore(s => s.collected);
   const lastResult = useGameStore(s => s.lastResult);
+  const boonChoices = useGameStore(s => s.boonChoices);
   const endRun = useGameStore(s => s.endRun);
+  const applyBoon = useGameStore(s => s.applyBoon);
   const returnToChannel = useGameStore(s => s.returnToChannel);
   const setTab = useGameStore(s => s.setTab);
 
@@ -110,6 +112,30 @@ export function Live() {
         </div>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--gold)' }}>#{params.topic}</span>
       </div>
+
+      {/* Run modifier chips (2.7) */}
+      {params.modifiers.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '6px', padding: '8px 16px 0' }}>
+          {params.modifiers.map(mod => (
+            <div
+              key={mod.id}
+              title={mod.description}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                letterSpacing: '0.1em',
+                color: 'var(--gold)',
+                border: '1px solid var(--gold)',
+                borderRadius: '999px',
+                padding: '3px 10px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {mod.name.toUpperCase()}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Hype meter */}
       <div style={{ padding: '20px 16px 0' }}>
@@ -222,6 +248,38 @@ export function Live() {
               </div>
             </div>
           )}
+          {boonChoices && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.18em' }}>
+                PICK A BONUS
+              </div>
+              {boonChoices.map(boon => (
+                <motion.button
+                  key={boon.id}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => applyBoon(boon.id)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    padding: '10px 14px',
+                    fontFamily: 'var(--font-ui)',
+                    textAlign: 'left',
+                    color: 'var(--text)',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid var(--gold)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', letterSpacing: '0.06em', color: 'var(--gold)' }}>
+                    {boon.name.toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'var(--dim)' }}>{boon.description}</span>
+                </motion.button>
+              ))}
+            </div>
+          )}
+
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleBack}

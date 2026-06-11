@@ -1,5 +1,6 @@
 import { useGameStore } from "../store";
 import { computeRunParams } from "../features/livestream/computeRunParams";
+import { getTrendHeat } from "../features/social/trends";
 import { formatCount } from "../lib/format";
 
 export function LiveReadinessPanel() {
@@ -7,11 +8,15 @@ export function LiveReadinessPanel() {
   const followerConversion = useGameStore(s => s.followerConversion);
   const skillLevels = useGameStore(s => s.skillLevels);
   const ownedUpgrades = useGameStore(s => s.ownedUpgrades);
-  const trendTopic = useGameStore(s => s.trendTopic);
+  const activeTrend = useGameStore(s => s.activeTrend);
+  const trendsAvailable = useGameStore(s => s.trendsAvailable);
 
+  const topic = activeTrend ?? "trending";
+  const trendHeat = getTrendHeat(trendsAvailable, topic);
   const params = computeRunParams(
     { followers, followerConversion, skillLevels, ownedUpgrades },
-    trendTopic ?? "trending",
+    topic,
+    trendHeat,
   );
 
   return (
@@ -41,7 +46,7 @@ export function LiveReadinessPanel() {
 
         <div style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--text)', lineHeight: 1.4 }}>
           You'd start at <strong style={{ color: 'var(--cyan)' }}>~{formatCount(params.startViewers)}</strong> viewers
-          on <span style={{ color: 'var(--gold)' }}>#{trendTopic ?? 'trending'}</span> → GO LIVE
+          on <span style={{ color: 'var(--gold)' }}>#{topic}</span> → GO LIVE
         </div>
 
         <div style={{ display: 'flex', gap: '20px' }}>

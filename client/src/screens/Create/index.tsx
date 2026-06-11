@@ -1,23 +1,25 @@
 import { motion } from "framer-motion";
 import { useGameStore } from "../../store";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
+import { getTrendHeat } from "../../features/social/trends";
 import { formatCount } from "../../lib/format";
-
-const DEFAULT_TREND = "trending";
 
 export function CreateSheet({ onClose }: { onClose: () => void }) {
   const wallet = useGameStore(s => s.wallet);
   const followerConversion = useGameStore(s => s.followerConversion);
   const skillLevels = useGameStore(s => s.skillLevels);
   const ownedUpgrades = useGameStore(s => s.ownedUpgrades);
-  const trendTopic = useGameStore(s => s.trendTopic);
+  const activeTrend = useGameStore(s => s.activeTrend);
+  const trendsAvailable = useGameStore(s => s.trendsAvailable);
   const startRun = useGameStore(s => s.startRun);
   const setTab = useGameStore(s => s.setTab);
 
-  const topic = trendTopic ?? DEFAULT_TREND;
+  const topic = activeTrend ?? "trending";
+  const trendHeat = getTrendHeat(trendsAvailable, topic);
   const params = computeRunParams(
     { followers: wallet.followers, followerConversion, skillLevels, ownedUpgrades },
     topic,
+    trendHeat,
   );
 
   const handlePost = () => {

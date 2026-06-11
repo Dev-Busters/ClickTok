@@ -280,10 +280,29 @@ Goal: a fully playable LIVE run. This is the headline feature — good to build 
   > (followers/coins/diamonds/likes). "Return to Home after" is via the existing "BACK TO CHANNEL"
   > button (`returnToChannel()` + `setTab('home')`, from 2.2/2.3).
 
-- [ ] **2.7 — Run modifiers + post-run boon.** Roll `RunModifier`s at start and show them; implement
+- [x] **2.7 — Run modifiers + post-run boon.** Roll `RunModifier`s at start and show them; implement
   the 1-of-3 boon pick on a successful run (`01` §5.5).
   **Refs:** `01` §5.5, `04` §8. **DoD:** modifiers visibly change a run; boon pick appears on
   success and applies.
+  > note: added `features/livestream/modifiers.ts` (`MODIFIER_CATALOG`, `rollModifiers` per `04`§8 —
+  > 1 always, 2nd w/ 40% chance, no conflicting pairs; `applyModifiers`, `hasModifier`, and
+  > `MODIFIER_EFFECTS` magnitudes — `04`§8 names effects but not numbers, so these are
+  > implementation choices anchored to each effect's wording). `startRun` rolls modifiers and
+  > applies them to `computeRunParams`'s output (kept `computeRunParams` itself pure/deterministic
+  > so the Home/Create live-readiness previews don't flicker — a deviation from `04`§6's
+  > `modifiers = rollModifiers(...)` living inside `computeRunParams`). `shadowban_risk` schedules a
+  > one-time mid-run viewer/hype crash (`spawnCrashEvent`) and `viral_moment` schedules a
+  > guaranteed bigger hype wave (`spawnViralWaveEvent`, `events.ts`); `tough_crowd`/`trending_sound`
+  > skew `spawnFeedEvent`'s weights and `collectGift`/`resolveChoice`/`rideWave` payouts via new
+  > `weightMultipliers` param. `screens/Live` shows rolled modifiers as chips below the topic. Added
+  > `features/livestream/boons.ts` (`BOON_LIST`: Diamond Cache, Hype Carryover, Algorithm Favor —
+  > ids/magnitudes are implementation choices, `01`§5.5 only sketches examples) and a new
+  > `RunSlice.boonChoices`/`applyBoon`/`pendingHypeBoost` (ephemeral, deviation from `03`§5 by
+  > analogy to `lastResult`/`gainsBoostUntil`); `endRun` populates `boonChoices` on any non-FLOP
+  > grade, and the results overlay renders a "PICK A BONUS" picker. "Algorithm Favor" persists as a
+  > new `channelSlice.boonMultiplier` field (added to `PersistedV2` + migration default `1` for old
+  > saves) folded into `multiplier` via `recomputeStats`. Verified end-to-end in preview: modifier
+  > chips render per run, a "Hype Carryover" pick correctly seeded the next run's hype bar near-full.
 
 **Phase 2 exit criteria:** a full GO LIVE → react-to-feed → results loop that's meaningfully shaped
 by meta progression, with run-to-run variety.
@@ -292,13 +311,60 @@ by meta progression, with run-to-run variety.
 
 ## PHASE 3 — Discover, trends, polish, prestige
 
-- [ ] **3.1 — Discover + local trends.** Implement `socialSlice.trendsAvailable` (locally rotating
+- [x] **3.1 — Discover + local trends.** Implement `socialSlice.trendsAvailable` (locally rotating
   trends with `heat`), a Discover screen to browse/select the active trend, and wire `trendMultiplier`
   into runs. Replace the hardcoded `DEFAULT_TREND`.
   **Refs:** `03` §6, `04` §6, `06` §4. **DoD:** choosing a hotter trend raises projected/actual run
   viewers; selection persists into the run.
-- [ ] **3.2 — Inbox.** Notifications feed (run results, milestones, daily reward). Daily login reward.
+  > note: rewrote `socialSlice` to the `03`§6 shape (`activeTrend`, `trendsAvailable`,
+  > `setActiveTrend`, `setTrends`; kept the existing `LeaderboardEntry` name/shape — `03`'s
+  > `ChannelSummary` rename is out of scope here). Added `features/social/trends.ts`
+  > (`generateTrends`: shuffles a 10-topic pool, takes 5 with random `heat` 0..1; `getTrendHeat`).
+  > `activeTrend` is seeded from `trendsAvailable[0]` at store-creation time (non-null), removing
+  > both hardcoded `DEFAULT_TREND` consts (`Shell.tsx` "dancing", `Create/index.tsx` "trending");
+  > `Shell` now re-rolls `trendsAvailable` every 90s via `setTrends(generateTrends())` ("locally
+  > rotating", no server authority — that's `4.1`). `computeRunParams` already took `trendHeat`
+  > (1.3) — `LiveReadinessPanel`, `CreateSheet`, and `runSlice.startRun` now all pass
+  > `getTrendHeat(trendsAvailable, activeTrend)` through it, so `trendMultiplier` (`= topicMatch = 1
+  > + heat*0.5`) varies per trend. New `components/TrendList.tsx` on Discover lists each trend with
+  > a heat-colored `ProgressBar` and a "+N% viewers" readout (`heat*50`); tapping one calls
+  > `setActiveTrend`. Renamed `trendTopic`/`setTrend` → `activeTrend`/`setActiveTrend` everywhere
+  > (`HomeFeed`, `Leaderboard`, `LiveReadinessPanel`, `CreateSheet`, `Shell`/`useTrendRoom`).
+  > Verified in preview: switching the Discover selection from `#fitness` (heat→+48%) to `#cooking`
+  > (+41%) changed Home's "LIVE READINESS" projected viewers (225→215) and the GO LIVE run's actual
+  > start viewers/topic.
+- [x] **3.2 — Inbox.** Notifications feed (run results, milestones, daily reward). Daily login reward.
   **Refs:** `06` §5. **DoD:** events land in Inbox; daily reward claimable once/day.
+  > note: `03`/`04` define no Notification/Inbox/daily-reward/milestone types or numbers — per
+  > CLAUDE.md's "STOP and ask" rule, confirmed three implementation choices with the user before
+  > building:
+  > - **Daily reward** = coins, `base 100 + passiveCoinsPerSec * 300` (`features/inbox/daily.ts`),
+  >   claimable once per real-world calendar day (`isNewCalendarDay` compares `toDateString()`).
+  > - **Milestones** = `wallet.totalFollowers` crossing fixed thresholds `[100, 1k, 10k, 100k, 1M]`
+  >   (`features/inbox/milestones.ts`), each notified exactly once via `milestonesReached`.
+  > - **Run results** = every `endRun()` (voluntary/timer/flop) pushes a notification with grade +
+  >   reward summary.
+  >
+  > New local types `NotificationType`/`InboxNotification` in `features/inbox/types.ts` (no `03`
+  > equivalent — same precedent as `boons.ts`/`choices.ts`). New `inboxSlice.ts`
+  > (`notifications`, `lastDailyClaimAt`, `milestonesReached`, `pushNotification`,
+  > `checkMilestones`, `claimDailyReward`) added to `FullState` — a deviation from `03`§8's
+  > canonical type, same precedent as `RunSlice`/`SocialSlice`. This new state is durable history
+  > (not session/ephemeral), so it's persisted: bumped `SAVE_VERSION` 2→3 (`PersistedV3`), with a
+  > v2→v3 migration defaulting old saves to `notifications: []`, `lastDailyClaimAt: null`,
+  > `milestonesReached: []`.
+  >
+  > `checkMilestones()` runs at the top of `channelSlice.tick()` — the meta game loop calls `tick()`
+  > every frame regardless of passive income, so this is the single integration point that catches
+  > `totalFollowers` crossing a threshold from any source (taps, passive, idle, runs).
+  > `runSlice.endRun()` calls `pushNotification` with a `formatCount`-based grade/reward summary.
+  > Built `screens/Inbox/index.tsx` (daily-reward claim card + notification list,
+  > TikTok-activity-feed style), replacing the `PlaceholderScreen` in `Shell.tsx` (now removed —
+  > Inbox was its only remaining caller).
+  > Verified in preview: claiming the daily reward grants +100 coins, disables the button
+  > ("CLAIMED"), and logs a "Daily reward claimed" entry; running and ending a stream logs a
+  > "Stream ended — Grade C" entry with peak viewers + reward breakdown; manually pushing
+  > `totalFollowers` past 100 fires a "100 followers!" milestone entry exactly once.
 - [ ] **3.3 — Juice pass.** Animations/transitions, gift particles, screen-shake on big moments,
   optional sound. Escalate the run feed to Pixi ONLY if DOM stutters (CLAUDE.md).
   **DoD:** no jank at 60fps with a busy feed; before/after screenshots.

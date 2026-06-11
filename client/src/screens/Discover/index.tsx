@@ -1,4 +1,5 @@
 import { Leaderboard } from "../../components/Leaderboard";
+import { TrendList } from "../../components/TrendList";
 
 export function Discover() {
   return (
@@ -19,6 +20,7 @@ export function Discover() {
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
       </div>
 
+      <TrendList />
       <Leaderboard />
     </div>
   );

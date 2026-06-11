@@ -2,31 +2,29 @@ import { useEffect, useState } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useTrendRoom } from "../hooks/useTrendRoom";
 import { useGameStore, type IdleReport } from "../store";
+import { generateTrends } from "../features/social/trends";
 import { HomeFeed } from "../screens/HomeFeed";
 import { Discover } from "../screens/Discover";
+import { Inbox } from "../screens/Inbox";
 import { Profile } from "../screens/Profile";
 import { Live } from "../screens/Live";
 import { CreateSheet } from "../screens/Create";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
 
-const DEFAULT_TREND = "dancing";
 const WELCOME_BACK_THRESHOLD_SEC = 60;
+const TREND_ROTATION_SEC = 90;
 
 export function Shell() {
   const activeTab = useGameStore(s => s.activeTab);
   const openSheet = useGameStore(s => s.openSheet);
   const setSheet = useGameStore(s => s.setSheet);
   const phase = useGameStore(s => s.phase);
-  const trendTopic = useGameStore(s => s.trendTopic);
-  const setTrend = useGameStore(s => s.setTrend);
+  const activeTrend = useGameStore(s => s.activeTrend);
+  const setTrends = useGameStore(s => s.setTrends);
   const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
 
   const [idleReport, setIdleReport] = useState<IdleReport | null>(null);
-
-  useEffect(() => {
-    if (!trendTopic) setTrend(DEFAULT_TREND);
-  }, [trendTopic, setTrend]);
 
   useEffect(() => {
     const report = applyIdleIncome(Date.now());
@@ -35,8 +33,14 @@ export function Shell() {
     }
   }, [applyIdleIncome]);
 
+  // 3.1: locally rotating trends — refresh the pool + heat every ~90s.
+  useEffect(() => {
+    const id = setInterval(() => setTrends(generateTrends()), TREND_ROTATION_SEC * 1000);
+    return () => clearInterval(id);
+  }, [setTrends]);
+
   useGameLoop();
-  useTrendRoom(trendTopic);
+  useTrendRoom(activeTrend);
 
   return (
     <div
@@ -61,9 +65,7 @@ export function Shell() {
           <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
             {activeTab === 'home' && <HomeFeed />}
             {activeTab === 'discover' && <Discover />}
-            {activeTab === 'inbox' && (
-              <PlaceholderScreen title="INBOX" subtitle="NOTIFICATIONS — COMING SOON" />
-            )}
+            {activeTab === 'inbox' && <Inbox />}
             {activeTab === 'profile' && <Profile />}
           </div>
 
@@ -78,33 +80,6 @@ export function Shell() {
       {idleReport && (
         <WelcomeBackSheet report={idleReport} onDismiss={() => setIdleReport(null)} />
       )}
-    </div>
-  );
-}
-
-function PlaceholderScreen({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div
-      style={{
-        minHeight: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '12px',
-        padding: '24px',
-        textAlign: 'center',
-      }}
-    >
-      <div
-        className="chroma"
-        style={{ fontFamily: 'var(--font-display)', fontSize: '36px', letterSpacing: '0.06em', color: 'var(--text)' }}
-      >
-        {title}
-      </div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--dim)', letterSpacing: '0.12em' }}>
-        {subtitle}
-      </div>
     </div>
   );
 }

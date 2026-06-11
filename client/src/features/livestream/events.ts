@@ -15,7 +15,7 @@ export const MAX_FEED_EVENTS = 20;
 
 const GIFT_TTL_SEC = 6;
 
-type FeedEventType = "comment" | "troll" | "hype_wave" | "choice";
+export type FeedEventType = "comment" | "troll" | "hype_wave" | "choice";
 
 const FEED_EVENT_TTL_SEC: Record<Exclude<FeedEventType, "choice">, number> = {
   comment: 6,
@@ -89,9 +89,20 @@ export function spawnGiftEvent(clockSec: number, giftQuality: number): RunEvent 
 }
 
 // Spawns one of comment/troll/hype_wave/choice. Avoids stacking a second hype
-// wave while one is already active in the feed.
-export function spawnFeedEvent(clockSec: number, hasActiveWave: boolean): RunEvent {
-  let type = weightedPick(FEED_EVENT_WEIGHTS);
+// wave while one is already active in the feed. `weightMultipliers` lets run
+// modifiers (04 §8: tough_crowd, trending_sound) skew the spawn odds.
+export function spawnFeedEvent(
+  clockSec: number,
+  hasActiveWave: boolean,
+  weightMultipliers: Partial<Record<FeedEventType, number>> = {},
+): RunEvent {
+  const weights: Record<FeedEventType, number> = { ...FEED_EVENT_WEIGHTS };
+  for (const key of Object.keys(weightMultipliers) as FeedEventType[]) {
+    const mult = weightMultipliers[key];
+    if (mult) weights[key] *= mult;
+  }
+
+  let type = weightedPick(weights);
   if (type === "hype_wave" && hasActiveWave) type = "comment";
 
   if (type === "choice") {
@@ -117,4 +128,32 @@ export function spawnFeedEvent(clockSec: number, hasActiveWave: boolean): RunEve
   if (type === "comment") return { ...base, type, text: pickFrom(COMMENT_POOL) };
   if (type === "troll") return { ...base, type, text: pickFrom(TROLL_POOL) };
   return { ...base, type: "hype_wave" };
+}
+
+const CRASH_TEXT = "wait... where did everyone go?? 📉 #shadowban";
+
+// `shadowban_risk` (04 §8): the one-time mid-stream viewer crash, flavored as
+// a comment so it reads in the feed without triggering troll-drain logic.
+export function spawnCrashEvent(clockSec: number): RunEvent {
+  return {
+    id: crypto.randomUUID(),
+    type: "comment",
+    spawnedAt: clockSec,
+    expiresAt: clockSec + FEED_EVENT_TTL_SEC.comment,
+    resolved: false,
+    text: CRASH_TEXT,
+  };
+}
+
+// `viral_moment` (04 §8): the guaranteed huge hype wave. `amount: 1` flags it
+// for `rideWave` to apply a bigger boost than a normal wave.
+export function spawnViralWaveEvent(clockSec: number): RunEvent {
+  return {
+    id: crypto.randomUUID(),
+    type: "hype_wave",
+    spawnedAt: clockSec,
+    expiresAt: clockSec + FEED_EVENT_TTL_SEC.hype_wave,
+    resolved: false,
+    amount: 1,
+  };
 }
