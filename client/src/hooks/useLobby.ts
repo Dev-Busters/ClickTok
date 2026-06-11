@@ -25,11 +25,13 @@ export function useLobby() {
   const setLiveDirectory = useGameStore(s => s.setLiveDirectory);
   const setTrends = useGameStore(s => s.setTrends);
   const setLeaderboard = useGameStore(s => s.setLeaderboard);
+  const setTrendLeaderboard = useGameStore(s => s.setTrendLeaderboard);
   const setAlgorithm = useGameStore(s => s.setAlgorithm);
   const phase = useGameStore(s => s.phase);
   const params = useGameStore(s => s.params);
   const streamId = useGameStore(s => s.streamId);
   const spectating = useGameStore(s => s.spectating);
+  const activeTrend = useGameStore(s => s.activeTrend);
 
   // Connect to the global lobby room once the player has a handle.
   useEffect(() => {
@@ -61,13 +63,17 @@ export function useLobby() {
 
     socket.addEventListener("open", () => {
       stopFallback();
-      const { wallet } = useGameStore.getState();
+      const { wallet, cloudUserId, activeTrend: trend } = useGameStore.getState();
       const msg: LobbyClientMessage = {
         type: "hello",
         handle,
         creatorLevel: computeCreatorLevel(wallet.totalFollowers),
+        userId: cloudUserId ?? undefined,
       };
       socket.send(JSON.stringify(msg));
+      if (trend) {
+        socket.send(JSON.stringify({ type: "getTrendLeaderboard", trend } satisfies LobbyClientMessage));
+      }
     });
 
     socket.addEventListener("close", startFallback);
@@ -84,6 +90,12 @@ export function useLobby() {
         case "leaderboard":
           setLeaderboard(msg.channels.map(c => ({ id: c.id, handle: c.handle, followers: c.followers, rank: c.rank })));
           break;
+        case "trendLeaderboard":
+          // Ignore stale responses for a trend the player has since switched away from.
+          if (msg.trend === useGameStore.getState().activeTrend) {
+            setTrendLeaderboard(msg.channels.map(c => ({ id: c.id, handle: c.handle, followers: c.followers, rank: c.rank })));
+          }
+          break;
         case "algorithm":
           setAlgorithm(msg.state);
           break;
@@ -91,12 +103,15 @@ export function useLobby() {
     });
 
     // 4.4: leaderboard scoring moves into the lobby (was useTrendRoom's score broadcast).
+    // 4.5b: include userId (durable identity) + activeTrend (per-trend leaderboard).
     const scoreInterval = setInterval(() => {
-      const { wallet } = useGameStore.getState();
+      const { wallet, cloudUserId, activeTrend: trend } = useGameStore.getState();
       socketRef.current?.send(JSON.stringify({
         type: "score",
         followers: Math.floor(wallet.followers),
         likes: Math.floor(wallet.likes),
+        userId: cloudUserId ?? undefined,
+        trend: trend ?? undefined,
       } satisfies LobbyClientMessage));
     }, SCORE_UPDATE_MS);
 
@@ -107,7 +122,13 @@ export function useLobby() {
       socketRef.current = null;
       lobbySendRef.current = null;
     };
-  }, [handle, setLiveDirectory, setTrends, setLeaderboard, setAlgorithm]);
+  }, [handle, setLiveDirectory, setTrends, setLeaderboard, setTrendLeaderboard, setAlgorithm]);
+
+  // 4.5b: re-request the per-trend leaderboard whenever the player switches trends.
+  useEffect(() => {
+    if (!activeTrend) return;
+    socketRef.current?.send(JSON.stringify({ type: "getTrendLeaderboard", trend: activeTrend } satisfies LobbyClientMessage));
+  }, [activeTrend]);
 
   // Announce goLive when a run starts; send liveUpdate periodically; send endLive when done.
   useEffect(() => {

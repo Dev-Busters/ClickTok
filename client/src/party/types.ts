@@ -4,7 +4,7 @@
 import type { GiftTier, RunEventType, RunModifierId, RunResult } from '../features/livestream/types';
 export type { GiftTier };
 
-// ——— Leaderboard (4.4: lives in the lobby room) ———
+// ——— Leaderboard (4.4: lives in the lobby room; 4.5b: persisted in Supabase) ———
 export type ChannelSummary = {
   id: string;
   handle: string;
@@ -12,6 +12,7 @@ export type ChannelSummary = {
   likes: number;
   rank: number;
   live?: boolean;
+  trend?: string;
 };
 
 // ——— Shared Phase 4 shapes ———
@@ -64,17 +65,19 @@ export type RunSnapshot = {
 
 // ——— Lobby room ———
 export type LobbyClientMessage =
-  | { type: "hello"; handle: string; creatorLevel: number }
+  | { type: "hello"; handle: string; creatorLevel: number; userId?: string }
   | { type: "goLive"; summary: LiveStreamSummary }
   | { type: "liveUpdate"; summary: LiveStreamSummary }
   | { type: "endLive"; streamId: string }
-  | { type: "score"; followers: number; likes: number }
+  | { type: "score"; followers: number; likes: number; userId?: string; trend?: string }  // (4.5b) userId/trend persist + scope the leaderboard
+  | { type: "getTrendLeaderboard"; trend: string }                                        // (4.5b)
   | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number };
 
 export type LobbyServerMessage =
   | { type: "directory"; streams: LiveStreamSummary[] }
   | { type: "trends"; trends: { topic: string; heat: number }[]; rotatesAt: number }
-  | { type: "leaderboard"; channels: ChannelSummary[] }
+  | { type: "leaderboard"; channels: ChannelSummary[] }                       // global, top followers
+  | { type: "trendLeaderboard"; trend: string; channels: ChannelSummary[] }   // (4.5b) per-trend
   | { type: "algorithm"; state: AlgorithmState };
 
 // ——— Stream room (streamer and viewers are both clients of the same room) ———

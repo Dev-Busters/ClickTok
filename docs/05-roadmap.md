@@ -514,9 +514,33 @@ by meta progression, with run-to-run variety.
   > `wallet`/`handle`/`ownedUpgrades`/etc. and recomputes derived stats; a push→reload round trip
   > pulled the pushed state back down.
 
-- [ ] **4.5b — Durable leaderboards.** Move the lobby's in-memory leaderboard (4.4) into Supabase
+- [x] **4.5b — Durable leaderboards.** Move the lobby's in-memory leaderboard (4.4) into Supabase
   so it survives a PartyKit restart; global and per-trend views.
   **Refs:** `01` §7.4. **DoD:** leaderboard data survives a PartyKit restart.
+  > note: new `public.leaderboard_scores` table (`user_id` PK → `auth.users`, `handle`, `followers`,
+  > `likes`, `trend`, `updated_at`), RLS public-SELECT-only — writes happen server-side from the
+  > lobby room using `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS). New `party/.env`/`.env.example`
+  > (both gitignored except the example) hold `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`; when
+  > unset, `supabaseConfig()` returns `null` and the lobby behaves exactly like the pre-4.5b
+  > in-memory-only leaderboard (no crash, just no durability) — the service role key still needs
+  > to be filled in from the dashboard for persistence to actually activate.
+  > Channels are now keyed by stable `cloudUserId` (from 4.5a's anonymous-upgradeable auth) when
+  > present, falling back to the ephemeral PartyKit connection id for guests — only durable
+  > (logged-in) entries get persisted/restored across restarts. `onStart()` calls
+  > `loadLeaderboard()`, which fetches the top 100 rows ordered by `followers desc` from Supabase
+  > to seed `this.channels`. `score` messages debounce writes per-user (min 10s between upserts) to
+  > avoid hammering Supabase on the 2s score tick.
+  > Per-trend leaderboard ("TRENDING #topic") uses a request/response pair
+  > (`getTrendLeaderboard`/`trendLeaderboard`) instead of a broadcast, since each viewer may be on a
+  > different trend; `useLobby` requests it on connect and whenever `activeTrend` changes.
+  > `ChannelSummary` gained an optional `trend` field; `rankedChannels()`/new
+  > `trendRankedChannels()` both slice to top 10 for display. `Leaderboard.tsx` extracted a shared
+  > `LeaderboardSection` for "TOP CREATORS" (global) and "TRENDING #topic" (per-trend), each
+  > hidden if empty. Verified in browser preview: both sections render on Discover with the local
+  > player highlighted; `pnpm typecheck` passes for client + party.
+  > Also noted (pre-existing, unrelated to this task): a "React has detected a change in the order
+  > of Hooks" console warning for `Shell` reproduces on clean `main` too — not a regression from
+  > this change, left as-is.
 
 - [ ] **4.5c — Server-side reward validation.** Move viewer-reward granting (drops/jackpots/
   shoutouts, currently client-trusted per `01` §7.4) behind server-side checks.
