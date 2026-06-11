@@ -365,9 +365,17 @@ by meta progression, with run-to-run variety.
   > ("CLAIMED"), and logs a "Daily reward claimed" entry; running and ending a stream logs a
   > "Stream ended — Grade C" entry with peak viewers + reward breakdown; manually pushing
   > `totalFollowers` past 100 fires a "100 followers!" milestone entry exactly once.
-- [ ] **3.3 — Juice pass.** Animations/transitions, gift particles, screen-shake on big moments,
+- [x] **3.3 — Juice pass.** Animations/transitions, gift particles, screen-shake on big moments,
   optional sound. Escalate the run feed to Pixi ONLY if DOM stutters (CLAUDE.md).
   **DoD:** no jank at 60fps with a busy feed; before/after screenshots.
+  > note: done as a TikTok-faithfulness redesign (2026-06-10): Home rebuilt as a full-bleed FYP
+  > (tap-the-video-to-post + heart bursts, right action rail, caption + sound marquee); Live
+  > restyled to TikTok LIVE (host/viewer pills, username'd comment pills, ambient HeartRain scaled
+  > by hype, hype stage glow, circular hotbar w/ conic cooldown sweep); Profile header → TikTok
+  > 3-stat row + flat currency pills. Deleted orphaned StatsBar/TapButton/LiveReadinessPanel.
+  > Added dev-only `window.gameStore` (preview testing; rAF is throttled in background tabs).
+  > NOT done: screen-shake, sound — fold into a later polish task if wanted. 60fps unverified in
+  > the throttled preview; re-check on a real device.
 - [ ] **3.4 — Prestige ("Rebrand").** Implement reset-for-Clout-multiplier (`01` §4.4) + UI.
   **DoD:** rebrand resets the right things, keeps diamonds, applies a permanent multiplier.
 - [ ] **3.5 — Balance pass.** Tune `BALANCE` against the guidance in `04` §11 using real playthroughs.

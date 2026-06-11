@@ -54,6 +54,19 @@ html, body {
 
 .cursor-blink { animation: blink 1s step-end infinite; }
 
+/* TikTok-style sound ticker */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* TikTok LIVE ambient hearts — drift + scale set via CSS vars per heart */
+@keyframes heart-float {
+  0%   { transform: translateY(0) translateX(0) scale(0.5) rotate(-10deg); opacity: 0; }
+  12%  { opacity: 0.95; }
+  100% { transform: translateY(-360px) translateX(var(--drift, 14px)) scale(var(--bloom, 1.1)) rotate(12deg); opacity: 0; }
+}
+
 /* CRT scanlines — fixed overlay */
 body::after {
   content: '';

@@ -8,38 +8,57 @@ export function ReactionHotbar() {
   const useReaction = useGameStore(s => s.useReaction);
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", gap: "10px", padding: "10px 16px 18px" }}>
+    <div style={{ display: "flex", justifyContent: "center", gap: "12px", padding: "10px 16px 18px" }}>
       {reactions.map(id => {
         const cooldown = cooldowns[id];
+        const total = REACTION_CATALOG[id].cooldownSec;
         const ready = cooldown <= 0;
+        const frac = ready ? 0 : Math.min(1, cooldown / total);
         return (
           <motion.button
             key={id}
-            whileTap={ready ? { scale: 0.9 } : undefined}
+            whileTap={ready ? { scale: 0.85 } : undefined}
             onClick={() => useReaction(id)}
             disabled={!ready}
             title={REACTION_CATALOG[id].description}
             style={{
-              width: "52px",
-              height: "52px",
+              position: "relative",
+              width: "54px",
+              height: "54px",
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: "2px",
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid var(--dim)",
-              borderRadius: "8px",
-              opacity: ready ? 1 : 0.4,
+              background: "rgba(255,255,255,0.1)",
+              border: ready ? "1.5px solid rgba(255,255,255,0.25)" : "1.5px solid transparent",
+              borderRadius: "50%",
               cursor: ready ? "pointer" : "default",
-              color: "var(--text)",
+              boxShadow: ready ? "0 0 14px rgba(255,255,255,0.08)" : "none",
+              overflow: "hidden",
             }}
           >
-            <span style={{ fontSize: "20px" }}>{REACTION_ICON[id]}</span>
+            <span style={{ fontSize: "24px", lineHeight: 1, opacity: ready ? 1 : 0.45 }}>
+              {REACTION_ICON[id]}
+            </span>
             {!ready && (
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--dim)" }}>
-                {Math.ceil(cooldown)}
-              </span>
+              <>
+                {/* Radial cooldown sweep */}
+                <div style={{
+                  position: "absolute",
+                  inset: 0,
+                  borderRadius: "50%",
+                  background: `conic-gradient(rgba(0,0,0,0.72) ${frac * 360}deg, transparent 0deg)`,
+                }} />
+                <span style={{
+                  position: "absolute",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#fff",
+                  textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+                }}>
+                  {Math.ceil(cooldown)}
+                </span>
+              </>
             )}
           </motion.button>
         );

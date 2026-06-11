@@ -4,6 +4,8 @@ import { useRunLoop } from "../../hooks/useRunLoop";
 import { ProgressBar } from "../../components/ProgressBar";
 import { LiveFeed } from "../../components/LiveFeed";
 import { ReactionHotbar } from "../../components/ReactionHotbar";
+import { HeartRain } from "../../components/HeartRain";
+import { avatarGradient } from "../../lib/avatar";
 import { formatCount } from "../../lib/format";
 
 function hypeColor(hype: number): string {
@@ -62,18 +64,41 @@ export function Live() {
       background: 'var(--bg)',
       zIndex: 50,
     }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '20px 16px 0' }}>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '40px', lineHeight: 1, color: 'var(--text)' }}>
-            {formatCount(viewers)}
+      {/* Top bar — TikTok LIVE: host pill left, viewers + end right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 12px 0' }}>
+        {/* Host pill */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px 4px 4px', borderRadius: '999px', background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{
+            width: '28px', height: '28px', borderRadius: '50%',
+            background: avatarGradient(handle),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1.5px solid var(--red)',
+          }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '12px', color: '#fff' }}>
+              {(handle || "?").slice(0, 2).toUpperCase()}
+            </span>
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.22em', marginTop: '4px' }}>
-            VIEWERS
-          </div>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', fontWeight: 700, color: '#fff' }}>@{handle}</span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.14em',
+            color: '#fff', background: 'var(--red)', borderRadius: '3px', padding: '2px 6px',
+            animation: 'dot-pulse 1.6s ease-in-out infinite',
+          }}>
+            LIVE
+          </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+        {/* Viewers + END */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '999px', background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)">
+              <circle cx="12" cy="8" r="3.5" />
+              <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6Z" />
+            </svg>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', fontWeight: 700, color: '#fff' }}>
+              {formatCount(viewers)}
+            </span>
+          </div>
           {phase === 'live' && (
             <motion.button
               whileTap={{ scale: 0.95 }}
@@ -81,36 +106,27 @@ export function Live() {
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '10px',
-                letterSpacing: '0.18em',
-                color: 'var(--text)',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid var(--dim)',
-                padding: '6px 12px',
+                letterSpacing: '0.14em',
+                color: '#fff',
+                background: 'rgba(255,31,75,0.25)',
+                border: '1px solid var(--red)',
+                borderRadius: '999px',
+                padding: '7px 14px',
                 cursor: 'pointer',
               }}
             >
               END
             </motion.button>
           )}
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', color: 'var(--text)' }}>
-            {formatTimer(params.durationSec - clockSec)}
-          </div>
         </div>
       </div>
 
-      {/* Identity row */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '8px 16px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '7px', height: '7px', borderRadius: '50%',
-            background: 'var(--red)',
-            boxShadow: '0 0 8px var(--red)',
-            animation: 'dot-pulse 1.6s ease-in-out infinite',
-          }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--red)', letterSpacing: '0.18em' }}>LIVE</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text)' }}>@{handle}</span>
-        </div>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--gold)' }}>#{params.topic}</span>
+      {/* Topic + timer row */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '8px 16px 0' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--gold)' }}>#{params.topic}</span>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: '18px', color: 'var(--text)', lineHeight: 1 }}>
+          {formatTimer(params.durationSec - clockSec)}
+        </span>
       </div>
 
       {/* Run modifier chips (2.7) */}
@@ -143,24 +159,30 @@ export function Live() {
       </div>
 
       {/* Stage + live feed */}
-      <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* Hype-driven stage glow — the "camera" feed */}
         <div style={{
-          width: '120px',
-          height: '120px',
-          borderRadius: '50%',
-          border: '2px dashed rgba(255,255,255,0.08)',
+          position: 'absolute',
+          inset: 0,
+          background: `radial-gradient(ellipse 80% 60% at 50% 60%, ${hypeColor(hype)}, transparent 70%)`,
+          opacity: 0.10 + (hype / 100) * 0.22,
+          transition: 'opacity 0.5s',
+          pointerEvents: 'none',
         }} />
+        {phase === 'live' && <HeartRain hype={hype} />}
         {phase === 'live' && <LiveFeed />}
       </div>
 
       {/* Collected ticker */}
       {phase === 'live' && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', padding: '0 16px 4px' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--gold)' }}>
-            🪙 {formatCount(collected.coins)}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', padding: '6px 16px 4px' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontFamily: 'var(--font-ui)', fontSize: '12px', fontWeight: 600, color: 'var(--gold)', background: 'rgba(0,0,0,0.45)', borderRadius: '999px', padding: '4px 12px' }}>
+            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: 'var(--gold)', boxShadow: '0 0 5px var(--gold)' }} />
+            {formatCount(collected.coins)}
           </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--cyan)' }}>
-            💎 {formatCount(collected.diamonds)}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontFamily: 'var(--font-ui)', fontSize: '12px', fontWeight: 600, color: 'var(--cyan)', background: 'rgba(0,0,0,0.45)', borderRadius: '999px', padding: '4px 12px' }}>
+            <span style={{ width: '8px', height: '8px', background: 'var(--cyan)', boxShadow: '0 0 5px var(--cyan)', transform: 'rotate(45deg)' }} />
+            {formatCount(collected.diamonds)}
           </span>
         </div>
       )}
@@ -235,11 +257,17 @@ export function Live() {
                 <span>+{formatCount(lastResult.rewards.followers)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--gold)' }}>
-                <span>🪙 Coins</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                  <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: 'var(--gold)' }} />
+                  Coins
+                </span>
                 <span>+{formatCount(lastResult.rewards.coins)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--cyan)' }}>
-                <span>💎 Diamonds</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                  <span style={{ width: '8px', height: '8px', background: 'var(--cyan)', transform: 'rotate(45deg)' }} />
+                  Diamonds
+                </span>
                 <span>+{formatCount(lastResult.rewards.diamonds)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text)' }}>

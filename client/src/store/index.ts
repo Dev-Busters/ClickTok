@@ -58,5 +58,11 @@ export const useGameStore = create<FullState>()(
   ),
 );
 
+// Dev-only: expose the store for debugging/driving state from the console
+// (e.g. the browser preview, where rAF throttling freezes the game loops).
+if (import.meta.env.DEV) {
+  (window as unknown as { gameStore: typeof useGameStore }).gameStore = useGameStore;
+}
+
 export type { LeaderboardEntry } from "./slices/socialSlice";
 export type { IdleReport } from "./slices/channelSlice";
