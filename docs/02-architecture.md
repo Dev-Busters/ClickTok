@@ -138,10 +138,11 @@ Both loops mutate the store through actions, not by writing state directly in th
 - Today: `party/src/trend.ts` is a per-room ("trend") leaderboard server; client connects via
   `useTrendRoom.ts`. Message types are duplicated in `client/src/party/types.ts` and
   `party/src/trend.ts` — **edit both together.**
-- Phase 4 extends this: server-authoritative trend rotation, a presence/live room for raids, and
-  global-event aggregation. Design messages so the server can later own scoring/trends
-  authoritatively. Keep client→server messages describing *intent/score*, server→client describing
-  *world state* (already the shape).
+- Phase 4 extends this (see `01` §7, `03` §6): one global **lobby** room (presence, live
+  directory, trends, leaderboard, The Algorithm meter) + one **stream room per live run**
+  (streamer broadcasts `RunSnapshot`s; spectators send interaction messages back). Design messages
+  so the server can later own scoring/trends authoritatively. Keep client→server messages
+  describing *intent/score*, server→client describing *world state* (already the shape).
 
 ## 7. Multiplayer-readiness rules (cheap to follow now, expensive to retrofit)
 

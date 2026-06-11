@@ -383,19 +383,65 @@ by meta progression, with run-to-run variety.
 
 ---
 
-## PHASE 4 — Multiplayer / community (build last)
+## PHASE 4 — Multiplayer: real spectator streams (design LOCKED 2026-06-10)
 
-- [ ] **4.1 — Server-authoritative trends.** Move trend rotation into PartyKit; clients read the
-  global hot trend; aggregate "push" from players streaming it.
-  **Refs:** `01` §7, `02` §6–7. **DoD:** all clients see the same rotating trend; streaming it nudges
-  its heat.
-- [ ] **4.2 — Live raids (player→player).** `goLive`/`raid`/`raided` messages (`03` §6); a live player
-  can raid another's run, injecting viewers. The signature cross-player effect.
-  **DoD:** two clients: one raids, the other's run gains viewers in real time.
-- [ ] **4.3 — Global events / challenges.** Server-wide goals with shared rewards.
-- [ ] **4.4 — Supabase accounts + cloud save + durable leaderboards.** Add the Supabase adapter at the
-  `meta.ts` serialize boundary (`02` §4); accounts; persistent leaderboards.
-  **DoD:** sign in, save syncs across devices, leaderboard persists across server restarts.
+> **Supersedes the old Phase 4** (raids absorbed into spectator interaction; global challenges
+> absorbed into The Algorithm). Design in `01` §7; wire types in `03` §6; all numbers in `04` §12.
+> Each task is independently shippable; the game must stay fully playable solo at every step.
+> Multi-client DoDs are verified with two browser windows against the local PartyKit dev server.
+
+- [ ] **4.1 — Lobby presence + live directory.** New PartyKit lobby room (`party/src/lobby.ts`,
+  pattern-match `trend.ts`): handle `hello`/`goLive`/`liveUpdate`/`endLive`, broadcast `directory`
+  (`03` §6). Client: a `useLobby` hook (mounted in `Shell` like `useTrendRoom`), `socialSlice`
+  Phase-4 fields (`liveDirectory`), and the Discover **LIVE NOW** rail (`06` §4). `startRun`
+  announces `goLive` (generate a `streamId`), `endRun`/unmount announces `endLive`; `liveUpdate`
+  every few seconds. Cards are display-only this task (no join). Mirror types in
+  `client/src/party/types.ts` AND `party/src/lobby.ts` — edit both.
+  **Refs:** `01` §7.1, `03` §6, `04` §12.0, `06` §4, `02` §6. **DoD:** two windows: going live in
+  one shows a live card (handle/topic/viewers/hype) in the other within ~2s, updating while live,
+  gone on end; zero regression to solo play; typecheck.
+
+- [ ] **4.2 — Spectating (read-only).** Stream rooms (`party/src/stream.ts`): streamer `open`s the
+  room and publishes `RunSnapshot` `snapshotPerSec`×/sec; server rebroadcasts to viewers with
+  `realViewers`. Client: `spectateSlice` (`03` §6), tapping a LIVE NOW card joins as a viewer, and
+  the **Live screen renders in spectator mode** (`06` §7 spectator notes) — same meters/feed driven
+  by `applySnapshot`, no hotbar, a LEAVE button. On leave or `ended`, grant the **watch-drop**
+  (`04` §12.4, jackpot = 0 for now) and show it on a viewer result sheet.
+  **Refs:** `01` §7.1, `03` §6, `04` §12.0+§12.4, `06` §7, `02` §6. **DoD:** window B taps A's card
+  → sees A's meters/feed move in near-real-time; B leaving (or A ending) grants B the formula-exact
+  drop; A's run is unaffected by being watched; typecheck.
+
+- [ ] **4.3 — Viewer interaction (the heart).** Implement `hypeTap`/`quickChat`/`sendGift`/`vote`
+  viewer messages + the server relays to the streamer (`03` §6). Viewer side: action bar (heart-spam
+  button w/ rate limit + batching, quick-chat row, gift drawer that spends coins, poll overlay)
+  per `06` §7. Streamer side: inject `real: true` RunEvents (glow render), apply real-crowd
+  effects (`04` §12.3: displayViewers weighting, tap decay relief, flop relief, gift income +
+  hype spikes), mirror choice events as `StreamPoll`s with `voteBoostMult` resolution. Rewards:
+  tap micro-coins, gift clout-back, early-backer jackpot via the watch-drop, vote payouts
+  (`04` §12.1–12.4), and the post-run **shoutout** of the top real gifter.
+  **Refs:** `01` §7.1–7.2, `03` §5–6, `04` §12.1–12.4, `06` §7. **DoD:** two windows: B's taps
+  visibly slow A's hype decay; B's gift costs B coins, appears glowing in A's feed, and pays both
+  sides per formula; a choice event shows as a poll B votes in; an early B gift on an A-grade run
+  pays B the jackpot in the drop sheet; A can shout out B (+followers to B); typecheck.
+
+- [ ] **4.4 — The Algorithm + server-authoritative trends.** Lobby aggregates `feedAlgorithm` into
+  `AlgorithmState` (feeds/decay/tiers per `04` §12.5) and broadcasts it; Discover renders the
+  world-boss meter bar (`06` §4); the tier multiplier folds into `recomputeStats()` (like
+  `boonMultiplier`); BLESSED grants the guaranteed 2nd modifier in `startRun`. Move trend rotation
+  from the client 90s timer (3.1) into the lobby `trends` broadcast; going live on a trend pushes
+  its heat for everyone. Migrate the leaderboard `score` flow into the lobby; retire
+  `party/src/trend.ts` + `useTrendRoom`.
+  **Refs:** `01` §7.3–7.4, `03` §6, `04` §12.5, `06` §4, `02` §6. **DoD:** two windows see identical
+  trends + meter; activity (stream/watch/gift) raises the meter; crossing FED multiplies income
+  ×1.10 in both; single-window solo play still works offline (STARVED fallback, local trend
+  fallback if the socket is down); typecheck.
+
+- [ ] **4.5 — Supabase: accounts + cloud save + durable leaderboards + reward validation.** Add the
+  Supabase adapter at the `meta.ts` serialize boundary (`02` §4); auth (anonymous-upgradeable);
+  cloud save sync; persistent leaderboards; move viewer-reward granting (drops/jackpots/shoutouts)
+  behind server-side checks — until here they are client-trusted (accepted beta risk, `01` §7.4).
+  **Refs:** `01` §7.4, `02` §4. **DoD:** sign in, save syncs across two devices, leaderboard
+  survives a PartyKit restart, spoofed reward messages are rejected.
 
 ---
 

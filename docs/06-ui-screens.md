@@ -49,11 +49,18 @@ The hub. TikTok's home is the vertical video feed; ours blends that with the pos
 Trends + leaderboard (and the future multiplayer surface).
 
 - **Search bar** (cosmetic placeholder) at top.
+- **(Phase 4.1) LIVE NOW rail:** above the trends, a horizontally scrollable rail of live-stream
+  cards (TikTok LIVE-tab style) from `socialSlice.liveDirectory`: avatar (handle-generated, like
+  Profile), `@handle`, a red **LIVE** badge, `#topic`, viewer count, a thin hype bar. Sorted by
+  creator level then viewers. Tap → join as spectator (4.2; display-only in 4.1). Empty state:
+  "nobody's live — be the first" + a GO LIVE shortcut.
+- **(Phase 4.4) The Algorithm bar:** a world-boss-style meter across the top of the screen —
+  segmented bar with the FED/BLESSED thresholds ticked, current tier label glowing (`--cyan` FED,
+  `--gold` BLESSED), and the active buff ("ALL INCOME ×1.10"). Feeds from `socialSlice.algorithm`.
 - **Trending now:** list of trend topics with a `heat` meter (flame/intensity). Selecting one sets
   the **active trend** (`socialSlice.setActiveTrend`) used by runs. Show projected viewer bonus.
 - **Leaderboard:** the existing PartyKit `Leaderboard` (top channels for the active trend), styled
   as a TikTok ranking list. Highlight the player's row (already implemented).
-- This screen is where Phase 4 community features (raids available, who's live) will surface.
 
 ## 5. Create (＋) sheet & Inbox
 
@@ -106,6 +113,29 @@ This is a TikTok LIVE screen. Full-screen, hides the BottomNav.
 - **End Stream button:** top-right; ending voluntarily at high hype = outro bonus.
 - **Results sheet (on end):** peak viewers, gifts collected, hype grade (S–D / FLOP), followers
   gained, coins/diamonds — then "Back to Channel" + (on success) the 1-of-3 boon pick.
+  (Phase 4.3) adds a **top real gifter** row with a one-tap **SHOUT OUT** button.
+- **(Phase 4) Real-viewer rendering:** `real: true` feed events get a glow treatment (cyan border
+  glow + the viewer's `@handle`) so real humans visibly stand out from the sim crowd. A small
+  "👤 N real" counter sits by the viewer count when `realViewers > 0`.
+
+### 7b. Spectator mode (Phase 4.2–4.3) — same screen, viewer's seat
+
+The **same Live screen layout**, driven by `spectateSlice.liveSnapshot` instead of `runSlice`:
+- Top bar shows the **streamer's** `@handle` + LIVE badge + viewers/topic/timer; meters and the
+  feed update from snapshots. No End Stream — a **LEAVE** button (top-right) instead.
+- **No reaction hotbar.** In its place, the **viewer action bar** (4.3):
+  - a big **heart button** — the hype-tap spam target (rate-limited; burst hearts on tap, reuse
+    the FYP heart-burst), with a subtle charge meter when rate-limited out;
+  - a **quick-chat row** — the `QuickChatId` presets as one-tap pills (cooldown sweep);
+  - a **GIFT** button opening a bottom drawer: the four tiers with coin costs (disabled if
+    unaffordable); within the early-backer window, the drawer shows an "EARLY 🚀 jackpot ×3"
+    ribbon;
+  - **polls** — the streamer's choice events render as a voting card (one button per option,
+    live tally bars after voting).
+- In 4.2 (before interaction lands) the action bar renders disabled with a "soon" hint.
+- **Viewer result sheet** (on leave / stream end): the `WatchDrop` breakdown — watch time, coins
+  (+jackpot line if hit), likes, token followers, diamond if earned, shoutout banner if you got
+  one. "Back to Discover" button.
 
 ## 8. Shared UI primitives (`components/`)
 

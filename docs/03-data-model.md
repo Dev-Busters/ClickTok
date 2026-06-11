@@ -163,6 +163,9 @@ export type RunEvent = {
   giftTier?: GiftTier;                 // gift value tier
   choices?: RunChoice[];               // comment/sponsor decision options
   amount?: number;                     // generic magnitude (viewers, coins...)
+  // (Phase 4) real-viewer events — typed identically to sim ones, rendered with a glow:
+  real?: boolean;
+  fromHandle?: string;                 // the real viewer's handle (set iff real)
 };
 
 export type RunChoice = { label: string; apply: string /* effect key, see 04 */ };
@@ -220,10 +223,17 @@ export type RunResult = {
 };
 ```
 
-## 6. Social / multiplayer (Phase 4 — shapes to design toward)
+## 6. Social / multiplayer (Phase 4 — real spectator streams; see `01` §7)
+
+> Two PartyKit rooms: one global **lobby** (presence, live directory, trends, leaderboard, The
+> Algorithm) and one **stream room per live run** (id = `streamId`; streamer + spectators).
+> All numbers referenced here live in `04` §12. The old `goLive`/`raid`/`raided` messages are
+> **superseded** — raids were absorbed into spectator interaction.
 
 ```ts
-// client/src/party/types.ts  (MIRROR in party/src/*.ts)
+// client/src/party/types.ts  (MIRROR in party/src/*.ts — edit both together)
+
+// ——— Existing trend room (implemented; its leaderboard moves into the lobby in 4.4) ———
 export type ChannelSummary = {
   id: string;
   handle: string;
@@ -235,15 +245,106 @@ export type ChannelSummary = {
 
 export type ClientMessage =
   | { type: "join"; handle: string }
-  | { type: "score"; followers: number; likes: number }
-  | { type: "goLive"; topic: string }                 // Phase 4
-  | { type: "raid"; targetId: string; viewers: number }; // Phase 4
+  | { type: "score"; followers: number; likes: number };
 
 export type ServerMessage =
   | { type: "state"; room: { topic: string; startsAt: number; endsAt: number; channels: Record<string, ChannelSummary> } }
-  | { type: "leaderboard"; channels: ChannelSummary[] }
-  | { type: "raided"; fromHandle: string; viewers: number }; // Phase 4
+  | { type: "leaderboard"; channels: ChannelSummary[] };
 
+// ——— Shared Phase 4 shapes ———
+// creatorLevel = 1 + floor(log10(max(1, totalFollowers)))   // defined in 04 §12.0
+
+export type LiveStreamSummary = {        // a live run as advertised on Discover
+  streamId: string;                      // also the stream room id
+  handle: string;
+  creatorLevel: number;
+  topic: string;
+  viewers: number;                       // display total (sim + weighted real, 04 §12.3)
+  realViewers: number;
+  hype: number;                          // 0..100
+  startedAt: number;                     // ms epoch
+};
+
+export type AlgorithmTier = "STARVED" | "FED" | "BLESSED";
+export type AlgorithmState = { meter: number; tier: AlgorithmTier }; // thresholds in 04 §12.5
+
+export type QuickChatId = "w" | "fire" | "icon" | "ratio" | "cooked" | "real_one";
+// display text: W · 🔥🔥🔥 · an icon · ratio · cooked · a real one
+
+export type StreamPoll = {
+  pollId: string;                        // = the choice RunEvent's id
+  prompt: string;
+  options: string[];                     // RunChoice labels
+  closesAtSec: number;                   // run clock
+};
+
+export type SpectatorEvent = {           // trimmed RunEvent for the wire
+  id: string;
+  type: RunEventType;
+  text?: string;
+  giftTier?: GiftTier;
+  real?: boolean;
+  fromHandle?: string;
+};
+
+export type RunSnapshot = {              // streamer → server → spectators, 2–4×/sec
+  streamId: string;
+  handle: string;
+  topic: string;
+  clockSec: number;
+  durationSec: number;
+  viewers: number;                       // display total
+  hype: number;
+  modifiers: RunModifierId[];
+  newEvents: SpectatorEvent[];           // feed items since the previous snapshot only
+};
+
+// ——— Lobby room ———
+export type LobbyClientMessage =
+  | { type: "hello"; handle: string; creatorLevel: number }
+  | { type: "goLive"; summary: LiveStreamSummary }     // add me to the directory
+  | { type: "liveUpdate"; summary: LiveStreamSummary } // refresh viewers/hype on my card
+  | { type: "endLive"; streamId: string }
+  | { type: "score"; followers: number; likes: number }            // (4.4) leaderboard
+  | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number };
+
+export type LobbyServerMessage =
+  | { type: "directory"; streams: LiveStreamSummary[] }
+  | { type: "trends"; trends: { topic: string; heat: number }[]; rotatesAt: number } // (4.4)
+  | { type: "leaderboard"; channels: ChannelSummary[] }                              // (4.4)
+  | { type: "algorithm"; state: AlgorithmState };
+
+// ——— Stream room (streamer and viewers are both clients of the same room) ———
+export type StreamClientMessage =
+  // streamer →
+  | { type: "open"; summary: LiveStreamSummary }
+  | { type: "snapshot"; snap: RunSnapshot }
+  | { type: "pollOpen"; poll: StreamPoll }
+  | { type: "pollClose"; pollId: string; winningIndex: number }
+  | { type: "shoutout"; handle: string; followers: number }        // post-run top-gifter
+  | { type: "end"; grade: RunResult["grade"]; peakViewers: number }
+  // viewer →
+  | { type: "watch"; handle: string; creatorLevel: number }
+  | { type: "hypeTap"; taps: number }                  // batched, ≤1 msg/sec (04 §12.1)
+  | { type: "quickChat"; preset: QuickChatId }
+  | { type: "sendGift"; tier: GiftTier }
+  | { type: "vote"; pollId: string; choiceIndex: number };
+
+export type StreamServerMessage =
+  // → spectators
+  | { type: "snapshot"; snap: RunSnapshot; realViewers: number }
+  | { type: "poll"; poll: StreamPoll }
+  | { type: "shoutout"; handle: string; followers: number }        // claim iff handle is yours
+  | { type: "ended"; grade: RunResult["grade"] }
+  // → streamer (real interactions to inject as `real: true` RunEvents)
+  | { type: "viewerCount"; realViewers: number }
+  | { type: "realHype"; fromHandle: string; taps: number }
+  | { type: "realChat"; fromHandle: string; preset: QuickChatId }
+  | { type: "realGift"; fromHandle: string; tier: GiftTier; atRunSec: number }
+  | { type: "voteTally"; pollId: string; tally: number[] };
+```
+
+```ts
 // store/slices/socialSlice.ts
 export type SocialSlice = {
   activeTrend: string | null;     // replaces hardcoded DEFAULT_TREND
@@ -252,7 +353,44 @@ export type SocialSlice = {
   setActiveTrend: (t: string) => void;
   setLeaderboard: (l: ChannelSummary[]) => void;
   setTrends: (t: { topic: string; heat: number }[]) => void;
+  // Phase 4:
+  liveDirectory: LiveStreamSummary[];       // Discover "LIVE NOW" rail
+  algorithm: AlgorithmState | null;
+  setLiveDirectory: (s: LiveStreamSummary[]) => void;
+  setAlgorithm: (a: AlgorithmState) => void;
 };
+```
+
+```ts
+// store/slices/spectateSlice.ts (Phase 4 — EPHEMERAL, never persisted)
+export type WatchDrop = {
+  watchSec: number;
+  coins: number; diamonds: number; followers: number; likes: number;
+  jackpotCoins: number;        // early-backer payout (0 if none), 04 §12.2
+  shoutoutFollowers: number;   // 0 unless you were the shouted-out top gifter
+};
+
+export type SpectateSlice = {
+  spectating: LiveStreamSummary | null;    // null = not watching
+  liveSnapshot: RunSnapshot | null;
+  spectateFeed: SpectatorEvent[];          // rolling feed from snapshots (cap ~40)
+  realViewers: number;
+  watchStartedAt: number | null;           // ms epoch
+  myGiftCoinsSent: number;                 // this stream (jackpot/shoutout basis)
+  myEarlyGiftCoins: number;                // sent within the early-backer window
+  activePoll: StreamPoll | null;
+  pendingDrop: WatchDrop | null;           // drives the viewer result sheet
+  joinStream: (s: LiveStreamSummary) => void;
+  leaveStream: () => void;                 // compute + grant WatchDrop (04 §12.4)
+  applySnapshot: (snap: RunSnapshot, realViewers: number) => void;
+};
+```
+
+```ts
+// runSlice — Phase 4 additions (streamer side, ephemeral like the rest of RunSlice)
+//   realViewers: number;
+//   realTapsLast5s: number;   // sliding window for hype-decay relief (04 §12.3)
+//   realGiftLog: { handle: string; coins: number; atRunSec: number }[]; // top gifter + jackpot
 ```
 
 ## 7. UI slice & navigation
@@ -276,7 +414,8 @@ export type UiSlice = {
 // store/index.ts
 export type FullState =
   ChannelSlice & UpgradesSlice & SkillsSlice & CatalogSlice &
-  RunSlice & SocialSlice & UiSlice;
+  RunSlice & SocialSlice & UiSlice
+  & SpectateSlice; // Phase 4
 ```
 
 ## 9. Save shape & versioning

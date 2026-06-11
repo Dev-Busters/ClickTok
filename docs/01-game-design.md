@@ -165,19 +165,62 @@ Exact formulas in `04` § Run scoring.
    trends, reactions, and eventually prestige. →
 5. (Later) Community: ride global trends, get raided by / raid real players, join global events.
 
-## 7. Multiplayer / community (Phase 4 — design ahead, build last)
+## 7. Multiplayer — real spectator streams (Phase 4; design LOCKED 2026-06-10)
 
-Goal: individual players measurably affect all others, for richer live-dev content.
-- **Global trends:** server-authoritative trending topics rotate on a timer; streaming the hot
-  trend yields more. Players collectively "push" trends by streaming them (aggregate effect).
-- **Live raids (player→player):** when you're live, you can be raided by another live player —
-  their viewers spill into your run as a real buff, and vice versa. Direct cross-player effect.
-- **Gifts/collabs between players;** **global challenges** (server-wide goals with shared rewards).
-- **Leaderboards:** global and per-trend (the current PartyKit trend room is the seed of this).
-- Backed by **Supabase** for accounts, durable saves, and persistent leaderboards.
+**Core decision: a run is a real livestream other players can watch and interact with.** The
+single-player game already *simulates* a live audience; multiplayer makes parts of that audience
+real. Real players' joins, taps, comments, and gifts arrive in the streamer's feed as events typed
+identically to simulated ones (flagged `real`, rendered with a glow). NPC events keep filling the
+gaps, so a stream with zero real viewers plays exactly like today's single-player — the game
+degrades gracefully at any population.
 
-Architecture must not paint us into a corner here: keep run scoring and trend state expressible
-as messages a server could authoritatively own later. See `02` § Multiplayer-readiness.
+### 7.1 The viewer loop (watching is gameplay)
+- **Discover** lists who is live now (TikTok LIVE-tab style cards: streamer, topic, viewers, hype).
+- Joining opens a **read-only spectator Live screen** (same UI as streaming) plus a viewer action
+  bar:
+  - **Hype taps** — free, rate-limited heart-spam; each tap nudges the streamer's hype.
+  - **Quick-chat** — canned TikTok-style comments ("W", "🔥🔥🔥", "an icon"…). No free text
+    (moderation surface + more authentic to TikTok spam culture). Appears in the streamer's feed
+    under the viewer's handle.
+  - **Gifts** — cost the viewer coins; the streamer gets the coins + a hype spike; the viewer gets
+    a partial clout-back scaled by the streamer's **creator level**, plus an **early-backer
+    jackpot** if a gift sent in the first 30s ends in an ≥A-grade run ("I backed them first").
+  - **Votes** — the streamer's choice events double as audience polls; the majority boosts the
+    chosen effect, winning voters share a payout.
+- **Watch-drops:** when the stream ends (or the viewer leaves), the viewer receives a single drop =
+  watch time × streamer's creator level × the run's final grade. Higher-progressed streamers are
+  better loot zones — **progressed players literally become content and rewards for everyone
+  else.** This is the global effect: the more anyone grinds, the richer everyone's options.
+
+### 7.2 The streamer side
+Real viewers are strictly better than sim ones: they count extra in the viewer total (and payout),
+their gifts are bonus income, their taps slow hype decay, a real crowd effectively raises flop
+protection. Post-run, the streamer can **shout out** their top real gifter — that viewer gains
+followers. Reciprocity in the loop.
+
+**Economy guardrail:** viewing earns **coins** (and rare diamonds); **followers stay
+streamer-primary** (watch-drops grant only token follower amounts). Watching makes you richer;
+streaming makes you bigger. This keeps "everyone lurks, nobody streams" from being optimal.
+
+### 7.3 The Algorithm (global meter)
+One server-wide meter fed by all live activity (streams started, watch-seconds, gifts). Decays
+hourly; at thresholds grants everyone tiered buffs (FED: +10% all income; BLESSED: +25% + bonus
+run modifier). Shown on Discover like a world-boss bar. Collective play visibly improves the whole
+game — the simplest, most legible "players affect everyone" mechanic.
+
+### 7.4 Also in Phase 4
+- **Server-authoritative trends** (was the old 4.1): trend rotation lives in the lobby server;
+  streaming a trend pushes its heat for everyone.
+- **Leaderboards:** global and per-trend (the existing PartyKit trend room is the seed).
+- **Supabase** last: accounts, cloud saves, persistent leaderboards, stable player ids (until
+  then, handle = identity; acceptable for beta).
+- **Known constraints (accepted for beta):** client-trusted rewards are spoofable — server-side
+  validation comes with Supabase; cold-start handled by sim "featured streams" filler + the game
+  being fully playable solo; 3-min runs keep the directory fresh (a "stay live" run-chaining
+  option is a possible later addition).
+
+Architecture rule still stands: run scoring and trend state stay expressible as messages a server
+could authoritatively own later. See `02` § Multiplayer-readiness.
 
 ## 8. Out of scope (for now — note so models don't build them)
 

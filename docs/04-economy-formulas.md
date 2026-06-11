@@ -246,3 +246,135 @@ bad). All meta progress (gear/skills) is untouched by a flop.
 - Runs should out-earn ~5 min of idle by a healthy margin (runs are primary income).
 - Diamonds stay scarce — they gate the few elite upgrades; ~2–10 per good run.
 - If runs feel too swingy, lower `followerSqrtCoeff` variance sources and raise `flopGraceSec`.
+
+## 12. Phase 4 — viewer economy & The Algorithm (`01` §7, types in `03` §6)
+
+> Add to `BALANCE` (and `balance.ts`) as `BALANCE.social` when Phase 4 starts. **Guardrail
+> (locked):** viewing earns coins/likes (rare diamonds); followers stay streamer-primary — viewer
+> follower income is token-capped. Watching makes you richer; streaming makes you bigger. All
+> rewards are client-granted (trusted) until 4.5 adds server-side validation.
+
+```ts
+// merge into BALANCE (§0 / balance.ts):
+social: {
+  realViewerWeight: 5,            // each real viewer counts as 5 in the display/scored total
+  snapshotPerSec: 3,              // streamer publishes RunSnapshot 3×/sec
+
+  // §12.1 hype taps
+  tapMaxPerSec: 4,                // client rate limit; server drops excess
+  tapBatchSec: 1,                 // taps batched into ≤1 hypeTap message/sec
+  tapHypeAdd: 0.3,                // streamer: +hype per real tap
+  tapDecayReliefPerTap: 0.04,     // see §12.3
+  tapRewardBundle: 25,            // viewer: every 25 taps → coins = 1 × creatorLevel
+  tapRewardCapPerStream: 200,     // taps that count toward rewards per stream
+
+  // §12.2 quick-chat & gifts
+  quickChatCooldownSec: 3,        // no currency reward — it's expression, not income
+  giftHypeSpike: { rose: 3, heart: 6, galaxy: 15, lion: 35 },
+  giftCloutbackBase: 0.5,         // viewer likes-back = cost × (base + perLevel × creatorLevel)
+  giftCloutbackPerLevel: 0.1,
+  earlyBackerWindowSec: 30,
+  earlyBackerJackpotMult: 3,      // jackpot coins = early gift cost × 3, iff grade ≥ A
+
+  // §12.2 votes
+  voteBoostMult: 1.25,            // majority choice's effect magnitudes ×1.25
+  voteWinCoinsPerLevel: 10,       // winning voters: coins = 10 × creatorLevel
+
+  // §12.3 streamer-side real-crowd effects
+  flopReliefPerRealViewer: 0.10,  // see §12.3 (cap 0.5)
+  shoutoutFollowersPerLevel: 50,  // top gifter gains 50 × streamer creatorLevel followers
+
+  // §12.4 watch-drops
+  dropCoinsPerSecPerLevel: 0.15,
+  dropGradeMult: { S: 3, A: 2, B: 1.25, C: 1, D: 0.75, FLOP: 0.5 },
+  dropLikesPerSec: 0.5,
+  dropFollowerPer30s: 1,          // token; hard-capped
+  dropFollowerCap: 20,
+  dropDiamondMinSec: 90,          // +1 diamond iff grade ≥ A and watched ≥ 90s
+
+  // §12.5 The Algorithm
+  algoFeedStreamStarted: 5,
+  algoFeedPerWatchSec: 0.05,
+  algoFeedPerGiftCoin: 1 / 25,    // +1 meter per 25 coins of gift value
+  algoHalfLifeHours: 1,           // meter ×0.5 per hour
+  algoFedThreshold: 100,          //  ≥100 → FED:     ×1.10 all income
+  algoBlessedThreshold: 400,      //  ≥400 → BLESSED: ×1.25 + guaranteed 2nd run modifier
+},
+```
+
+### 12.0 Creator level (the viewer-economy scaler)
+
+```
+creatorLevel = 1 + floor(log10(max(1, wallet.totalFollowers)))
+// 0–9 → 1 · 10+ → 2 · 100+ → 3 · 1k+ → 4 · 10k+ → 5 · 100k+ → 6 · 1M+ → 7 …
+```
+Every viewer-side payout scales with the **streamer's** creator level — progressed players are
+better loot zones, which is the whole point (`01` §7.1).
+
+### 12.1 Hype taps (free interaction)
+
+Viewer taps are client-rate-limited to `tapMaxPerSec` and batched into one `hypeTap` message per
+`tapBatchSec`. Streamer applies `+tapHypeAdd` hype per tap (clamped 0–100 as usual). Viewer earns
+`coins = creatorLevel` per `tapRewardBundle` taps, up to `tapRewardCapPerStream` taps counted.
+
+### 12.2 Gifts & votes (paid / decisive interaction)
+
+**Gifts** — viewer spends `giftCoinValue[tier]` (§0 table; insufficient coins = can't send):
+```
+streamer: +giftCoinValue[tier] coins, +giftDiamondValue[tier] diamonds, +giftHypeSpike[tier] hype
+viewer:   likes-back = cost × (giftCloutbackBase + giftCloutbackPerLevel × creatorLevel)
+jackpot:  if sent at runClock ≤ earlyBackerWindowSec AND final grade ≥ A
+          → viewer also gets coins = cost × earlyBackerJackpotMult (paid via WatchDrop)
+```
+Real gifts are **bonus** on top of the sim gift schedule — the sim is unchanged by them.
+
+**Votes** — choice events (`RunEvent.choices`) are mirrored to the room as a `StreamPoll`. While
+real votes exist when the streamer resolves: the majority option's numeric effects are
+×`voteBoostMult`, and majority voters each earn `coins = voteWinCoinsPerLevel × creatorLevel`.
+The streamer still picks; the crowd weights and gets paid — ties / no votes = no boost.
+
+### 12.3 Streamer-side real-crowd effects
+
+```
+displayViewers   = simViewers + realViewerWeight × realViewers
+                   // used for the on-screen count, RunSnapshot, AND peakViewers/scoring (§10)
+hypeDecay_eff    = hypeDecayPerSec × (1 − min(0.5, tapDecayReliefPerTap × realTapsLast5s))
+flopFloor_eff    = flopFloor × (1 − min(0.5, flopReliefPerRealViewer × realViewers))
+```
+Real gifts/taps inject `real: true` RunEvents into the feed (glow render, `03` §5). Post-run, the
+results sheet offers **one** shoutout of the top real gifter (most gift coins): that viewer gains
+`shoutoutFollowersPerLevel × streamerCreatorLevel` followers.
+
+### 12.4 Watch-drops (the viewer's payout, on leave or stream end)
+
+```
+gradeMult = dropGradeMult[grade]        // leaving before the end: gradeMult = 1, no diamond
+coins     = round(watchSec × dropCoinsPerSecPerLevel × creatorLevel × gradeMult) + jackpotCoins
+likes     = round(watchSec × dropLikesPerSec)
+followers = min(dropFollowerCap, floor(watchSec / 30) × dropFollowerPer30s)   // token (guardrail)
+diamonds  = (grade ≥ A && watchSec ≥ dropDiamondMinSec) ? 1 : 0
+```
+Worked example: watching a level-5 streamer's full 180s A-grade run →
+`round(180 × 0.15 × 5 × 2)` = **270 coins**, 90 likes, 6 followers, 1 diamond.
+
+### 12.5 The Algorithm (global meter)
+
+Lobby server aggregates `feedAlgorithm` messages: `+algoFeedStreamStarted` per stream started,
+`+algoFeedPerWatchSec` per real watch-second, `+giftCoins × algoFeedPerGiftCoin` per real gift.
+Meter halves every `algoHalfLifeHours` hours. Tier (broadcast to all clients):
+```
+meter < 100  → STARVED  ×1.00
+meter ≥ 100  → FED      ×1.10 all income (posts, passive, run rewards)
+meter ≥ 400  → BLESSED  ×1.25 all income + every run rolls a guaranteed 2nd modifier
+               drawn from { algorithm_boost, trending_sound, viral_moment }
+```
+Client folds the tier multiplier into `multiplier` via `recomputeStats()` (like `boonMultiplier`).
+
+### 12.6 Tuning guidance (viewer economy)
+
+- Watching should pay roughly **half** of what streaming the same minutes would — rich enough to
+  be real gameplay, never optimal over going live yourself (followers enforce the rest).
+- Jackpots are the dopamine spike: rare (needs early gift + ≥A run) but 3× is felt. Tune frequency
+  before size.
+- Keep `realViewerWeight` high enough that ONE real viewer is felt by the streamer (~+5 viewers is
+  a visible bump early game, noise late game — revisit as population grows).
