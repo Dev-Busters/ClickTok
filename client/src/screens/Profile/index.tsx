@@ -1,6 +1,7 @@
 import { UpgradeShop } from "../../components/UpgradeShop";
 import { SkillsPanel } from "../../components/SkillsPanel";
 import { ProfileHeader } from "../../components/ProfileHeader";
+import { CloudAccountPanel } from "../../components/CloudAccountPanel";
 
 export function Profile() {
   return (
@@ -20,6 +21,12 @@ export function Profile() {
       </div>
 
       <SkillsPanel />
+
+      <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', margin: '20px 0' }}>
+        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
+      </div>
+
+      <CloudAccountPanel />
     </div>
   );
 }

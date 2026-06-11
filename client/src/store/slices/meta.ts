@@ -2,6 +2,7 @@ import type { Wallet } from "../../features/economy/types";
 import type { VideoPost } from "../../features/channel/types";
 import type { SkillId } from "../../features/skills/types";
 import type { InboxNotification } from "../../features/inbox/types";
+import type { FullState } from "../index";
 
 export const SAVE_VERSION = 3;
 
@@ -38,6 +39,31 @@ export type PersistedV3 = Omit<PersistedV2, "version"> & {
 };
 
 export type PersistedState = PersistedV3;
+
+// Single source of truth for "what gets saved" — used by the localStorage
+// `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
+// the two persistence targets never drift apart.
+export function toPersistedState(state: FullState): PersistedState {
+  return {
+    version: SAVE_VERSION,
+    handle: state.handle,
+    wallet: state.wallet,
+    comments: state.comments,
+    tapPower: state.tapPower,
+    passiveFollowersPerSec: state.passiveFollowersPerSec,
+    passiveCoinsPerSec: state.passiveCoinsPerSec,
+    multiplier: state.multiplier,
+    followerConversion: state.followerConversion,
+    boonMultiplier: state.boonMultiplier,
+    lastSeenAt: Date.now(),
+    ownedUpgrades: state.ownedUpgrades,
+    skillLevels: state.skillLevels,
+    videos: state.videos,
+    notifications: state.notifications,
+    lastDailyClaimAt: state.lastDailyClaimAt,
+    milestonesReached: state.milestonesReached,
+  };
+}
 
 // v1 shape (pre-1.1): persisted a flat `upgrades: Upgrade[]` with `purchased`/`cost`.
 type PersistedV1Upgrade = { id: string; purchased: boolean; cost: number };

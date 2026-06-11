@@ -483,12 +483,44 @@ by meta progression, with run-to-run variety.
   > (`viral_moment`), and stopping the party server fell back to STARVED + local trend rotation
   > with no console errors.
 
-- [ ] **4.5 — Supabase: accounts + cloud save + durable leaderboards + reward validation.** Add the
-  Supabase adapter at the `meta.ts` serialize boundary (`02` §4); auth (anonymous-upgradeable);
-  cloud save sync; persistent leaderboards; move viewer-reward granting (drops/jackpots/shoutouts)
-  behind server-side checks — until here they are client-trusted (accepted beta risk, `01` §7.4).
-  **Refs:** `01` §7.4, `02` §4. **DoD:** sign in, save syncs across two devices, leaderboard
-  survives a PartyKit restart, spoofed reward messages are rejected.
+> **4.5 split (2026-06-11):** the original single 4.5 bundled four distinct features — too large for
+> one session. Split into 4.5a/4.5b/4.5c, done in order; each gets its own typecheck pass + commit.
+
+- [x] **4.5a — Supabase auth (anonymous-upgradeable) + cloud save sync.** Add the Supabase adapter
+  at the `meta.ts` serialize boundary (`02` §4); anonymous sign-in on first load, upgradeable to a
+  real account via email link; cloud save sync.
+  **Refs:** `01` §7.4, `02` §4. **DoD:** sign in (anonymously), save syncs across two devices.
+  > note: created Supabase project "ClickTok" (`zdqnsizzhmkzirrrhnsa`); `client/.env` (gitignored)
+  > holds `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`. New `public.saves` table (`user_id` PK →
+  > `auth.users`, `handle`, `data jsonb`, `save_version`, `updated_at`), RLS scoped to
+  > `auth.uid() = user_id`. Required enabling "Anonymous Sign-Ins" in the dashboard's auth
+  > providers (no MCP tool exposes this config). `client/src/lib/supabase.ts` exports a `supabase`
+  > client that's `null` when env vars are unset — cloud sync becomes a no-op
+  > (`cloudSyncStatus: "offline"`) so the game stays fully local-only without Supabase configured.
+  > Extracted `meta.ts`'s `partialize` shape into a shared `toPersistedState(state)` (used by both
+  > the localStorage `persist` middleware and cloud push, so the two targets can't drift). New
+  > `cloudSlice` (ephemeral: `cloudUserId`/`cloudIsAnonymous`/`cloudEmail`/`cloudSyncStatus`, plus
+  > `loadPersistedState()` — the reverse of `toPersistedState`, reused for cloud-pull hydration).
+  > `features/cloud/sync.ts` (`pullCloudSave`/`pushCloudSave`) + `hooks/useCloudSync.ts` (mounted in
+  > `Shell`): on mount, signs in anonymously if no session, then last-write-wins sync — a separate
+  > localStorage key `clicktok-cloud-synced-at` (NOT part of `PersistedState`/`SAVE_VERSION`, since
+  > `lastSeenAt` is a session-start timestamp, not a save timestamp) tracks the last cloud
+  > `updated_at` this device has applied; pulls if the cloud row is newer, else pushes. Re-pushes
+  > every 30s and on `visibilitychange`. New `components/CloudAccountPanel.tsx` on Profile shows
+  > sync status (OFFLINE/SIGNING-IN/SYNCING/SYNCED/ERROR) and an email-link form
+  > (`supabase.auth.updateUser({email})` — anonymous→permanent upgrade, same `user.id`, so the
+  > existing cloud save carries over). Verified end-to-end live: anonymous sign-in created a
+  > `saves` row with the correct wallet/version; `loadPersistedState` correctly re-hydrates
+  > `wallet`/`handle`/`ownedUpgrades`/etc. and recomputes derived stats; a push→reload round trip
+  > pulled the pushed state back down.
+
+- [ ] **4.5b — Durable leaderboards.** Move the lobby's in-memory leaderboard (4.4) into Supabase
+  so it survives a PartyKit restart; global and per-trend views.
+  **Refs:** `01` §7.4. **DoD:** leaderboard data survives a PartyKit restart.
+
+- [ ] **4.5c — Server-side reward validation.** Move viewer-reward granting (drops/jackpots/
+  shoutouts, currently client-trusted per `01` §7.4) behind server-side checks.
+  **DoD:** spoofed reward messages are rejected.
 
 ---
 

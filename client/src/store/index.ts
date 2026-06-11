@@ -9,13 +9,15 @@ import { createSocialSlice, type SocialSlice } from "./slices/socialSlice";
 import { createUiSlice, type UiSlice } from "./slices/uiSlice";
 import { createInboxSlice, type InboxSlice } from "./slices/inboxSlice";
 import { createSpectateSlice, type SpectateSlice } from "./slices/spectateSlice";
-import { SAVE_VERSION, migrate, type PersistedState } from "./slices/meta";
+import { createCloudSlice, type CloudSlice } from "./slices/cloudSlice";
+import { SAVE_VERSION, migrate, toPersistedState, type PersistedState } from "./slices/meta";
 
-// 3.2 adds InboxSlice; 4.2 adds SpectateSlice — both deviate from 03 §8's
-// canonical FullState (same precedent as RunSlice/SocialSlice additions).
+// 3.2 adds InboxSlice; 4.2 adds SpectateSlice; 4.5 adds CloudSlice — all
+// deviate from 03 §8's canonical FullState (same precedent as
+// RunSlice/SocialSlice additions).
 export type FullState =
   ChannelSlice & UpgradesSlice & SkillsSlice & CatalogSlice &
-  RunSlice & SocialSlice & UiSlice & InboxSlice & SpectateSlice;
+  RunSlice & SocialSlice & UiSlice & InboxSlice & SpectateSlice & CloudSlice;
 
 export const useGameStore = create<FullState>()(
   persist<FullState, [], [], PersistedState>(
@@ -29,30 +31,13 @@ export const useGameStore = create<FullState>()(
       ...createUiSlice(set, get, api),
       ...createInboxSlice(set, get, api),
       ...createSpectateSlice(set, get, api),
+      ...createCloudSlice(set, get, api),
     }),
     {
       name: "clicktok-save",
       version: SAVE_VERSION,
       migrate,
-      partialize: (state) => ({
-        version: SAVE_VERSION,
-        handle: state.handle,
-        wallet: state.wallet,
-        comments: state.comments,
-        tapPower: state.tapPower,
-        passiveFollowersPerSec: state.passiveFollowersPerSec,
-        passiveCoinsPerSec: state.passiveCoinsPerSec,
-        multiplier: state.multiplier,
-        followerConversion: state.followerConversion,
-        boonMultiplier: state.boonMultiplier,
-        lastSeenAt: Date.now(),
-        ownedUpgrades: state.ownedUpgrades,
-        skillLevels: state.skillLevels,
-        videos: state.videos,
-        notifications: state.notifications,
-        lastDailyClaimAt: state.lastDailyClaimAt,
-        milestonesReached: state.milestonesReached,
-      }),
+      partialize: toPersistedState,
       onRehydrateStorage: () => (state) => {
         state?.recomputeStats();
       },
