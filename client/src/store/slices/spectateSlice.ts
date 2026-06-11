@@ -2,7 +2,7 @@ import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import { BALANCE } from "../../features/economy/balance";
 import type { GiftTier, LiveStreamSummary, QuickChatId, RunSnapshot, SpectatorEvent, StreamPoll } from "../../party/types";
-import { spectatorSocketRef } from "../../party/socketRefs";
+import { lobbySendRef, spectatorSocketRef } from "../../party/socketRefs";
 
 // Defined here per 03 §6 (not a wire type — stays in this slice).
 export type WatchDrop = {
@@ -203,6 +203,8 @@ export const createSpectateSlice: StateCreator<FullState, [], [], SpectateSlice>
     });
 
     spectatorSocketRef.current?.send(JSON.stringify({ type: "sendGift", tier }));
+    // 04 §12.5: real gift coins feed The Algorithm meter.
+    lobbySendRef.current?.({ type: "feedAlgorithm", kind: "giftCoins", amount: cost });
   },
 
   // 04 §12.2: cast a vote on an active poll.

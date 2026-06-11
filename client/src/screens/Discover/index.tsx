@@ -3,6 +3,7 @@ import { formatCount } from "../../lib/format";
 import { avatarGradient } from "../../lib/avatar";
 import { Leaderboard } from "../../components/Leaderboard";
 import { TrendList } from "../../components/TrendList";
+import { AlgorithmBar } from "../../components/AlgorithmBar";
 import type { LiveStreamSummary } from "../../party/types";
 
 function LiveNowCard({ stream }: { stream: LiveStreamSummary }) {
@@ -237,6 +238,8 @@ export function Discover() {
       <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', marginBottom: '16px' }}>
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
       </div>
+
+      <AlgorithmBar />
 
       <LiveNowRail />
 

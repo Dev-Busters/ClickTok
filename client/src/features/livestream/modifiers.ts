@@ -63,12 +63,19 @@ export function hasModifier(modifiers: RunModifier[], id: RunModifierId): boolea
 }
 
 // 04 §8: roll 1 modifier always; a 2nd with 40% chance, never a conflicting pair.
-export function rollModifiers(rng: () => number = Math.random): RunModifier[] {
+// 04 §12.5: BLESSED passes `guaranteedSecondPool` ({algorithm_boost,
+// trending_sound, viral_moment}) — the run always rolls a 2nd modifier from it.
+export function rollModifiers(rng: () => number = Math.random, guaranteedSecondPool?: RunModifierId[]): RunModifier[] {
   const first = ALL_MODIFIER_IDS[Math.floor(rng() * ALL_MODIFIER_IDS.length)];
   const picked: RunModifierId[] = [first];
+  const conflict = CONFLICTS[first];
 
-  if (rng() < 0.4) {
-    const conflict = CONFLICTS[first];
+  if (guaranteedSecondPool) {
+    const candidates = guaranteedSecondPool.filter(id => id !== first && id !== conflict);
+    if (candidates.length > 0) {
+      picked.push(candidates[Math.floor(rng() * candidates.length)]);
+    }
+  } else if (rng() < 0.4) {
     const candidates = ALL_MODIFIER_IDS.filter(id => id !== first && id !== conflict);
     if (candidates.length > 0) {
       picked.push(candidates[Math.floor(rng() * candidates.length)]);

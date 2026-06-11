@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.partykit.io/schema.json",
   "name": "clicktok",
-  "main": "src/trend.ts",
+  "main": "src/lobby.ts",
   "parties": {
     "lobby": "src/lobby.ts",
     "stream": "src/stream.ts"

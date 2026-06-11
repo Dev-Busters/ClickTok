@@ -77,7 +77,9 @@ export const BALANCE = {
     algoFeedPerWatchSec: 0.05,
     algoFeedPerGiftCoin: 1 / 25,
     algoHalfLifeHours: 1,
-    algoFedThreshold: 100,
-    algoBlessedThreshold: 400,
+    algoFedThreshold: 100,         //  ≥100 → FED:     ×1.10 all income
+    algoBlessedThreshold: 400,     //  ≥400 → BLESSED: ×1.25 + guaranteed 2nd run modifier
+    algoFedMult: 1.10,
+    algoBlessedMult: 1.25,
   },
 } as const;

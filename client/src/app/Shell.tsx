@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useLobby } from "../hooks/useLobby";
-import { useTrendRoom } from "../hooks/useTrendRoom";
 import { useStreamerRoom, useSpectatorRoom } from "../hooks/useStreamRoom";
 import { useGameStore, type IdleReport } from "../store";
-import { generateTrends } from "../features/social/trends";
 import { HomeFeed } from "../screens/HomeFeed";
 import { Discover } from "../screens/Discover";
 import { Inbox } from "../screens/Inbox";
@@ -15,15 +13,12 @@ import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
 
 const WELCOME_BACK_THRESHOLD_SEC = 60;
-const TREND_ROTATION_SEC = 90;
 
 export function Shell() {
   const activeTab = useGameStore(s => s.activeTab);
   const openSheet = useGameStore(s => s.openSheet);
   const setSheet = useGameStore(s => s.setSheet);
   const phase = useGameStore(s => s.phase);
-  const activeTrend = useGameStore(s => s.activeTrend);
-  const setTrends = useGameStore(s => s.setTrends);
   const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
   const spectating = useGameStore(s => s.spectating);
   const pendingDrop = useGameStore(s => s.pendingDrop);
@@ -37,14 +32,7 @@ export function Shell() {
     }
   }, [applyIdleIncome]);
 
-  // 3.1: locally rotating trends — refresh the pool + heat every ~90s.
-  useEffect(() => {
-    const id = setInterval(() => setTrends(generateTrends()), TREND_ROTATION_SEC * 1000);
-    return () => clearInterval(id);
-  }, [setTrends]);
-
   useGameLoop();
-  useTrendRoom(activeTrend);
   useLobby();
   useStreamerRoom();
   useSpectatorRoom();

@@ -14,23 +14,33 @@ export type SocialSlice = {
   setTrends: (trends: TrendInfo[]) => void;
   // Phase 4:
   liveDirectory: LiveStreamSummary[];
-  algorithm: AlgorithmState | null;
+  algorithm: AlgorithmState;
   setLiveDirectory: (streams: LiveStreamSummary[]) => void;
   setAlgorithm: (a: AlgorithmState) => void;
 };
 
 const INITIAL_TRENDS = generateTrends();
 
-export const createSocialSlice: StateCreator<FullState, [], [], SocialSlice> = (set) => ({
+// 4.4: solo/offline default — STARVED, ×1.00 (useLobby falls back to this
+// when the lobby socket is down).
+export const STARVED_ALGORITHM: AlgorithmState = { meter: 0, tier: "STARVED" };
+
+export const createSocialSlice: StateCreator<FullState, [], [], SocialSlice> = (set, get) => ({
   activeTrend: INITIAL_TRENDS[0]?.topic ?? "trending",
   trendsAvailable: INITIAL_TRENDS,
   leaderboard: [],
   liveDirectory: [],
-  algorithm: null,
+  algorithm: STARVED_ALGORITHM,
 
   setActiveTrend: (topic) => set({ activeTrend: topic }),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setTrends: (trendsAvailable) => set({ trendsAvailable }),
   setLiveDirectory: (liveDirectory) => set({ liveDirectory }),
-  setAlgorithm: (algorithm) => set({ algorithm }),
+  // Tier feeds recomputeStats()'s `multiplier` (04 §12.5), so a tier change
+  // must trigger a recompute, like applyBoon does for boonMultiplier.
+  setAlgorithm: (algorithm) => {
+    const tierChanged = get().algorithm.tier !== algorithm.tier;
+    set({ algorithm });
+    if (tierChanged) get().recomputeStats();
+  },
 });

@@ -27,6 +27,7 @@ import { formatCount } from "../../lib/format";
 import type {
   ReactionId,
   RunEvent,
+  RunModifierId,
   RunPhase,
   RunResult,
   RunStartParams,
@@ -112,14 +113,18 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   // 04 §6: compute run params from current meta state, roll/apply modifiers
   // (04 §8), then go live.
   startRun: (topic) => {
-    const { wallet, followerConversion, skillLevels, ownedUpgrades, trendsAvailable, pendingHypeBoost } = get();
+    const { wallet, followerConversion, skillLevels, ownedUpgrades, trendsAvailable, pendingHypeBoost, algorithm } = get();
     const trendHeat = getTrendHeat(trendsAvailable, topic);
     const baseParams = computeRunParams(
       { followers: wallet.followers, followerConversion, skillLevels, ownedUpgrades },
       topic,
       trendHeat,
     );
-    const modifiers = rollModifiers();
+    // 04 §12.5: BLESSED guarantees a 2nd modifier from this pool.
+    const guaranteedSecondPool: RunModifierId[] | undefined = algorithm.tier === "BLESSED"
+      ? ["algorithm_boost", "trending_sound", "viral_moment"]
+      : undefined;
+    const modifiers = rollModifiers(Math.random, guaranteedSecondPool);
     const params = applyModifiers(baseParams, modifiers);
 
     let crashAtSec: number | null = null;

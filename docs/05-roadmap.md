@@ -456,7 +456,7 @@ by meta progression, with run-to-run variety.
   > (wired consistently to the same actions/types exercised above) but not exercised live, since
   > a true second client session wasn't available in this preview environment.
 
-- [ ] **4.4 — The Algorithm + server-authoritative trends.** Lobby aggregates `feedAlgorithm` into
+- [x] **4.4 — The Algorithm + server-authoritative trends.** Lobby aggregates `feedAlgorithm` into
   `AlgorithmState` (feeds/decay/tiers per `04` §12.5) and broadcasts it; Discover renders the
   world-boss meter bar (`06` §4); the tier multiplier folds into `recomputeStats()` (like
   `boonMultiplier`); BLESSED grants the guaranteed 2nd modifier in `startRun`. Move trend rotation
@@ -467,6 +467,21 @@ by meta progression, with run-to-run variety.
   trends + meter; activity (stream/watch/gift) raises the meter; crossing FED multiplies income
   ×1.10 in both; single-window solo play still works offline (STARVED fallback, local trend
   fallback if the socket is down); typecheck.
+  > note: decay + trend rotation run on a 30s `party.storage.setAlarm` (re-armed each tick) plus
+  > lazy elapsed-time decay on every `feedAlgorithm`/connect, matching the existing in-memory
+  > `streams`/`streamerConns` precedent (no Durable Object storage persistence). Added
+  > `algoFedMult`/`algoBlessedMult` (1.10/1.25) to `BALANCE.social` per `04` §12.5. `algorithm` is
+  > typed non-null in `socialSlice` (deviates from `03` §6's `AlgorithmState | null`) with an
+  > exported `STARVED_ALGORITHM` default so `recomputeStats()`/UI never need null-checks; offline
+  > fallback in `useLobby` resets to `STARVED_ALGORITHM` + restarts the local 90s
+  > `generateTrends()` rotation on socket close. `rollModifiers()` gained an optional
+  > `guaranteedSecondPool` param (filtered for conflicts) used only when BLESSED. Added
+  > `lobbySendRef` to `socketRefs.ts` so `spectateSlice.sendViewerGift` can feed `giftCoins` without
+  > prop drilling. Verified live: two-socket probe pushed the meter STARVED→FED→BLESSED, Discover's
+  > `AlgorithmBar` updated in real time (×1.10/×1.25 buff text + tick marks), `recomputeStats()`
+  > `multiplier` reflected the tier mult, a BLESSED run rolled a guaranteed second modifier
+  > (`viral_moment`), and stopping the party server fell back to STARVED + local trend rotation
+  > with no console errors.
 
 - [ ] **4.5 — Supabase: accounts + cloud save + durable leaderboards + reward validation.** Add the
   Supabase adapter at the `meta.ts` serialize boundary (`02` §4); auth (anonymous-upgradeable);

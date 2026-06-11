@@ -1,10 +1,10 @@
-// Shared types between client and PartyKit server — keep in sync with party/src/trend.ts
-// Phase 4 lobby/stream types mirrored in party/src/lobby.ts — edit both together.
+// Shared types between client and the PartyKit lobby/stream rooms —
+// mirrored in party/src/lobby.ts and party/src/stream.ts — edit both together.
 
 import type { GiftTier, RunEventType, RunModifierId, RunResult } from '../features/livestream/types';
 export type { GiftTier };
 
-// ——— Existing trend room (implemented; leaderboard moves to lobby in 4.4) ———
+// ——— Leaderboard (4.4: lives in the lobby room) ———
 export type ChannelSummary = {
   id: string;
   handle: string;
@@ -13,14 +13,6 @@ export type ChannelSummary = {
   rank: number;
   live?: boolean;
 };
-
-export type ClientMessage =
-  | { type: "join"; handle: string }
-  | { type: "score"; followers: number; likes: number };
-
-export type ServerMessage =
-  | { type: "state"; room: { topic: string; startsAt: number; endsAt: number; channels: Record<string, ChannelSummary> } }
-  | { type: "leaderboard"; channels: ChannelSummary[] };
 
 // ——— Shared Phase 4 shapes ———
 // creatorLevel = 1 + floor(log10(max(1, totalFollowers)))   // defined in 04 §12.0

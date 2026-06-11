@@ -88,7 +88,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   // 04 §1/§2: postPower/multiplier/followerConversion/passiveCoinsPerSec from
   // owned gear+software effects and Charisma/Editing skill levels.
   recomputeStats: () => {
-    const { ownedUpgrades, skillLevels, boonMultiplier } = get();
+    const { ownedUpgrades, skillLevels, boonMultiplier, algorithm } = get();
 
     let postPowerAdd = 0;
     let postPowerMult = 1;
@@ -108,7 +108,11 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
 
     const charismaPostBonus = skillLevels.charisma * 1;
     const tapPower = (BALANCE.basePostPower + postPowerAdd + charismaPostBonus) * postPowerMult;
-    const multiplier = multiplierMult * boonMultiplier;
+    // 04 §12.5: The Algorithm's tier multiplier folds in like boonMultiplier.
+    const algoMult = algorithm.tier === "BLESSED" ? BALANCE.social.algoBlessedMult
+      : algorithm.tier === "FED" ? BALANCE.social.algoFedMult
+      : 1;
+    const multiplier = multiplierMult * boonMultiplier * algoMult;
     const followerConversion = 1 + followerConversionAdd + skillLevels.editing * 0.05;
     const passiveCoinsPerSec = passiveCoinsAdd * multiplier;
 
