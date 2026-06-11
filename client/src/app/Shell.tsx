@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
+import { useLobby } from "../hooks/useLobby";
 import { useTrendRoom } from "../hooks/useTrendRoom";
 import { useGameStore, type IdleReport } from "../store";
 import { generateTrends } from "../features/social/trends";
@@ -41,6 +42,7 @@ export function Shell() {
 
   useGameLoop();
   useTrendRoom(activeTrend);
+  useLobby();
 
   return (
     <div

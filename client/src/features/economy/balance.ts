@@ -40,4 +40,44 @@ export const BALANCE = {
     completionDiamondBase: 2,
     hypeBonusCoeff: 0.01,       // +1% rewards per hype point at end
   },
+
+  // Phase 4 — viewer economy & The Algorithm (04 §12)
+  social: {
+    realViewerWeight: 5,
+    snapshotPerSec: 3,
+
+    tapMaxPerSec: 4,
+    tapBatchSec: 1,
+    tapHypeAdd: 0.3,
+    tapDecayReliefPerTap: 0.04,
+    tapRewardBundle: 25,
+    tapRewardCapPerStream: 200,
+
+    quickChatCooldownSec: 3,
+    giftHypeSpike: { rose: 3, heart: 6, galaxy: 15, lion: 35 },
+    giftCloutbackBase: 0.5,
+    giftCloutbackPerLevel: 0.1,
+    earlyBackerWindowSec: 30,
+    earlyBackerJackpotMult: 3,
+
+    voteBoostMult: 1.25,
+    voteWinCoinsPerLevel: 10,
+
+    flopReliefPerRealViewer: 0.10,
+    shoutoutFollowersPerLevel: 50,
+
+    dropCoinsPerSecPerLevel: 0.15,
+    dropGradeMult: { S: 3, A: 2, B: 1.25, C: 1, D: 0.75, FLOP: 0.5 },
+    dropLikesPerSec: 0.5,
+    dropFollowerPer30s: 1,
+    dropFollowerCap: 20,
+    dropDiamondMinSec: 90,
+
+    algoFeedStreamStarted: 5,
+    algoFeedPerWatchSec: 0.05,
+    algoFeedPerGiftCoin: 1 / 25,
+    algoHalfLifeHours: 1,
+    algoFedThreshold: 100,
+    algoBlessedThreshold: 400,
+  },
 } as const;

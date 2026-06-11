@@ -390,7 +390,7 @@ by meta progression, with run-to-run variety.
 > Each task is independently shippable; the game must stay fully playable solo at every step.
 > Multi-client DoDs are verified with two browser windows against the local PartyKit dev server.
 
-- [ ] **4.1 — Lobby presence + live directory.** New PartyKit lobby room (`party/src/lobby.ts`,
+- [x] **4.1 — Lobby presence + live directory.** New PartyKit lobby room (`party/src/lobby.ts`,
   pattern-match `trend.ts`): handle `hello`/`goLive`/`liveUpdate`/`endLive`, broadcast `directory`
   (`03` §6). Client: a `useLobby` hook (mounted in `Shell` like `useTrendRoom`), `socialSlice`
   Phase-4 fields (`liveDirectory`), and the Discover **LIVE NOW** rail (`06` §4). `startRun`
@@ -400,6 +400,7 @@ by meta progression, with run-to-run variety.
   **Refs:** `01` §7.1, `03` §6, `04` §12.0, `06` §4, `02` §6. **DoD:** two windows: going live in
   one shows a live card (handle/topic/viewers/hype) in the other within ~2s, updating while live,
   gone on end; zero regression to solo play; typecheck.
+  > note: all Phase 4 wire types (stream room included) added to `client/src/party/types.ts` now so §6 is complete; stream room types unused until 4.2. `algorithm` field added to `socialSlice` for 4.4. `parties.lobby` added to `partykit.json`.
 
 - [ ] **4.2 — Spectating (read-only).** Stream rooms (`party/src/stream.ts`): streamer `open`s the
   room and publishes `RunSnapshot` `snapshotPerSec`×/sec; server rebroadcasts to viewers with

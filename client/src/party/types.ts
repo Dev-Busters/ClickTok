@@ -1,11 +1,16 @@
 // Shared types between client and PartyKit server — keep in sync with party/src/trend.ts
+// Phase 4 lobby/stream types mirrored in party/src/lobby.ts — edit both together.
 
+import type { GiftTier, RunEventType, RunModifierId, RunResult } from '../features/livestream/types';
+
+// ——— Existing trend room (implemented; leaderboard moves to lobby in 4.4) ———
 export type ChannelSummary = {
   id: string;
   handle: string;
   followers: number;
   likes: number;
   rank: number;
+  live?: boolean;
 };
 
 export type ClientMessage =
@@ -15,3 +20,95 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: "state"; room: { topic: string; startsAt: number; endsAt: number; channels: Record<string, ChannelSummary> } }
   | { type: "leaderboard"; channels: ChannelSummary[] };
+
+// ——— Shared Phase 4 shapes ———
+// creatorLevel = 1 + floor(log10(max(1, totalFollowers)))   // defined in 04 §12.0
+
+export type LiveStreamSummary = {
+  streamId: string;                      // also the stream room id
+  handle: string;
+  creatorLevel: number;
+  topic: string;
+  viewers: number;                       // display total (sim + weighted real, 04 §12.3)
+  realViewers: number;
+  hype: number;                          // 0..100
+  startedAt: number;                     // ms epoch
+};
+
+export type AlgorithmTier = "STARVED" | "FED" | "BLESSED";
+export type AlgorithmState = { meter: number; tier: AlgorithmTier };
+
+export type QuickChatId = "w" | "fire" | "icon" | "ratio" | "cooked" | "real_one";
+// display text: W · 🔥🔥🔥 · an icon · ratio · cooked · a real one
+
+export type StreamPoll = {
+  pollId: string;
+  prompt: string;
+  options: string[];
+  closesAtSec: number;
+};
+
+export type SpectatorEvent = {
+  id: string;
+  type: RunEventType;
+  text?: string;
+  giftTier?: GiftTier;
+  real?: boolean;
+  fromHandle?: string;
+};
+
+export type RunSnapshot = {
+  streamId: string;
+  handle: string;
+  topic: string;
+  clockSec: number;
+  durationSec: number;
+  viewers: number;
+  hype: number;
+  modifiers: RunModifierId[];
+  newEvents: SpectatorEvent[];
+};
+
+// ——— Lobby room ———
+export type LobbyClientMessage =
+  | { type: "hello"; handle: string; creatorLevel: number }
+  | { type: "goLive"; summary: LiveStreamSummary }
+  | { type: "liveUpdate"; summary: LiveStreamSummary }
+  | { type: "endLive"; streamId: string }
+  | { type: "score"; followers: number; likes: number }
+  | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number };
+
+export type LobbyServerMessage =
+  | { type: "directory"; streams: LiveStreamSummary[] }
+  | { type: "trends"; trends: { topic: string; heat: number }[]; rotatesAt: number }
+  | { type: "leaderboard"; channels: ChannelSummary[] }
+  | { type: "algorithm"; state: AlgorithmState };
+
+// ——— Stream room (streamer and viewers are both clients of the same room) ———
+export type StreamClientMessage =
+  // streamer →
+  | { type: "open"; summary: LiveStreamSummary }
+  | { type: "snapshot"; snap: RunSnapshot }
+  | { type: "pollOpen"; poll: StreamPoll }
+  | { type: "pollClose"; pollId: string; winningIndex: number }
+  | { type: "shoutout"; handle: string; followers: number }
+  | { type: "end"; grade: RunResult["grade"]; peakViewers: number }
+  // viewer →
+  | { type: "watch"; handle: string; creatorLevel: number }
+  | { type: "hypeTap"; taps: number }
+  | { type: "quickChat"; preset: QuickChatId }
+  | { type: "sendGift"; tier: GiftTier }
+  | { type: "vote"; pollId: string; choiceIndex: number };
+
+export type StreamServerMessage =
+  // → spectators
+  | { type: "snapshot"; snap: RunSnapshot; realViewers: number }
+  | { type: "poll"; poll: StreamPoll }
+  | { type: "shoutout"; handle: string; followers: number }
+  | { type: "ended"; grade: RunResult["grade"] }
+  // → streamer
+  | { type: "viewerCount"; realViewers: number }
+  | { type: "realHype"; fromHandle: string; taps: number }
+  | { type: "realChat"; fromHandle: string; preset: QuickChatId }
+  | { type: "realGift"; fromHandle: string; tier: GiftTier; atRunSec: number }
+  | { type: "voteTally"; pollId: string; tally: number[] };
