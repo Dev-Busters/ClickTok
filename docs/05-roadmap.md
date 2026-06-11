@@ -376,8 +376,9 @@ by meta progression, with run-to-run variety.
   > Added dev-only `window.gameStore` (preview testing; rAF is throttled in background tabs).
   > NOT done: screen-shake, sound — fold into a later polish task if wanted. 60fps unverified in
   > the throttled preview; re-check on a real device.
-- [ ] **3.4 — Prestige ("Rebrand").** Implement reset-for-Clout-multiplier (`01` §4.4) + UI.
-  **DoD:** rebrand resets the right things, keeps diamonds, applies a permanent multiplier.
+- [~] **3.4 — Prestige ("Rebrand"). DEFERRED — DO NOT BUILD.** (User decision 2026-06-10: no
+  prestige mechanics for now; multiplayer is the priority. Spec stub in `01` §4.4 retained for a
+  possible post-multiplayer revisit.) **Skip this task.**
 - [ ] **3.5 — Balance pass.** Tune `BALANCE` against the guidance in `04` §11 using real playthroughs.
 
 ---

@@ -102,7 +102,12 @@ export function HomeFeed() {
         style={{ position: 'absolute', right: '10px', bottom: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}
       >
         {/* Avatar + follow badge */}
-        <div style={{ position: 'relative', width: '44px', height: '44px' }}>
+        <motion.div
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.92 }}
+          transition={{ type: "spring", stiffness: 520, damping: 22 }}
+          style={{ position: 'relative', width: '44px', height: '44px', cursor: 'pointer' }}
+        >
           <div style={{
             width: '44px', height: '44px', borderRadius: '50%',
             background: avatarGradient(handle),
@@ -116,7 +121,7 @@ export function HomeFeed() {
           <div style={{ position: 'absolute', left: '50%', bottom: '-7px', transform: 'translateX(-50%)', width: '16px', height: '16px', borderRadius: '50%', background: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#fff', lineHeight: 1 }}>
             +
           </div>
-        </div>
+        </motion.div>
 
         <RailStat count={wallet.likes} label="likes" icon={
           <svg width="30" height="30" viewBox="0 0 24 24" fill="#fff">
@@ -145,8 +150,11 @@ export function HomeFeed() {
       {/* ── Bottom-left: caption block (TikTok style) ── */}
       <div style={{ position: 'absolute', left: '12px', right: '76px', bottom: '14px', display: 'flex', flexDirection: 'column', gap: '7px', pointerEvents: 'none' }}>
         {/* GO LIVE pill */}
-        <button
+        <motion.button
           onPointerDown={e => { e.stopPropagation(); setSheet('create'); }}
+          whileHover={{ scale: 1.05, boxShadow: '0 0 22px rgba(255,31,75,0.5)' }}
+          whileTap={{ scale: 0.94 }}
+          transition={{ type: "spring", stiffness: 520, damping: 24 }}
           style={{
             pointerEvents: 'auto',
             alignSelf: 'flex-start',
@@ -166,7 +174,7 @@ export function HomeFeed() {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>
             ~{formatCount(projectedViewers)} viewers
           </span>
-        </button>
+        </motion.button>
 
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '15px', fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
           @{handle}
@@ -219,7 +227,16 @@ function RailStat({ count, label, icon, gold, cyan }: {
   count: number; label: string; icon: React.ReactNode; gold?: boolean; cyan?: boolean;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }} title={label}>
+    <motion.button
+      whileHover={{ scale: 1.18, y: -2 }}
+      whileTap={{ scale: 0.8 }}
+      transition={{ type: "spring", stiffness: 520, damping: 22 }}
+      title={label}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+        background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+      }}
+    >
       <div style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }}>{icon}</div>
       <span style={{
         fontFamily: 'var(--font-ui)', fontSize: '12px', fontWeight: 600,
@@ -228,6 +245,6 @@ function RailStat({ count, label, icon, gold, cyan }: {
       }}>
         {formatCount(count)}
       </span>
-    </div>
+    </motion.button>
   );
 }

@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactElement } from "react";
+import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 
 export function BottomNav() {
@@ -32,13 +33,16 @@ export function BottomNav() {
       />
 
       {/* Center "+" — opens the Create sheet, doesn't change the active tab */}
-      <button
+      <motion.button
         onClick={() => setSheet('create')}
         aria-label="Create"
+        whileHover={{ scale: 1.12, y: -2 }}
+        whileTap={{ scale: 0.88 }}
+        transition={{ type: "spring", stiffness: 520, damping: 22 }}
         style={createButtonStyle}
       >
         <CreateIcon />
-      </button>
+      </motion.button>
 
       <NavButton
         active={activeTab === 'inbox'}
@@ -69,12 +73,19 @@ function NavButton({
 }) {
   const color = active ? 'var(--text)' : 'var(--dim)';
   return (
-    <button onClick={onClick} aria-label={label} style={navButtonStyle}>
+    <motion.button
+      onClick={onClick}
+      aria-label={label}
+      whileHover={{ scale: 1.1, y: -2 }}
+      whileTap={{ scale: 0.88 }}
+      transition={{ type: "spring", stiffness: 520, damping: 22 }}
+      style={navButtonStyle}
+    >
       <Icon color={color} />
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em', color }}>
         {label}
       </span>
-    </button>
+    </motion.button>
   );
 }
 
