@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "client", "dev"],
       "autoPort": true
+    },
+    {
+      "name": "clicktok-party",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "party", "dev"],
+      "port": 1999
     }
   ]
 }

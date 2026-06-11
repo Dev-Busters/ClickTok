@@ -25,6 +25,9 @@ export type RunEvent = {
   giftTier?: GiftTier;                 // gift value tier
   choices?: RunChoice[];               // comment/sponsor decision options
   amount?: number;                     // generic magnitude (viewers, coins...)
+  // Phase 4: real-viewer events are typed identically to sim ones, rendered with a glow.
+  real?: boolean;
+  fromHandle?: string;                 // the real viewer's handle (set iff real)
 };
 
 export type RunChoice = { label: string; apply: string /* effect key, see 04 */ };

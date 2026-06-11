@@ -3,7 +3,8 @@
   "name": "clicktok",
   "main": "src/trend.ts",
   "parties": {
-    "lobby": "src/lobby.ts"
+    "lobby": "src/lobby.ts",
+    "stream": "src/stream.ts"
   },
   "compatibilityDate": "2024-01-01"
 }

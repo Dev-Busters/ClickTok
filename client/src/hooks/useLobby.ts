@@ -18,6 +18,7 @@ export function useLobby() {
   const setLiveDirectory = useGameStore(s => s.setLiveDirectory);
   const phase = useGameStore(s => s.phase);
   const params = useGameStore(s => s.params);
+  const streamId = useGameStore(s => s.streamId);
 
   // Connect to the global lobby room once the player has a handle.
   useEffect(() => {
@@ -52,9 +53,8 @@ export function useLobby() {
   // Announce goLive when a run starts; send liveUpdate periodically; send endLive when done.
   useEffect(() => {
     const socket = socketRef.current;
-    if (phase !== "live" || !params || !socket) return;
+    if (phase !== "live" || !params || !socket || !streamId) return;
 
-    const streamId = crypto.randomUUID();
     streamIdRef.current = streamId;
     const startedAt = Date.now();
 
@@ -88,6 +88,6 @@ export function useLobby() {
         streamIdRef.current = null;
       }
     };
-  }, [phase, params]);
+  }, [phase, params, streamId]);
   // params is stable for the life of a run; phase transitions drive setup/teardown
 }

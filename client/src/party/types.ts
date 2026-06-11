@@ -2,6 +2,7 @@
 // Phase 4 lobby/stream types mirrored in party/src/lobby.ts — edit both together.
 
 import type { GiftTier, RunEventType, RunModifierId, RunResult } from '../features/livestream/types';
+export type { GiftTier };
 
 // ——— Existing trend room (implemented; leaderboard moves to lobby in 4.4) ———
 export type ChannelSummary = {

@@ -8,13 +8,14 @@ import { createRunSlice, type RunSlice } from "./slices/runSlice";
 import { createSocialSlice, type SocialSlice } from "./slices/socialSlice";
 import { createUiSlice, type UiSlice } from "./slices/uiSlice";
 import { createInboxSlice, type InboxSlice } from "./slices/inboxSlice";
+import { createSpectateSlice, type SpectateSlice } from "./slices/spectateSlice";
 import { SAVE_VERSION, migrate, type PersistedState } from "./slices/meta";
 
-// 3.2 adds InboxSlice to FullState — not part of 03 §8's canonical FullState
-// type (predates the Inbox), same precedent as RunSlice/SocialSlice additions.
+// 3.2 adds InboxSlice; 4.2 adds SpectateSlice — both deviate from 03 §8's
+// canonical FullState (same precedent as RunSlice/SocialSlice additions).
 export type FullState =
   ChannelSlice & UpgradesSlice & SkillsSlice & CatalogSlice &
-  RunSlice & SocialSlice & UiSlice & InboxSlice;
+  RunSlice & SocialSlice & UiSlice & InboxSlice & SpectateSlice;
 
 export const useGameStore = create<FullState>()(
   persist<FullState, [], [], PersistedState>(
@@ -27,6 +28,7 @@ export const useGameStore = create<FullState>()(
       ...createSocialSlice(set, get, api),
       ...createUiSlice(set, get, api),
       ...createInboxSlice(set, get, api),
+      ...createSpectateSlice(set, get, api),
     }),
     {
       name: "clicktok-save",

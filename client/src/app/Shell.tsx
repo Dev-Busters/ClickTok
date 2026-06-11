@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useLobby } from "../hooks/useLobby";
 import { useTrendRoom } from "../hooks/useTrendRoom";
+import { useStreamerRoom, useSpectatorRoom } from "../hooks/useStreamRoom";
 import { useGameStore, type IdleReport } from "../store";
 import { generateTrends } from "../features/social/trends";
 import { HomeFeed } from "../screens/HomeFeed";
@@ -24,6 +25,8 @@ export function Shell() {
   const activeTrend = useGameStore(s => s.activeTrend);
   const setTrends = useGameStore(s => s.setTrends);
   const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
+  const spectating = useGameStore(s => s.spectating);
+  const pendingDrop = useGameStore(s => s.pendingDrop);
 
   const [idleReport, setIdleReport] = useState<IdleReport | null>(null);
 
@@ -43,6 +46,8 @@ export function Shell() {
   useGameLoop();
   useTrendRoom(activeTrend);
   useLobby();
+  useStreamerRoom();
+  useSpectatorRoom();
 
   return (
     <div
@@ -60,7 +65,7 @@ export function Shell() {
         overflow: 'hidden',
       }}
     >
-      {phase === 'live' || phase === 'results' ? (
+      {phase === 'live' || phase === 'results' || spectating !== null || pendingDrop !== null ? (
         <Live />
       ) : (
         <>

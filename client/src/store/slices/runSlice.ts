@@ -35,6 +35,7 @@ import type {
 export type RunSlice = {
   phase: RunPhase;
   params: RunStartParams | null;
+  streamId: string | null;   // 4.2: stable UUID for this run; used as stream room id
   clockSec: number;          // elapsed run time
   viewers: number;
   peakViewers: number;
@@ -51,6 +52,12 @@ export type RunSlice = {
   viralWaveAtSec: number | null; // 2.7: scheduled `viral_moment` wave time, or null
   pendingHypeBoost: number;      // 2.7: `hype_carryover` boon, applied to next run's start hype
   boonChoices: BoonDef[] | null; // 2.7: 1-of-3 post-run boon pick, shown on a successful run
+  // 4.3: real-crowd state (ephemeral, streamer-side)
+  realViewers: number;
+  realTapsLast5s: number;        // sliding window fed by useStreamerRoom for hype-decay relief
+  realGiftLog: { handle: string; coins: number; atRunSec: number }[];
+  lastChoiceResolution: { pollId: string; winningIndex: number } | null;
+  pendingVoteTally: Record<string, number[]>; // pollId → per-option vote counts
 
   startRun: (topic: string) => void;     // compute params from meta, go live
   runTick: (dt: number) => void;         // the run loop step (engine)
@@ -61,6 +68,8 @@ export type RunSlice = {
   endRun: (reason: "voluntary" | "timer" | "flop") => RunResult;
   applyBoon: (id: BoonId) => void;       // 2.7: apply the chosen post-run boon
   returnToChannel: () => void;           // dismiss results, back to phase "idle"
+  injectRealEvent: (event: RunEvent) => void; // 4.3: inject a real viewer event into the feed
+  applyRealViewerCount: (count: number) => void; // 4.3: update realViewers from viewerCount msg
 };
 
 const INITIAL_COOLDOWNS: Record<ReactionId, number> = {
@@ -77,6 +86,7 @@ const INITIAL_HYPE = 50;
 export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, get) => ({
   phase: "idle",
   params: null,
+  streamId: null,
   clockSec: 0,
   viewers: 0,
   peakViewers: 0,
@@ -93,6 +103,11 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   viralWaveAtSec: null,
   pendingHypeBoost: 0,
   boonChoices: null,
+  realViewers: 0,
+  realTapsLast5s: 0,
+  realGiftLog: [],
+  lastChoiceResolution: null,
+  pendingVoteTally: {},
 
   // 04 §6: compute run params from current meta state, roll/apply modifiers
   // (04 §8), then go live.
@@ -120,6 +135,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     set({
       phase: "live",
       params,
+      streamId: crypto.randomUUID(),
       clockSec: 0,
       viewers: params.startViewers,
       peakViewers: params.startViewers,
@@ -136,6 +152,11 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       pendingHypeBoost: 0,
       crashAtSec,
       viralWaveAtSec,
+      realViewers: 0,
+      realTapsLast5s: 0,
+      realGiftLog: [],
+      lastChoiceResolution: null,
+      pendingVoteTally: {},
     });
   },
 
@@ -146,6 +167,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     const {
       phase, params, clockSec, hype, viewers, peakViewers, cooldowns, flopTimer,
       events, giftRateBoostUntil, crashAtSec, viralWaveAtSec,
+      realViewers, realTapsLast5s,
     } = get();
     if (phase !== "live" || !params) return;
 
@@ -155,8 +177,13 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     let liveEvents = events.filter(e => e.expiresAt > newClockSec);
     const activeTrolls = liveEvents.filter(e => e.type === "troll").length;
 
+    // 04 §12.3: real taps reduce effective hype decay (cap 50%).
+    const { social: S } = BALANCE;
+    const hypeDecayEff = params.hypeDecayPerSec *
+      (1 - Math.min(0.5, S.tapDecayReliefPerTap * realTapsLast5s));
+
     let newHype = clamp(
-      hype - params.hypeDecayPerSec * dt - activeTrolls * BALANCE.run.trollHypeDrainPerSec * dt,
+      hype - hypeDecayEff * dt - activeTrolls * BALANCE.run.trollHypeDrainPerSec * dt,
       0, 100,
     );
 
@@ -215,8 +242,14 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       liveEvents = liveEvents.slice(liveEvents.length - MAX_FEED_EVENTS);
     }
 
-    const newPeakViewers = Math.max(peakViewers, newViewers);
-    const newFlopTimer = newViewers < params.flopFloor ? flopTimer + dt : 0;
+    // 04 §12.3: real viewers inflate the display total and scoring peak.
+    const displayViewers = newViewers + S.realViewerWeight * realViewers;
+    const newPeakViewers = Math.max(peakViewers, displayViewers);
+
+    // 04 §12.3: real viewers reduce the effective flop floor (cap 50%).
+    const flopFloorEff = params.flopFloor *
+      (1 - Math.min(0.5, S.flopReliefPerRealViewer * realViewers));
+    const newFlopTimer = newViewers < flopFloorEff ? flopTimer + dt : 0;
 
     set({
       clockSec: newClockSec,
@@ -299,7 +332,7 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
   // magnitudes are anchored to existing run formulas — see `choices.ts`.
   // 2.7: `tough_crowd` also boosts the sponsor payout.
   resolveChoice: (eventId, choiceIndex) => {
-    const { phase, events, hype, viewers, wallet, collected, clockSec, gainsBoostUntil, skillLevels, params } = get();
+    const { phase, events, hype, viewers, wallet, collected, clockSec, gainsBoostUntil, skillLevels, params, pendingVoteTally } = get();
     if (phase !== "live") return;
 
     const event = events.find(e => e.id === eventId);
@@ -310,63 +343,64 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     const remaining = events.filter(e => e.id !== eventId);
     const gainsMult = clockSec < gainsBoostUntil ? 3 : 1;
 
+    // 04 §12.2: if majority of voters picked this option, boost its effects.
+    const tally = pendingVoteTally[eventId];
+    const voteBoost = (() => {
+      if (!tally || tally.length === 0) return 1;
+      const max = Math.max(...tally);
+      if (max === 0) return 1;
+      return tally[choiceIndex] === max ? BALANCE.social.voteBoostMult : 1;
+    })();
+    const newPendingVoteTally = { ...pendingVoteTally };
+    delete newPendingVoteTally[eventId];
+
+    const resolution = { lastChoiceResolution: { pollId: eventId, winningIndex: choiceIndex }, pendingVoteTally: newPendingVoteTally };
+
     switch (choice.apply as ChoiceEffectId) {
       case "sponsor_accept": {
-        // Same payout shape as `collectGift`, at the "galaxy" tier — a big
-        // one-time bag in exchange for a viewer dip (01 §5.2).
         const valueBonus = 1 + BALANCE.run.monetizationGiftPerLevel * skillLevels.monetization;
         const hypeBonus = 1 + hype / 100;
         const toughCrowdMult = hasModifier(params?.modifiers ?? [], "tough_crowd")
           ? MODIFIER_EFFECTS.toughCrowdGiftValueMult
           : 1;
-        const coins = Math.round(BALANCE.run.giftCoinValue.galaxy * valueBonus * hypeBonus * gainsMult * toughCrowdMult);
-        set({
-          events: remaining,
-          viewers: viewers * 0.92,
-          collected: { ...collected, coins: collected.coins + coins },
-        });
+        const coins = Math.round(BALANCE.run.giftCoinValue.galaxy * valueBonus * hypeBonus * gainsMult * toughCrowdMult * voteBoost);
+        set({ events: remaining, viewers: viewers * 0.92, collected: { ...collected, coins: collected.coins + coins }, ...resolution });
         break;
       }
 
       case "sponsor_decline":
-        set({ events: remaining, hype: clamp(hype + 5, 0, 100) });
+        set({ events: remaining, hype: clamp(hype + 5 * voteBoost, 0, 100), ...resolution });
         break;
 
       case "drama_clapback":
-        set({ events: remaining, hype: clamp(hype + 10, 0, 100), viewers: viewers * 0.95 });
+        set({ events: remaining, hype: clamp(hype + 10 * voteBoost, 0, 100), viewers: viewers * 0.95, ...resolution });
         break;
 
       case "drama_classy": {
-        const followersGain = Math.round(viewers * 0.1) * gainsMult;
+        const followersGain = Math.round(viewers * 0.1 * gainsMult * voteBoost);
         set({
           events: remaining,
-          hype: clamp(hype + 3, 0, 100),
-          wallet: {
-            ...wallet,
-            followers: wallet.followers + followersGain,
-            totalFollowers: wallet.totalFollowers + followersGain,
-          },
+          hype: clamp(hype + 3 * voteBoost, 0, 100),
+          wallet: { ...wallet, followers: wallet.followers + followersGain, totalFollowers: wallet.totalFollowers + followersGain },
+          ...resolution,
         });
         break;
       }
 
       case "shoutout_fan": {
-        const followersGain = Math.round(viewers * 0.05) * gainsMult;
+        const followersGain = Math.round(viewers * 0.05 * gainsMult * voteBoost);
         set({
           events: remaining,
-          hype: clamp(hype + 2, 0, 100),
-          wallet: {
-            ...wallet,
-            followers: wallet.followers + followersGain,
-            totalFollowers: wallet.totalFollowers + followersGain,
-          },
+          hype: clamp(hype + 2 * voteBoost, 0, 100),
+          wallet: { ...wallet, followers: wallet.followers + followersGain, totalFollowers: wallet.totalFollowers + followersGain },
+          ...resolution,
         });
         break;
       }
 
       case "shoutout_skip":
       default:
-        set({ events: remaining });
+        set({ events: remaining, ...resolution });
         break;
     }
   },
@@ -524,5 +558,16 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
     }
   },
 
-  returnToChannel: () => set({ phase: "idle", params: null, lastResult: null, boonChoices: null }),
+  returnToChannel: () => set({
+    phase: "idle", params: null, streamId: null, lastResult: null, boonChoices: null,
+    realViewers: 0, realTapsLast5s: 0, realGiftLog: [], lastChoiceResolution: null, pendingVoteTally: {},
+  }),
+
+  // 4.3: inject a real viewer event (glow-rendered) into the live feed.
+  injectRealEvent: (event) => set(state => ({
+    events: state.events.concat(event).slice(-MAX_FEED_EVENTS),
+  })),
+
+  // 4.3: update real viewer count from the stream room's viewerCount message.
+  applyRealViewerCount: (count) => set({ realViewers: count }),
 });

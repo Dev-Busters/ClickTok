@@ -6,23 +6,28 @@ import { TrendList } from "../../components/TrendList";
 import type { LiveStreamSummary } from "../../party/types";
 
 function LiveNowCard({ stream }: { stream: LiveStreamSummary }) {
+  const joinStream = useGameStore(s => s.joinStream);
   const initials = stream.handle.slice(0, 2).toUpperCase();
   const hypeBarWidth = `${Math.round(stream.hype)}%`;
 
   return (
-    <div style={{
-      flexShrink: 0,
-      width: '108px',
-      borderRadius: '12px',
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      padding: '10px 8px 0',
-      gap: '4px',
-    }}>
+    <div
+      onClick={() => joinStream(stream)}
+      style={{
+        flexShrink: 0,
+        width: '108px',
+        borderRadius: '12px',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '10px 8px 0',
+        gap: '4px',
+        cursor: 'pointer',
+        transition: 'background 0.15s',
+      }}>
       {/* Avatar */}
       <div style={{
         width: '48px',

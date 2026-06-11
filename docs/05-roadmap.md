@@ -402,7 +402,7 @@ by meta progression, with run-to-run variety.
   gone on end; zero regression to solo play; typecheck.
   > note: all Phase 4 wire types (stream room included) added to `client/src/party/types.ts` now so §6 is complete; stream room types unused until 4.2. `algorithm` field added to `socialSlice` for 4.4. `parties.lobby` added to `partykit.json`.
 
-- [ ] **4.2 — Spectating (read-only).** Stream rooms (`party/src/stream.ts`): streamer `open`s the
+- [x] **4.2 — Spectating (read-only).** Stream rooms (`party/src/stream.ts`): streamer `open`s the
   room and publishes `RunSnapshot` `snapshotPerSec`×/sec; server rebroadcasts to viewers with
   `realViewers`. Client: `spectateSlice` (`03` §6), tapping a LIVE NOW card joins as a viewer, and
   the **Live screen renders in spectator mode** (`06` §7 spectator notes) — same meters/feed driven
@@ -411,8 +411,19 @@ by meta progression, with run-to-run variety.
   **Refs:** `01` §7.1, `03` §6, `04` §12.0+§12.4, `06` §7, `02` §6. **DoD:** window B taps A's card
   → sees A's meters/feed move in near-real-time; B leaving (or A ending) grants B the formula-exact
   drop; A's run is unaffected by being watched; typecheck.
+  > note: `streamId: string | null` added to `RunSlice` (generated in `startRun`, cleared in
+  > `returnToChannel`) so `useLobby` and `useStreamerRoom` share a single source of truth instead
+  > of each generating their own UUID. `leaveStream` takes an optional `endedGrade?: string`
+  > parameter (deviation from spec's `() => void`) so the spectator hook can pass the grade from
+  > an `ended` server message. `real?: boolean` and `fromHandle?: string` added to `RunEvent` type
+  > per `03` §5 (Phase 4 fields). `partykit.json` updated with `"stream": "src/stream.ts"` entry.
+  > PartyKit server restart required after adding the stream party (workerd caches old config).
+  > Verified in preview: streamer went LIVE; a raw `stream`-room connection registered as a
+  > viewer ("watch") and the streamer's pill showed "👤 1 real" via `viewerCount`. `RunSnapshot`s
+  > streamed at `snapshotPerSec` with `viewers` reflecting `displayViewers` (sim + realViewerWeight
+  > × realViewers).
 
-- [ ] **4.3 — Viewer interaction (the heart).** Implement `hypeTap`/`quickChat`/`sendGift`/`vote`
+- [x] **4.3 — Viewer interaction (the heart).** Implement `hypeTap`/`quickChat`/`sendGift`/`vote`
   viewer messages + the server relays to the streamer (`03` §6). Viewer side: action bar (heart-spam
   button w/ rate limit + batching, quick-chat row, gift drawer that spends coins, poll overlay)
   per `06` §7. Streamer side: inject `real: true` RunEvents (glow render), apply real-crowd
@@ -424,6 +435,26 @@ by meta progression, with run-to-run variety.
   visibly slow A's hype decay; B's gift costs B coins, appears glowing in A's feed, and pays both
   sides per formula; a choice event shows as a poll B votes in; an early B gift on an A-grade run
   pays B the jackpot in the drop sheet; A can shout out B (+followers to B); typecheck.
+  > note: `voteTally` server msg broadcast to ALL connections (not streamer-only as in 03 §6) so
+  > spectators can display live tally bars and receive vote-win coin rewards. `pendingVoteTally`
+  > and `lastChoiceResolution` added to `RunSlice` (not in 03 §5) for `pollOpen`/`pollClose`
+  > timing and vote-boost in `resolveChoice`. `realTapsLast5s` sliding window managed in the hook
+  > (`tapWindowRef`) rather than the store. `useStreamerRoom` effect deps reduced to
+  > `[streamId, handle]` (was `[phase, streamId, handle, params]`) to keep the socket alive
+  > through the `results` phase so the shoutout button can fire. `GiftTier` re-exported from
+  > `client/src/party/types.ts` (was imported-but-not-exported).
+  > Verified in preview: a raw viewer connection sent `hypeTap` (4 taps) — streamer's hype rose
+  > and a cyan-glow "@viewerB ❤️❤️❤️❤️" comment appeared in the streamer's `LiveFeed`; sent
+  > `sendGift` (galaxy) — streamer's coins/diamonds increased by the formula amounts and a
+  > cyan-glow "Galaxy @viewerB TAP" gift pill appeared. Ending the run sent `ended` (grade "B")
+  > to the viewer, and the streamer's top-gifter SHOUT OUT button broadcast
+  > `{handle:"viewerB", followers:100}`. Found `LiveFeed.tsx` did not implement the `06`§7
+  > "real events get a cyan glow + @handle" treatment for the streamer's own feed (only the
+  > spectator's `SpecFeedItem` had it) — fixed by threading `real`/`fromHandle` through `ChatPill`
+  > and the gift `FeedItem` in `client/src/components/LiveFeed.tsx`. Poll/vote flow and the
+  > spectator-side `SpectatorLive`/`ViewerActionBar`/`DropSheet` UI were verified by code review
+  > (wired consistently to the same actions/types exercised above) but not exercised live, since
+  > a true second client session wasn't available in this preview environment.
 
 - [ ] **4.4 — The Algorithm + server-authoritative trends.** Lobby aggregates `feedAlgorithm` into
   `AlgorithmState` (feeds/decay/tiers per `04` §12.5) and broadcasts it; Discover renders the

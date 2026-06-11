@@ -24,9 +24,9 @@ function eventHash(id: string): number {
   return hash;
 }
 
-function ChatPill({ id, children, danger }: { id: string; children: React.ReactNode; danger?: boolean }) {
+function ChatPill({ id, children, danger, real, fromHandle }: { id: string; children: React.ReactNode; danger?: boolean; real?: boolean; fromHandle?: string }) {
   const h = eventHash(id);
-  const name = CHAT_NAMES[h % CHAT_NAMES.length];
+  const name = real && fromHandle ? `@${fromHandle}` : CHAT_NAMES[h % CHAT_NAMES.length];
   const hue = h % 360;
   return (
     <div style={{
@@ -38,6 +38,8 @@ function ChatPill({ id, children, danger }: { id: string; children: React.ReactN
       padding: "6px 12px 6px 7px",
       background: "rgba(0,0,0,0.4)",
       borderRadius: "16px",
+      border: real ? "1px solid rgba(37,244,238,0.4)" : "none",
+      boxShadow: real ? "0 0 8px rgba(37,244,238,0.2)" : "none",
     }}>
       <div style={{
         width: "22px", height: "22px", flexShrink: 0,
@@ -47,7 +49,7 @@ function ChatPill({ id, children, danger }: { id: string; children: React.ReactN
       <div style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
         <span style={{
           fontFamily: "var(--font-ui)", fontSize: "11px", fontWeight: 600,
-          color: danger ? "var(--red)" : "rgba(255,255,255,0.55)",
+          color: danger ? "var(--red)" : real ? "var(--cyan)" : "rgba(255,255,255,0.55)",
         }}>
           {name}
         </span>
@@ -122,6 +124,7 @@ function FeedItem({ event }: { event: RunEvent }) {
   }
 
   if (event.type === "gift" && event.giftTier) {
+    const accent = event.real ? "var(--cyan)" : "var(--gold)";
     return (
       <motion.button
         layout
@@ -138,9 +141,9 @@ function FeedItem({ event }: { event: RunEvent }) {
           gap: "8px",
           padding: "8px 14px",
           background: "rgba(0,0,0,0.55)",
-          border: "1px solid var(--gold)",
+          border: `1px solid ${accent}`,
           borderRadius: "999px",
-          boxShadow: "0 0 18px rgba(245,166,35,0.35)",
+          boxShadow: event.real ? "0 0 18px rgba(37,244,238,0.35)" : "0 0 18px rgba(245,166,35,0.35)",
           cursor: "pointer",
         }}
       >
@@ -154,7 +157,12 @@ function FeedItem({ event }: { event: RunEvent }) {
         <span style={{ fontFamily: "var(--font-ui)", fontSize: "13px", fontWeight: 700, color: "#fff" }}>
           {TIER_LABEL[event.giftTier]}
         </span>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: "9px", letterSpacing: "0.14em", color: "var(--gold)" }}>
+        {event.real && event.fromHandle && (
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "var(--cyan)" }}>
+            @{event.fromHandle}
+          </span>
+        )}
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: "9px", letterSpacing: "0.14em", color: accent }}>
           TAP
         </span>
       </motion.button>
@@ -190,7 +198,7 @@ function FeedItem({ event }: { event: RunEvent }) {
       exit={{ opacity: 0 }}
       style={{ alignSelf: "flex-start", maxWidth: "80%" }}
     >
-      <ChatPill id={event.id}>{event.text}</ChatPill>
+      <ChatPill id={event.id} real={event.real} fromHandle={event.fromHandle}>{event.text}</ChatPill>
     </motion.div>
   );
 }
