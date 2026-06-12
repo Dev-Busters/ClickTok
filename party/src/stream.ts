@@ -96,11 +96,39 @@ export default class StreamServer implements Party.Server {
   private votesByPoll = new Map<string, Map<string, number>>();
   // connId → ms epoch of last quickChat (per-connection rate limit, 04 §12.7)
   private lastQuickChatMs = new Map<string, number>();
+  // 4.5c-2: connection id → verified Supabase user.id (populated in onConnect via JWT)
+  private connUserIds = new Map<string, string>();
 
   constructor(readonly party: Party.Room) {}
 
-  async onConnect(_conn: Party.Connection) {
-    // Client sends open/watch first; nothing to push on bare connect.
+  // Mirrored from lobby.ts (04 §12.7); falls back to in-memory-only if unset.
+  private supabaseConfig(): { url: string; key: string } | null {
+    const env = this.party.env as Record<string, string | undefined>;
+    const url = env.SUPABASE_URL;
+    const key = env.SUPABASE_SERVICE_ROLE_KEY;
+    return url && key ? { url, key } : null;
+  }
+
+  async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
+    // 4.5c-2: verify Supabase JWT if present — bind verified user.id to this connection.
+    const token = new URL(ctx.request.url).searchParams.get("token");
+    if (token) {
+      const config = this.supabaseConfig();
+      if (config) {
+        try {
+          const res = await fetch(`${config.url}/auth/v1/user`, {
+            headers: { apikey: config.key, Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const user = await res.json() as { id: string };
+            if (user.id) this.connUserIds.set(conn.id, user.id);
+          }
+        } catch {
+          // token verification failed — connection continues as guest
+        }
+      }
+    }
+    // Client sends open/watch first; nothing else to push on bare connect.
   }
 
   private computeTally(pollId: string): number[] {
@@ -279,6 +307,7 @@ export default class StreamServer implements Party.Server {
   }
 
   async onClose(conn: Party.Connection) {
+    this.connUserIds.delete(conn.id); // 4.5c-2: clean up verified identity
     this.lastQuickChatMs.delete(conn.id);
     if (conn.id === this.streamerConnId) {
       // Streamer disconnected — notify spectators with the last known grade or FLOP.

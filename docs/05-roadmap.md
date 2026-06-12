@@ -578,7 +578,7 @@ by meta progression, with run-to-run variety.
   > `pnpm typecheck` passes; 13/13 probe assertions pass (`probe-4.5c1.mjs`, run against local
   > PartyKit dev server at 127.0.0.1:1999).
 
-- [ ] **4.5c-2 — Verified identity (Supabase JWT → PartyKit).** Client: append the Supabase
+- [x] **4.5c-2 — Verified identity (Supabase JWT → PartyKit).** Client: append the Supabase
   `access_token` to BOTH party sockets' connection URLs (PartySocket `query: { token }`, value
   from `supabase.auth.getSession()`; omit when null). Server (lobby + stream room): in
   `onConnect`, read `token` from the request URL and verify it via
@@ -593,6 +593,16 @@ by meta progression, with run-to-run variety.
   B's real `userId` → B's `leaderboard_scores` row is untouched and A appears only as an
   in-memory guest; an authenticated socket's `score` persists to its own row; killing Supabase
   env vars locally still yields a working lobby; typecheck for client + party.
+  > note: `query` is a lazy async function (PartySocket supports `() => Promise<Params>`) so
+  > the token is fetched right before connection and refreshed on reconnect — no token is stored
+  > in client state. `ctx.request.url` used in both lobby and stream `onConnect` to read the
+  > query param; `conn.uri` would also work. `connUserIds` map in lobby replaces the 4.5b
+  > `hello.userId` trust path for the leaderboard key and persistence decision. Stream room
+  > binds the verified id but does not yet use it in message handling (no DoD requirement).
+  > `probe-4.5c2.mjs` (5/5 assertions pass) includes a 12s wait for the persistence debounce
+  > to prove the authenticated row write end-to-end; guest tests are sub-second. An initial
+  > probe bug (drain not awaited → stale leaderboard picked up by waitFor) was found and fixed
+  > before the final run. Prod deploy still needed — see note below.
 
 ---
 

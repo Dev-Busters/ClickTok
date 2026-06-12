@@ -111,6 +111,8 @@ export default class LobbyServer implements Party.Server {
   private channels = new Map<string, ChannelEntry>();
   // connection id → leaderboard key, so onMessage/onClose can find the entry
   private connKeys = new Map<string, string>();
+  // 4.5c-2: connection id → verified Supabase user.id (populated in onConnect via JWT)
+  private connUserIds = new Map<string, string>();
   // userId → ms epoch of last Supabase write (debounce)
   private lastPersist = new Map<string, number>();
   // connection id → ms epoch of last feedAlgorithm message (rate limit, 04 §12.7)
@@ -138,7 +140,26 @@ export default class LobbyServer implements Party.Server {
     await this.party.storage.setAlarm(now + ALARM_INTERVAL_MS);
   }
 
-  async onConnect(conn: Party.Connection) {
+  async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
+    // 4.5c-2: verify Supabase JWT if present — bind verified user.id to this connection.
+    // Tokenless connections are guests: full gameplay, in-memory leaderboard only, never persisted.
+    const token = new URL(ctx.request.url).searchParams.get("token");
+    if (token) {
+      const config = this.supabaseConfig();
+      if (config) {
+        try {
+          const res = await fetch(`${config.url}/auth/v1/user`, {
+            headers: { apikey: config.key, Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const user = await res.json() as { id: string };
+            if (user.id) this.connUserIds.set(conn.id, user.id);
+          }
+        } catch {
+          // token verification failed — connection continues as guest
+        }
+      }
+    }
     const now = Date.now();
     this.decayAlgo(now);
     this.maybeRotateTrends(now);
@@ -172,10 +193,10 @@ export default class LobbyServer implements Party.Server {
 
       switch (msg.type) {
         case "hello": {
-          // 4.5b: key by the stable Supabase userId when known, so a reconnect
-          // (or a restart that reloaded from Supabase) finds the same entry.
+          // 4.5c-2: use the JWT-verified id if present; never trust client-sent userId.
           // Key is bound once at hello; subsequent score messages cannot change it.
-          const key = msg.userId ?? sender.id;
+          const verifiedId = this.connUserIds.get(sender.id);
+          const key = verifiedId ?? sender.id;
           this.connKeys.set(sender.id, key);
           const existing = this.channels.get(key);
           this.channels.set(key, {
@@ -186,7 +207,7 @@ export default class LobbyServer implements Party.Server {
             rank: existing?.rank ?? 0,
             live: existing?.live,
             trend: existing?.trend,
-            userId: msg.userId,
+            userId: verifiedId,  // only set if JWT-verified; never from msg.userId
           });
           break;
         }
@@ -228,7 +249,9 @@ export default class LobbyServer implements Party.Server {
 
         case "score": {
           // Use the key bound at hello; ignore any score.userId switch attempt (04 §12.7).
+          // 4.5c-2: ground-truth identity comes from the verified JWT, not client-sent fields.
           const key = this.connKeys.get(sender.id) ?? sender.id;
+          const verifiedId = this.connUserIds.get(sender.id);
           const existing = this.channels.get(key);
           const ch: ChannelEntry = {
             id: key,
@@ -238,12 +261,12 @@ export default class LobbyServer implements Party.Server {
             rank: existing?.rank ?? 0,
             live: existing?.live,
             trend: msg.trend ?? existing?.trend,
-            userId: existing?.userId,  // preserve what was set at hello; never from score
+            userId: verifiedId,  // 4.5c-2: only the JWT-verified id; never from msg.userId
           };
           this.channels.set(key, ch);
           this.broadcastLeaderboard();
           if (ch.trend) this.broadcastTrendLeaderboard(ch.trend);
-          if (ch.userId) await this.persistScore(ch.userId, ch);
+          if (verifiedId) await this.persistScore(verifiedId, ch); // 4.5c-2: persist only verified
           break;
         }
 
@@ -276,6 +299,7 @@ export default class LobbyServer implements Party.Server {
   }
 
   async onClose(conn: Party.Connection) {
+    this.connUserIds.delete(conn.id); // 4.5c-2: clean up verified identity
     this.feedAlgoLastMs.delete(conn.id);
 
     const streamId = this.streamerConns.get(conn.id);

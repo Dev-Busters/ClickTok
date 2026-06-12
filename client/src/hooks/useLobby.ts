@@ -5,6 +5,7 @@ import { STARVED_ALGORITHM } from "../store/slices/socialSlice";
 import { generateTrends } from "../features/social/trends";
 import { lobbySendRef } from "../party/socketRefs";
 import type { LobbyClientMessage, LobbyServerMessage, LiveStreamSummary } from "../party/types";
+import { supabase } from "../lib/supabase";
 
 const PARTY_HOST = import.meta.env.VITE_PARTYKIT_HOST ?? "localhost:1999";
 const LIVE_UPDATE_MS = 3000;
@@ -37,7 +38,19 @@ export function useLobby() {
   useEffect(() => {
     if (!handle) return;
 
-    const socket = new PartySocket({ host: PARTY_HOST, room: "lobby", party: "lobby" });
+    // 4.5c-2: append Supabase access_token to the connection URL so the server
+    // can verify identity and bind a durable leaderboard key.
+    const socket = new PartySocket({
+      host: PARTY_HOST,
+      room: "lobby",
+      party: "lobby",
+      query: async () => {
+        if (!supabase) return {};
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        return token ? { token } : {};
+      },
+    });
     socketRef.current = socket;
     lobbySendRef.current = (msg) => socketRef.current?.send(JSON.stringify(msg));
 

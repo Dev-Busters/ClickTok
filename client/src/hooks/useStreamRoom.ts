@@ -14,6 +14,7 @@ import { BALANCE } from "../features/economy/balance";
 import type { RunEvent } from "../features/livestream/types";
 import { spectatorSocketRef, streamerSendRef } from "../party/socketRefs";
 import { clamp } from "../lib/math";
+import { supabase } from "../lib/supabase";
 
 const PARTY_HOST = import.meta.env.VITE_PARTYKIT_HOST ?? "localhost:1999";
 
@@ -47,7 +48,18 @@ export function useStreamerRoom() {
   useEffect(() => {
     if (!streamId || !handle) return;
 
-    const socket = new PartySocket({ host: PARTY_HOST, room: streamId, party: "stream" });
+    // 4.5c-2: append Supabase access_token so the stream room can verify identity.
+    const socket = new PartySocket({
+      host: PARTY_HOST,
+      room: streamId,
+      party: "stream",
+      query: async () => {
+        if (!supabase) return {};
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        return token ? { token } : {};
+      },
+    });
     streamerSendRef.current = (msg: StreamClientMessage) => socket.send(JSON.stringify(msg));
     sentEventIdsRef.current = new Set();
     sentPollIdsRef.current = new Set();
@@ -273,10 +285,17 @@ export function useSpectatorRoom() {
   useEffect(() => {
     if (!spectating || !handle) return;
 
+    // 4.5c-2: append Supabase access_token so the stream room can verify identity.
     const socket = new PartySocket({
       host: PARTY_HOST,
       room: spectating.streamId,
       party: "stream",
+      query: async () => {
+        if (!supabase) return {};
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        return token ? { token } : {};
+      },
     });
     spectatorSocketRef.current = socket;
 
