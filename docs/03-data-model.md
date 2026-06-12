@@ -401,12 +401,50 @@ export type SpectateSlice = {
 //   realTapsLast5s: number;   // sliding window for hype-decay relief (04 §12.3)
 //   realGiftLog: { handle: string; coins: number; atRunSec: number }[]; // top gifter + jackpot
 
-## 6.5 The Feed (Phase 7 — see `01` §8; numbers in `04` §13)
+## 6.5 The Feed & the Element system (Phase 7 — see `01` §8; numbers in `04` §13)
+
+```ts
+// features/elements/types.ts (Phase 7.3+ — the clicker element framework, client-only)
+export type ElementId = "beat_sync" | "duet_loop";   // extensible — new elements = new id here
+
+export type BeatGrade = "perfect" | "good" | "ok" | "miss";
+
+export type ElementDef = {
+  id: ElementId;
+  name: string;              // display name, e.g. "BEAT SYNC"
+  tagline: string;           // one-line pitch shown on the locked pod / unlock sheet
+  requires: { coins: number; followers: number }; // coins SPENT to unlock; followers = gate
+};
+
+// One in-flight wave (ephemeral). Discriminated per element:
+export type ElementWave =
+  | { element: "beat_sync"; startedAt: number;   // ms epoch — THE shared clock; ring scale and
+      rings: { id: number; grade?: BeatGrade }[] } //  grading both derive from (now - startedAt)
+  | { element: "duet_loop"; startedAt: number;
+      armedIndex: number | null;                  // pod lit and waiting for its tap
+      completed: number };                        // pods finished (0..duetCircles)
+
+// store/slices/elementsSlice.ts
+export type ElementsSlice = {
+  ownedElements: Partial<Record<ElementId, boolean>>; // ⚠ PERSISTED — SAVE_VERSION bump +
+                                                      // migration (default {}), per `02` §4
+  activeWave: ElementWave | null;     // ephemeral
+  nextWaveAt: number;                 // ephemeral scheduler clock (ms epoch)
+  unlockElement: (id: ElementId) => boolean; // false if can't afford / follower gate unmet
+  spawnWave: (id: ElementId) => void;
+  tapRing: (ringId: number) => void;  // beat_sync: grade = f(now - startedAt) vs 04 §13.2 windows
+  tapDuetPod: () => void;             // duet_loop: pays iff armedIndex is this pod
+  expireOrResolveWave: () => void;    // payout, clear, schedule nextWaveAt (+ idle gap)
+};
+```
 
 ```ts
 // client/src/party/types.ts  (MIRROR in party/src/lobby.ts — edit both together)
-export type FeedBoostId =
-  | "coin_surge" | "fan_magnet" | "like_storm" | "lucky_taps" | "hype_seed";
+// ⚠ 7.5 REWORK: `FeedBoostId`/`boost` (shipped in 7.1) become `FeedModId`/`mod` when the video
+// system integrates — videos modify clicker MECHANICS, not stats (01 §8.3, mods table 04 §13.5).
+export type FeedModId =
+  | "ring_slow" | "extra_ring" | "wide_window"   // beat_sync mods
+  | "duet_flow" | "core_surge" | "wave_rush";    // duet/core/scheduler mods
 
 export type VideoCard = {
   videoId: string;           // client-generated uuid (like streamId)
@@ -414,7 +452,7 @@ export type VideoCard = {
   creatorLevel: number;
   topic: string;             // trend topic at post time
   captionId: string;         // preset caption template id — NEVER free text (moderation)
-  boost: FeedBoostId;        // rolled at publish time
+  mod: FeedModId;            // rolled at publish time (was `boost: FeedBoostId` pre-7.5)
   postedAt: number;          // ms epoch — SERVER-stamped on postVideo
   tapCount: number;          // global engagement counter — SERVER-owned, client value ignored
   npc?: boolean;             // server-generated filler (no royalties)
@@ -434,18 +472,21 @@ export type LobbyServerMessageFeed =                 // merge into LobbyServerMe
 
 ```ts
 // store/slices/feedSlice.ts (Phase 7 — EPHEMERAL, never persisted)
+// 7.2 builds the combo/engageTap half; deck/pager/publish/royalty fields activate at 7.5–7.6.
 export type FeedSlice = {
-  deck: VideoCard[];           // current scroll deck (server feed; NPC-local fallback offline)
-  deckIndex: number;
-  combo: number;               // taps in a row on the current card (resets on swipe)
-  tapsThisCard: number;        // batched → `engage` on swipe-away/unmount
-  pendingHypeSeed: number;     // hype_seed accrual; consumed (and zeroed) by startRun
-  publishReadyAt: number;      // ms epoch — POST cooldown gate
-  setDeck: (cards: VideoCard[]) => void;
-  advance: (dir: 1 | -1) => void;          // swipe: flush engage batch, reset combo
-  engageTap: () => void;                   // THE clicker: gains × boost × combo (04 §13)
-  publishVideo: () => VideoCard | null;    // null if on cooldown; grants burst (04 §13.3)
-  applyRoyalty: (taps: number, fromHandle: string) => void; // likes += taps × royaltyLikesPerTap
+  combo: number;               // consecutive-tap counter; DRAINS when idle (04 §13.1) and
+                               // resets on swipe once the pager exists (7.5)
+  lastTapAt: number;           // ms epoch — drives combo decay
+  deck: VideoCard[];           // (7.5) scroll deck (server feed; NPC-local fallback offline)
+  deckIndex: number;           // (7.5)
+  tapsThisCard: number;        // (7.6) batched → `engage` on swipe-away/unmount
+  publishReadyAt: number;      // (7.5) ms epoch — POST cooldown gate
+  engageTap: () => void;       // THE clicker: gainPerPost × comboMult (× mods after 7.5);
+                               // also arms duet_loop's next pod when its wave is active
+  setDeck: (cards: VideoCard[]) => void;   // (7.5)
+  advance: (dir: 1 | -1) => void;          // (7.5) swipe: flush engage batch, reset combo
+  publishVideo: () => VideoCard | null;    // (7.5) null if on cooldown; burst (04 §13.3)
+  applyRoyalty: (taps: number, fromHandle: string) => void; // (7.6) likes += taps × rate
 };
 ```
 
@@ -480,7 +521,8 @@ export type FullState =
   ChannelSlice & UpgradesSlice & SkillsSlice & CatalogSlice &
   RunSlice & SocialSlice & UiSlice
   & SpectateSlice  // Phase 4
-  & FeedSlice;     // Phase 7
+  & FeedSlice      // Phase 7
+  & ElementsSlice; // Phase 7.3+
 ```
 
 ## 9. Save shape & versioning

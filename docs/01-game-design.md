@@ -229,36 +229,48 @@ why; the center of every screen is blank; the clicker has no fiction. This redes
 three with one structure: **the Home screen becomes a real TikTok-style vertical video feed, and
 the clicker lives at its center.**
 
-### 8.1 The structure
-- Home is a **full-bleed vertical pager of videos** — one video fills the screen; **swipe up** for
-  the next, swipe down to go back, exactly like TikTok. Since we have no real video, a "video" is
-  a procedurally animated visual (the `VideoCanvas`: deterministic from the video's id/topic —
-  layered drifting gradients/shapes + a topic glyph), with the poster's `@handle`, caption, and
-  topic tag overlaid like a TikTok post.
-- **Videos are posted by other players.** The ＋ sheet's POST action publishes a `VideoCard` to a
-  shared server pool; everyone's feed draws from it. NPC-generated videos pad the pool when real
-  content is thin (same cold-start pattern as featured streams). Captions are **preset templates
-  only — never free text** (same moderation rule as quick-chat).
-- **The center of the video is the TAP CORE** — the clicker. A large, obviously-tappable pulsing
-  target. Tapping it ("engaging") earns the existing per-tap gains (economy unchanged, `04` §1).
-  Floating `+N` numbers, heart bursts, and a combo ring make every tap legible.
+### 8.1 The structure (REVISED 2026-06-12 after design session — elements first, videos after)
+- Home houses **the clicker gameplay loop**. Dead center: the **TAP CORE** — a large,
+  obviously-tappable pulsing target. Tapping it ("engaging") earns the existing per-tap gains
+  (economy unchanged, `04` §1) × a **combo** multiplier that builds with consecutive taps and
+  drains when you stop. Floating `+N` numbers, bursts, and the combo ring make every tap legible.
+- Behind everything, a full-bleed **`VideoCanvas`** ambient visual (NPC-seeded until the video
+  system lands) — the screen is never blank, and the canvas *reacts* to play (tap pulses, wave
+  hits spike its intensity).
+- Above the core sits the **element stage**: the zone where unlockable gameplay **elements**
+  spawn interactive "waves." This is the progression surface — see §8.2.
 
-### 8.2 Why you tap, why you swipe (the new tension)
-- **Combo:** consecutive taps on the same video build a combo that multiplies gains (caps at
-  ×1.5 at 100 taps) and visually evolves the TAP CORE at milestones. Swiping resets it.
-- **Boosts:** every video carries a visible **boost** that applies *while you tap with it on
-  screen* — e.g. +50% coins, +50% followers, ×2 likes, lucky ×10 taps, or seeding your next run
-  with bonus starting hype. Numbers in `04` §13.
-- The tension: **stay** and build your combo, or **swipe** hunting a better boost. That's the
-  whole TikTok dopamine loop, made mechanical.
-- **Royalties:** when other players tap your video, you earn likes in real time (and your video's
-  public tap counter climbs). Posting feeds others' boosts; their engagement feeds you back —
-  the same "players are content for each other" principle as §7.
+### 8.2 The element system (the addiction engine)
+**Elements are gameplay mechanics you unlock with the resources the game pays you.** Each is a
+self-contained minigame that works *alongside* the base button, registered in a catalog
+(framework first — adding element N+1 must be a catalog entry + one component, no framework
+surgery). Unlocks cost coins and are gated by metrics (followers etc.); **locked elements are
+visible on the FYP as dim "???" pods showing their unlock requirements** — desire before access.
+A **scheduler** runs at most ONE element wave at a time (phone-screen clarity), rotating through
+unlocked elements with breathing gaps; the base button always works.
 
-### 8.3 Posting (semantic change)
-Tapping no longer "posts" (the 3.3-era tap-to-post is retired). **Tap = engage** (the
-moment-to-moment clicker income); **POST (＋ sheet) = publish a video** — it grants a burst of
-gains (a fistful of taps' worth at once) on a cooldown, and puts your card in everyone's feed.
+Launch elements (both rhythm-flavored — the fiction is TikTok's own audio culture):
+1. **BEAT SYNC** (timing rings): a pod row of 3 buttons appears; a glowing **approach ring
+   shrinks** onto each; tap each button exactly when its ring matches its size. The three rings
+   are **staggered**, so clean play is literally tapping a rhythm. Graded per tap —
+   PERFECT / GOOD / OK / MISS — with payouts multiplying the base tap gain; an all-PERFECT wave
+   pays a bonus. (Think osu!/Guitar Hero compressed into 2 seconds of TikTok sound culture.)
+2. **DUET LOOP** (call-and-response): 3 dormant pods; **each requires a TAP CORE tap to arm it**
+   — tap the core, an energy beam ignites the next pod, tap the pod, back to the core… Fast
+   full chains earn a **FLOW** bonus. The back-and-forth IS the rhythm; and because core taps
+   build combo, Duet Loop naturally feeds the combo engine while you play it.
+Payouts everywhere are `× gainPerPost × current comboMult` (`04` §13) — elements and the base
+button feed each other instead of competing.
+
+### 8.3 Videos & posting (integrates AFTER the element system is fun on its own)
+The player-video feed (publish via POST, server pool, NPC padding, swipe-up pager, royalties —
+all as previously designed) layers on top **once the clicker loop stands alone**. The key change
+from the original §8 design: videos no longer carry flat stat boosts — **a video's bonus
+modifies the clicker mechanics themselves** (slower rings, an extra ring, wider timing windows,
+longer FLOW windows, supercharged core taps, faster wave spawns…). Swiping is hunting for the
+modifier that fits how you like to play; posting puts YOUR modifier card in everyone's feed.
+Captions stay preset-template-only (moderation), publish stays burst+cooldown, royalties stay
+live-only likes. Tap = engage ≠ post (the 3.3-era tap-to-post stays retired).
 
 ### 8.4 No more blank centers (applies to every mode)
 The `VideoCanvas` visual also becomes the **Live stage backdrop** (streamer and spectator),
@@ -266,9 +278,10 @@ seeded by the streamer's identity/topic, with intensity that scales with hype. R
 forward: **no screen ships with a dead center** — something animated and meaningful occupies it.
 
 ### 8.5 First-run legibility (from the same playtest)
-A one-time 3-step coach-mark overlay on first Home visit (TAP THE CORE → SWIPE for new
-boosts → GO LIVE for the real rewards), an idle "TAP" pulse hint, and an affordance rule:
-**every interactive element shows a visible label** — if it's a button, it must look like one.
+A one-time 3-step coach-mark overlay on first Home visit (TAP THE CORE → the element stage:
+"unlock new ways to play" → GO LIVE for the real rewards), an idle "TAP" pulse hint, and an
+affordance rule: **every interactive element shows a visible label** — if it's a button, it must
+look like one.
 
 ## 9. Out of scope (for now — note so models don't build them)
 

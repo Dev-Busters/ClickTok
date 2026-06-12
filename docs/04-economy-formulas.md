@@ -415,77 +415,123 @@ the watch-drop is `×featuredDropMult` with `gradeMult = 1`. Net effect: feature
 worth watching when nobody's live, strictly worse than any real stream — filler never outcompetes
 people.
 
-## 13. Phase 7 — The Feed (`01` §8, types in `03` §6.5)
+## 13. Phase 7 — The Feed & the Element system (`01` §8, types in `03` §6.5)
 
-> The engage tap reuses §1's `gainPerPost` **unchanged** — boosts and combo multiply it. Add the
-> constants to `BALANCE` as `BALANCE.feed`; the two SERVER-marked values mirror into
-> `party/src/lobby.ts` alongside `HARDEN` (§12.7), not into the client bundle.
+> REVISED 2026-06-12 (elements-first redesign). The engage tap reuses §1's `gainPerPost`
+> **unchanged** — combo, elements, and (later) video mods multiply it. Constants live in
+> `BALANCE.feed` / `BALANCE.elements`; SERVER-marked values mirror into `party/src/lobby.ts`
+> alongside `HARDEN` (§12.7). ⚠ The 7.1-era `BALANCE.feed` boost constants
+> (`boostCoinSurge`/`luckyTap*`/`hypeSeed*`) and `features/feed/boosts.ts` are **retired** —
+> reworked into the §13.5 video mods at task 7.5.
 
 ```ts
 // merge into BALANCE (§0 / balance.ts):
 feed: {
-  // §13.1 combo
+  // §13.1 combo (base button)
   comboPerTap: 0.005,            // comboMult = 1 + min(combo, comboCap) × this
   comboCap: 100,                 // → max ×1.5
   comboMilestones: [10, 25, 50, 100], // TAP CORE visual evolution stages
+  comboDecayDelaySec: 2.5,       // idle grace before the combo starts draining
+  comboDecayPerSec: 25,          // drain rate (full 100 combo gone in 4s of idling)
 
-  // §13.2 boosts (flat v1; post-MVP candidate: scale by poster creatorLevel)
-  boostCoinSurge: 0.5,           // +50% coins per tap
-  boostFanMagnet: 0.5,           // +50% followers per tap
-  boostLikeStorm: 1.0,           // +100% (×2) likes per tap
-  luckyTapChance: 0.08,          // lucky_taps: 8% per tap…
-  luckyTapMult: 10,              //   …pays ×10 (all three currencies)
-  hypeSeedTapsPer: 50,           // hype_seed: every 50 taps → +hypeSeedHype next-run start hype
-  hypeSeedHype: 5,
-  hypeSeedCap: 25,               // pendingHypeSeed cap (≈ half a hype_dance-fueled opening)
-
-  // §13.3 publishing
-  publishBurstTaps: 25,          // POST grants 25 × gainPerPost instantly (no boost/combo mult)
+  // §13.3 publishing (task 7.5)
+  publishBurstTaps: 25,          // POST grants 25 × gainPerPost instantly (no combo/mod mult)
   publishCooldownSec: 120,       // client-side gate (POST button shows countdown)
 
-  // §13.4 royalties
+  // §13.4 royalties (task 7.6)
   royaltyLikesPerTap: 0.5,       // poster earns likes = taps × this (live-only v1; NPC: none)
 
-  // §13.5 the pool
+  // §13.5 the pool (tasks 7.5–7.6)
   feedPoolCap: 50,               // SERVER: newest N cards kept
   feedMinDeck: 10,               // pad with NPC cards up to this (server; client offline too)
   engageMaxTapsPerMsg: 120,      // SERVER clamp (≈ tapMaxPerSec × a 15–30s stay, with slack)
   serverPublishCooldownSec: 60,  // SERVER per-connection postVideo rate limit (client gate is 120)
 },
+
+elements: {
+  waveIdleGapSec: 6,             // scheduler: breathing room between waves (one wave at a time)
+
+  // BEAT SYNC (timing rings) — unlock: 2,500 coins, gated at 1,000 followers
+  beatSync: {
+    unlock: { coins: 2500, followers: 1000 },
+    rings: 3,
+    shrinkSec: 1.6,              // ring travels scale 2.2 → 1.0 in this time
+    staggerSec: 0.45,            // spawn offset between rings — THE rhythm
+    windowPerfect: 0.08,         // |ringScale − 1| ≤ → PERFECT  ×4 gainPerPost
+    windowGood: 0.20,            //                  → GOOD     ×2
+    windowOk: 0.40,              //                  → OK       ×1   (worse/expired = MISS ×0)
+    perfectWaveBonus: 5,         // all-3-PERFECT: +5 × gainPerPost on top
+  },
+
+  // DUET LOOP (call-and-response) — unlock: 10,000 coins, gated at 5,000 followers
+  duetLoop: {
+    unlock: { coins: 10000, followers: 5000 },
+    pods: 3,
+    armTimeoutSec: 2.5,          // an armed pod fades back to dormant if not tapped
+    podPayout: 3,                // each pod tap pays 3 × gainPerPost (core taps pay normal)
+    flowSec: 4.0,                // full chain (core→pod ×3, 6 taps) inside this → FLOW
+    flowBonus: 6,                // +6 × gainPerPost
+  },
+},
 ```
 
-### 13.1 The engage tap (THE clicker formula)
+### 13.1 The engage tap + combo (THE clicker formula)
 
 ```
-boostMult(currency) = active card's boost, applied ONLY to its currency (coin_surge → coins,
-                      fan_magnet → followers, like_storm → likes; others see ×1)
-comboMult           = 1 + min(combo, comboCap) × comboPerTap
-luckyMult           = (boost is lucky_taps && roll < luckyTapChance) ? luckyTapMult : 1
-gain(currency)      = gainPerPost(currency) × boostMult(currency) × comboMult × luckyMult
+comboMult = 1 + min(combo, comboCap) × comboPerTap          // ×1.5 max
+gain(currency) = gainPerPost(currency) × comboMult           // × video modMult after 7.5
+combo += 1 per TAP CORE tap; after comboDecayDelaySec idle, combo -= comboDecayPerSec × dt
+(once the 7.5 pager exists, swiping also resets combo to 0)
 ```
-Worked example: postPower-era `gainPerPost.coins = 10`, card boost `coin_surge`, combo 100:
-`10 × 1.5 × 1.5 = 22.5 → 22` coins/tap. Same tap at combo 0: `15`. Swiping away resets to `10`.
+Worked example: `gainPerPost.coins = 10` → combo 0: `10`/tap; combo 100: `15`/tap.
 
-`hype_seed`: while active, every `hypeSeedTapsPer` taps adds `hypeSeedHype` to
-`pendingHypeSeed` (cap `hypeSeedCap`); `startRun` adds it to the initial hype (base 50) and
-zeroes it. Ephemeral — lost on reload, by design.
+### 13.2 Element waves (grading + payouts)
 
-### 13.2–13.5 rules
-- **Boost rolled at publish** (uniform over the 5 ids) — the poster can't pick; rerolling by
-  re-posting is gated by the cooldown.
-- **Publish burst** is `publishBurstTaps × gainPerPost` with **no** boost/combo multipliers, so
-  POST ≈ a guaranteed quarter-combo's worth — strong, not dominant.
-- **Royalties** are live-only v1: the lobby relays `royalty` to the poster's connection if
-  present; offline engagement only bumps the card's public `tapCount`. NPC cards never pay.
-- **Caption templates:** `captionId` indexes a client-side pool of ~20 strings ("{topic} hits
-  different 💀", "POV: the algorithm chose you", …) — server whitelists ids exactly like
-  quick-chat presets (`§12.7` pattern). Unknown id ⇒ message dropped.
-- **Server clamps:** `engage.taps` capped at `engageMaxTapsPerMsg` and `Number.isFinite`-guarded;
-  `postVideo` rate-limited per connection at `serverPublishCooldownSec`; `card.tapCount`/
-  `postedAt` are server-stamped (client values ignored) — all per the §12.7 hardening doctrine.
+Every element payout is `× gainPerPost × comboMult at resolution time` — elements reward you for
+keeping the combo warm, and Duet Loop's required core taps literally build it.
+
+**BEAT SYNC** — ring `i` spawns at `startedAt + i × staggerSec`, its scale at time `t` is
+`2.2 − 1.2 × (t − spawn)/shrinkSec` (clamped); grade by `|scale − 1|` at tap time against the
+windows above. Per-ring payout = `gradeMult (4/2/1/0) × gainPerPost × comboMult`; an
+all-PERFECT wave adds `perfectWaveBonus × gainPerPost × comboMult`. Ring expires unt apped past
+`windowOk` ⇒ MISS. **The same clock drives the visual and the grade** — what you see IS the math.
+
+**DUET LOOP** — wave spawns with all pods dormant; a TAP CORE tap arms the next pod (beam fires);
+tapping the armed pod pays `podPayout × gainPerPost × comboMult` and returns control to the core.
+Armed pod untapped for `armTimeoutSec` ⇒ it goes dormant again (no penalty, chain stalls).
+Completing all pods within `flowSec` of the wave's first core tap ⇒ `flowBonus × gainPerPost ×
+comboMult` and the FLOW flourish.
+
+**Scheduler:** at most one active wave; on resolve/expiry wait `waveIdleGapSec`, then spawn the
+next unlocked element round-robin. Waves pause while a sheet is open or a run/spectate is active.
+
+### 13.3–13.4 publishing & royalties (unchanged from the original §13 — land at 7.5/7.6)
+Publish burst = `publishBurstTaps × gainPerPost`, no multipliers, client cooldown
+`publishCooldownSec`. Royalties = `taps × royaltyLikesPerTap` likes, live-only, NPC cards never
+pay. Caption templates whitelisted server-side (quick-chat pattern, §12.7).
+
+### 13.5 Video mods (task 7.5 — videos modify the MECHANICS, `01` §8.3)
+
+Rolled uniformly at publish (poster can't pick). Active while that video is on screen:
+
+| id | applies to | effect |
+|---|---|---|
+| `ring_slow` | beat_sync | ring `shrinkSec` ×1.25 (easier timing) |
+| `extra_ring` | beat_sync | +1 ring per wave (more payout, denser rhythm) |
+| `wide_window` | beat_sync | grading windows ×1.5 |
+| `duet_flow` | duet_loop | `flowSec` +2s and `armTimeoutSec` +1s |
+| `core_surge` | TAP CORE | core taps pay coins ×1.5 |
+| `wave_rush` | scheduler | `waveIdleGapSec` ×0.5 (waves twice as often) |
+
+Locked elements ignore their mods (a `ring_slow` card does nothing for a player without
+Beat Sync — visible on the card, which doubles as an advertisement for the unlock).
 
 ### 13.6 Tuning guidance
-- The feed should feel ~20–40% better than the old bare tap (boost+combo average), not 2×; runs
-  must stay the headline income (§11 still rules).
-- If players AFK-park on `coin_surge` cards, that's fine — combo caps and runs still dominate.
-- Watch the `lucky_taps` ×10 in PostHog (it's the visible dopamine spike); tune chance before mult.
+- Elements should make active feed time worth ~1.5–2× bare tapping, and runs must STILL dominate
+  per-minute income (§11 rules everything).
+- The unlock prices are the first real coin sinks outside gear — if players hit 1k followers with
+  nowhere near 2.5k coins (or vice versa), retune toward "unlock lands within one session of
+  hitting the follower gate."
+- PERFECT should be hittable by a focused human ~half the time at base speed; tune `windowPerfect`
+  (not payouts) first if PostHog shows all-MISS waves.
+- Watch all-PERFECT rate + FLOW rate in PostHog — those are the dopamine spikes; instrument both.

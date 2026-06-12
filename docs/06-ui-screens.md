@@ -31,34 +31,60 @@ TikTok's 5-slot bar. Fixed to bottom, dark, hairline top border.
 - Active tab: label/icon in `--text`; inactive in `--dim`. Small label under each icon (TikTok
   style). Tap → `setTab` / for ＋ → `setSheet('create')`.
 
-## 3. Home — "For You" feed pager (`screens/HomeFeed/`; Phase 7 redesign — `01` §8)
+## 3. Home — the clicker stage (`screens/HomeFeed/`; Phase 7 REVISED — `01` §8)
 
-TikTok's home IS a vertical video feed — as of Phase 7, so is ours, with the clicker at its
-center. (The 3.3-era single-card tap-to-post layout is superseded.)
+Home houses the clicker loop: TAP CORE center, the **element stage** above it, `VideoCanvas`
+ambience behind it. (The 3.3-era tap-to-post layout is superseded; the swipe-up video pager
+layers in at task 7.5 without changing this layout.)
 
-- **The pager:** one `VideoCard` fills the screen edge-to-edge. **Swipe up** (touch drag / mouse
-  drag / wheel) snap-advances to the next card with a TikTok-style vertical slide; swipe down goes
-  back. Preload ±1 card so swiping never shows a blank. Deck from `feedSlice.deck`
-  (server pool, NPC-padded; local NPC deck offline — `04` §13.5).
-- **The video (`VideoCanvas`):** full-bleed procedural animation, deterministic from
-  `videoId`/`topic` (layered drifting gradients + shapes in the CRT palette + a big faint topic
-  glyph). Overlaid TikTok-style: poster `@handle` (+ tiny avatar) bottom-left with the caption
-  and `#topic` tag, the sound-marquee line, and the card's **tap counter** (`formatCount`, 👆)
-  as social proof. NPC cards look identical to real ones (no badge — the feed fiction holds).
-- **TAP CORE (the clicker, dead center):** a large (~140px hit area) circular pulsing target —
-  unmistakably a button (ring, glow, idle pulse, "TAP" micro-label until first tap of the
-  session). Each tap: heart/coin burst + floating `+N` per currency + a 1–2px screen-kick.
-  A **combo ring** wraps it, filling toward `comboCap`; at each `comboMilestones` stage the core
-  visibly evolves (size/glow/particle tier). Combo counter ("×1.32") rides above the ring.
-- **Boost banner:** a slim pill above the TAP CORE: boost icon + name + effect ("🪙 COIN SURGE
-  — +50% coins while you tap"). It's the reason to care which video is on screen; make it read
-  at a glance. New-card entrance animates the banner in.
-- **Kept from the current build:** top stat strip (followers hero + currency pills), right action
-  rail, the **GO LIVE pill** (with ~viewers projection), and bottom nav. The rail's like/comment
-  buttons now act on the current card (cosmetic counts ok v1).
-- **First-run coach marks (Phase 7.6):** 3-step dimmed overlay anchored to real elements —
-  (1) TAP CORE "Tap to earn", (2) swipe gesture hint "Swipe for new boosts", (3) GO LIVE pill
+**Layout (390×844 reference):** top stat strip (followers hero + currency pills) → element stage
+(upper ~35%, where waves spawn; locked "???" pods dock at its top edge) → **TAP CORE** at dead
+center → GO LIVE pill + caption/marquee at the bottom → right action rail → bottom nav. Backdrop:
+full-bleed `VideoCanvas` (NPC-seeded pre-7.5) under a dark scrim, `intensity` fed by combo and
+wave events — every tap makes the whole screen breathe.
+
+- **TAP CORE:** ~140px circular target, unmistakably a button — concentric rings, soft glow,
+  slow idle "breathing," a "TAP" micro-label until the first tap each session. Per tap: a radial
+  **shockwave ripple** + small particle ring + floating `+N` per currency (arcing up with slight
+  scatter) + a 1–2px screen-kick. The **combo ring** wraps the core, filling toward `comboCap`;
+  it **drains visibly** when idle (the player SEES the combo dying — that's the pressure). At
+  each `comboMilestones` stage the core re-tiers: ring color walks the palette
+  (`--dim` → `--cyan` → `--red` → `--gold`) with brighter glow and denser tap particles. Combo
+  counter ("×1.32") rides above the ring in mono caps.
+- **Locked element pods:** small dim circles docked above the stage, each with "???", a lock
+  glyph, and its requirement in plain text ("2.5K 🪙 · needs 1K followers"). Within reach (gate
+  met, ≥80% of the coins) they shimmer. Tap → unlock sheet (name, tagline, a tiny looping demo
+  animation of the mechanic, cost button). Unlock = the pod ignites and flies into the stage.
+- **BEAT SYNC wave:** 3 pods fade-in across the stage in a shallow arc. Each pod has an
+  **approach ring** — a glowing stroke (SVG circle, `--cyan` w/ drop-shadow) that shrinks from
+  2.2× the pod's size to 1×, staggered left→right so the hit moments cascade like a 3-note
+  phrase. **The ring's scale and the grading derive from the same wave clock** (Framer
+  `useAnimationFrame` against `wave.startedAt`) — never animate it with an independent tween.
+  On tap: PERFECT = the ring *locks* onto the pod with a white flash, gold burst, "PERFECT" in
+  mono caps; GOOD = cyan pulse; OK = dim tick; MISS = red flicker + 4px x-shake, ring shatters
+  into 2–3 fading shards. All-PERFECT wave = full-screen white pulse, `VideoCanvas` intensity
+  spike, "+BONUS" banner. Grade colors: PERFECT `--gold`, GOOD `--cyan`, OK `--dim`, MISS
+  `--red` — consistent everywhere, including floating numbers.
+- **DUET LOOP wave:** 3 dormant pods (dim, slow pulse). A TAP CORE tap fires an **energy beam**
+  — an animated gradient streak (red→cyan, ~120ms) from the core to the next pod, igniting it
+  (ring flare + glow + "TAP!" label). Tapping the armed pod sends the beam back with a
+  counter-pulse on the core. Each completed pod leaves a faint **afterglow link** between core
+  and pod; finish the chain inside `flowSec` and the three links flash into a triangle with a
+  gold "FLOW" banner + bonus. Armed-pod timeout: the glow gutters out (no harsh fail signal —
+  the chain just stalls).
+- **Performance rules:** transforms + opacity only (no layout/paint properties in animation),
+  one shared rAF clock for wave timing, pods/rings are fixed-size elements scaled via
+  `transform`, target 60fps on a phone with the canvas + a wave + particles all live.
+- **Kept from the current build:** right action rail, GO LIVE pill (with ~viewers projection),
+  bottom nav. Rail like/comment act on the current backdrop "video" (cosmetic counts ok v1).
+- **First-run coach marks (task 7.8):** 3-step dimmed overlay anchored to real elements —
+  (1) TAP CORE "Tap to earn", (2) element stage "Unlock new ways to play", (3) GO LIVE pill
   "Streams pay 10×". Advances per tap, never shows again (`uiSlice.coachMarksSeen`, persisted).
+- **(Task 7.5) Pager:** the screen becomes one card in a vertical snap pager — swipe up/down
+  changes the backdrop video + active **mod banner** (slim pill above the stage: mod icon +
+  name + effect, e.g. "🎯 WIDE WINDOW — easier PERFECTs on this video"); poster `@handle`,
+  caption, `#topic`, and tap-counter overlay bottom-left, TikTok style. TAP CORE, combo, and the
+  element stage persist across swipes (combo resets, waves reschedule).
 
 ## 4. Discover (`screens/Discover/`)
 

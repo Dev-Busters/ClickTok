@@ -992,10 +992,15 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
 ## PHASE 7 — The Feed (first-playtest redesign; design LOCKED 2026-06-12, `01` §8)
 
 > From the first human playtest: nothing was legible, centers were blank, the clicker had no
-> fiction. The fix: Home becomes a real swipeable video feed of other players' posts, with the
-> clicker (TAP CORE) at its center and per-video boosts. Design `01` §8 · types `03` §6.5 ·
-> numbers `04` §13 · UI `06` §3. Build in order — each task shippable, solo play never regresses.
+> fiction. **REVISED 2026-06-12 (post-7.1 design session): elements first, videos after.** Home
+> houses the clicker (TAP CORE + combo) plus an unlockable **element system** — minigame
+> mechanics (BEAT SYNC timing rings, DUET LOOP call-and-response) bought with earned resources
+> behind metric gates. The player-video feed layers on at 7.5+, with videos carrying **mechanic
+> modifiers** instead of stat boosts. Design `01` §8 · types `03` §6.5 · numbers `04` §13 ·
+> UI/visual direction `06` §3. Build in order — each task shippable, solo play never regresses.
 > Tasks touching `party/` end with `npx partykit deploy`; client changes deploy via push.
+> (7.1's `features/feed/boosts.ts` + the `BALANCE.feed` boost constants are superseded — they get
+> reworked into §13.5 mods at 7.5; `VideoCanvas`/`npcVideos` carry forward unchanged.)
 
 - [x] **7.1 — VideoCard plumbing + the VideoCanvas visual.** Types from `03` §6.5 (`VideoCard`,
   `FeedBoostId` — mirror into `party/src/lobby.ts` now, unused server-side until 7.3). New
@@ -1018,43 +1023,72 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > mounted 3 VideoCanvases in App.tsx, verified 3 clearly distinct animated panels (red/white/
   > gold), then removed. `pnpm typecheck` clean (client + party).
 
-- [ ] **7.2 — Feed pager + TAP CORE (the new Home, local deck).** Rebuild `screens/HomeFeed/` per
-  `06` §3: vertical snap pager over a local NPC deck (`feedMinDeck` cards), full-bleed
-  `VideoCanvas` cards with poster overlay + boost banner, TAP CORE center with combo ring,
-  milestones, floating `+N`s, and idle TAP pulse. `feedSlice` (`03` §6.5): `engageTap()` grants
-  `gainPerPost × boost × combo (× lucky)` exactly per `04` §13.1 (verify against the worked
-  example); swipe resets combo + advances; `hype_seed` accrues `pendingHypeSeed` and `startRun`
-  consumes it. Retire tap-anywhere-to-post; keep stat strip, rail, GO LIVE pill. POST in the
-  Create sheet keeps its current behavior until 7.3.
-  **Refs:** `01` §8.1–8.3, `03` §6.5, `04` §13.1–13.2, `06` §3. **DoD:** in preview: tapping the
-  core pays the formula-exact amounts (check a coin_surge card at combo 0 and 100); swiping
-  changes video + boost and resets combo; a hype_seed card's accrual raises the next run's
-  starting hype; smooth swipes (no blank frames); typecheck.
+- [ ] **7.2 — TAP CORE + combo (the new Home, no pager yet).** Rebuild `screens/HomeFeed/` per
+  `06` §3 layout: full-bleed `VideoCanvas` backdrop (NPC-seeded via `npcVideos`, slow ambient
+  rotation; `intensity` fed by combo) under a dark scrim; **TAP CORE** dead center with shockwave/
+  particles/floating `+N`s, combo ring with milestone re-tiering AND visible idle drain
+  (`comboDecayDelaySec`/`comboDecayPerSec`); `feedSlice` 7.2 half (`combo`, `lastTapAt`,
+  `engageTap()` paying `gainPerPost × comboMult` per `04` §13.1). Retire tap-anywhere-to-post;
+  keep stat strip, rail, GO LIVE pill. Do NOT consume the 7.1 boosts catalog (superseded).
+  **Refs:** `01` §8.1, `03` §6.5, `04` §13.1, `06` §3. **DoD:** in preview: tap pays the
+  formula-exact amounts at combo 0 and 100 (worked example `04` §13.1); idling 2.5s visibly
+  drains the ring and the multiplier follows; milestone tiers recolor the core; smooth on a
+  390px viewport; typecheck.
 
-- [ ] **7.3 — Publish + the server feed pool.** Lobby (`party/src/lobby.ts`): in-memory pool
-  (cap `feedPoolCap`), handle `postVideo` (stamp `postedAt`, zero `tapCount`, whitelist
-  `captionId` against the template ids, rate-limit per connection at `serverPublishCooldownSec`),
-  `getFeed` → `feed` (newest-first, NPC-padded to `feedMinDeck` server-side), broadcast
-  `videoPosted`. Client: `useLobby` requests the feed on connect and merges `videoPosted` into
-  the deck; Create-sheet **POST** becomes `publishVideo()` (`04` §13.3: burst gain, 120s cooldown
-  with visible countdown on the button); offline fallback stays the local NPC deck.
-  **Refs:** `01` §8.1+8.3, `03` §6.5, `04` §13.3+13.5, `02` §6. **DoD:** two windows: A POSTs →
-  the card appears in B's deck within ~2s with A's handle/boost; POST again immediately → blocked
-  by cooldown both client- and server-side (probe: also a forged `captionId` and an immediate
-  repeat `postVideo` are dropped); offline solo deck still full; typecheck; `npx partykit deploy`.
+- [ ] **7.3 — Element framework + BEAT SYNC.** The pluggable element system per `01` §8.2:
+  `features/elements/` (catalog of `ElementDef`s, per-element components), `elementsSlice`
+  (`03` §6.5) with `ownedElements` **PERSISTED (⚠ SAVE_VERSION bump + migration defaulting `{}`;
+  old saves must load)**, the one-wave-at-a-time scheduler (`waveIdleGapSec`, round-robin,
+  paused during sheets/runs/spectate), locked "???" pods with explicit requirements + the unlock
+  sheet (spend coins, enforce follower gate) per `06` §3. Then the first element through it:
+  **BEAT SYNC** — 3 staggered approach rings driven by ONE shared wave clock
+  (`useAnimationFrame` vs `wave.startedAt` — the visual and the grade derive from the same
+  number, `04` §13.2), PERFECT/GOOD/OK/MISS grading + payouts × comboMult, all-PERFECT wave
+  bonus, full visual treatment per `06` §3 (ring lock-flash, grade colors, miss shatter).
+  **Refs:** `01` §8.2, `03` §6.5, `04` §13.2, `06` §3, `02` §4. **DoD:** locked pod shows
+  requirements; unlock blocked below the follower gate / without coins, succeeds and persists
+  across reload when met (old save migrates clean); waves spawn on schedule; driving the wave
+  clock manually proves each grade window pays its exact multiple; all-PERFECT pays the bonus;
+  typecheck.
 
-- [ ] **7.4 — Engagement royalties.** Client: batch `tapsThisCard`, send `engage` on swipe-away/
+- [ ] **7.4 — DUET LOOP (the second element — proves the framework).** Implement per `04` §13.2 +
+  `06` §3: dormant pods, `engageTap()` arms the next pod (energy beam), armed-pod tap pays
+  `podPayout × gainPerPost × comboMult`, `armTimeoutSec` gutters a neglected pod, full chain
+  inside `flowSec` pays the FLOW bonus with the triangle flourish. **Pluggability test: this
+  task should add a catalog entry + one component + slice case — if it needs framework surgery,
+  fix the framework (and say so in the note).**
+  **Refs:** `01` §8.2, `03` §6.5, `04` §13.2, `06` §3. **DoD:** with both elements unlocked the
+  scheduler alternates them; the chain pays formula-exact (pods + FLOW verified); timeout stalls
+  without penalty; framework diff outside `features/elements/` is ≈zero; typecheck.
+
+- [ ] **7.5 — Video pager + server pool + mechanic mods.** The player-video layer per `01` §8.3:
+  rework `features/feed/boosts.ts` → `mods.ts` (`FeedModId` catalog per `04` §13.5 table;
+  `VideoCard.boost` → `mod` — mirror BOTH type files; bump nothing persisted). Client: vertical
+  snap pager per `06` §3 (swipe changes backdrop video + active mod banner; combo resets; waves
+  reschedule; TAP CORE/element stage persist), mods modify element/core/scheduler params ONLY
+  while their card is on screen, locked-element mods inert but advertised. Server
+  (`party/src/lobby.ts`): pool (cap `feedPoolCap`), `postVideo` (stamp `postedAt`, zero
+  `tapCount`, whitelist `captionId`, rate-limit `serverPublishCooldownSec`), `getFeed` → `feed`
+  (NPC-padded to `feedMinDeck`), `videoPosted` broadcast. Create-sheet POST → `publishVideo()`
+  (burst + 120s countdown per `04` §13.3). Offline: local NPC deck, all mods still function.
+  **Refs:** `01` §8.3, `03` §6.5, `04` §13.3+13.5, `06` §3, `02` §6. **DoD:** two windows: A
+  POSTs → card in B's deck ≈2s with A's handle/mod; a `wide_window` card observably widens
+  grading and `wave_rush` halves the gap (verify against constants); swipe resets combo; probe:
+  forged `captionId` + cooldown-violating `postVideo` dropped; offline deck full and playable;
+  typecheck; `npx partykit deploy`.
+
+- [ ] **7.6 — Engagement royalties.** Client: batch `tapsThisCard`, send `engage` on swipe-away/
   unmount/tab-change. Server: `Number.isFinite` + clamp to `engageMaxTapsPerMsg`, bump the card's
   `tapCount`, relay `royalty` to the poster's connection when present (key by verified
   userId/handle binding from 4.5c-2). Poster client: `applyRoyalty` grants
   `taps × royaltyLikesPerTap` likes + a small toast ("@b binged your video +10 ❤️"); card tap
   counters render on feed cards. NPC cards: counters only, never royalties.
-  **Refs:** `01` §8.2, `03` §6.5, `04` §13.4–13.5. **DoD:** two windows: B taps A's card 20×,
+  **Refs:** `01` §8.3, `03` §6.5, `04` §13.3–13.4. **DoD:** two windows: B taps A's card 20×,
   swipes → A's likes rise by the formula amount with a toast, the card's public counter rises for
   both; probe: `engage` with `taps: 9999` clamps, `taps: "x"` drops; typecheck;
   `npx partykit deploy`.
 
-- [ ] **7.5 — Live stage backdrop (kill the last blank center).** Render `VideoCanvas` behind
+- [ ] **7.7 — Live stage backdrop (kill the last blank center).** Render `VideoCanvas` behind
   BOTH `StreamerLive` and `SpectatorLive` (seed = `streamId` + handle, topic = run topic) with
   `intensity` driven by current hype and a dark scrim preserving HUD/feed legibility (`06` §7).
   Also seed it on the featured-sim spectator path.
@@ -1062,8 +1096,8 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   both show the animated stage that visibly energizes as hype climbs; HUD/feed still readable;
   no fps regression with a busy feed; typecheck.
 
-- [ ] **7.6 — First-run coach marks + affordance pass.** Three-step overlay per `06` §3 anchored
-  to TAP CORE / swipe zone / GO LIVE pill; `uiSlice.coachMarksSeen` persisted (⚠ `partialize` +
+- [ ] **7.8 — First-run coach marks + affordance pass.** Three-step overlay per `06` §3 anchored
+  to TAP CORE / element stage / GO LIVE pill; `uiSlice.coachMarksSeen` persisted (⚠ `partialize` +
   SAVE_VERSION bump + migration defaulting false, per `02` §4 — old saves must load). Affordance
   sweep across ALL screens: every interactive element gets a visible text label or an
   unmistakable button treatment (rail buttons get micro-labels; any icon-only control gets a
