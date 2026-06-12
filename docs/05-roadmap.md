@@ -997,7 +997,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
 > numbers `04` §13 · UI `06` §3. Build in order — each task shippable, solo play never regresses.
 > Tasks touching `party/` end with `npx partykit deploy`; client changes deploy via push.
 
-- [ ] **7.1 — VideoCard plumbing + the VideoCanvas visual.** Types from `03` §6.5 (`VideoCard`,
+- [x] **7.1 — VideoCard plumbing + the VideoCanvas visual.** Types from `03` §6.5 (`VideoCard`,
   `FeedBoostId` — mirror into `party/src/lobby.ts` now, unused server-side until 7.3). New
   `components/VideoCanvas.tsx` (`06` §8: seed+topic → deterministic layered animated visual,
   `intensity`/`dim` props, CSS/Framer only). New `features/feed/boosts.ts` (the 5 boost defs:
@@ -1007,6 +1007,16 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   **Refs:** `03` §6.5, `04` §13.2, `06` §8. **DoD:** typecheck; temporarily mounting 3
   `VideoCanvas`es with different seeds in the preview shows clearly distinct, animated, 60fps
   visuals (then remove the temp mount); boost/NPC modules import cleanly.
+  > note: `BALANCE.feed` block added (§13 constants). Mulberry32 PRNG in VideoCanvas uses FNV-1a
+  > string hash as seed; critical fix: the `>>> 0` unsigned coercion was missing on the final XOR
+  > step and both intermediate `t` assignments — without it the PRNG emitted negative values,
+  > causing color lookups into `PALETTE[-1]`/`[-2]` (undefined → no background-color applied) and
+  > sub-minimum sizes/positions. Fixed in both VideoCanvas and npcVideos. A Framer Motion 11
+  > gotcha: `background`/`backgroundColor` props on `motion.div` are intercepted as animation
+  > targets and silently dropped from the DOM style — fixed by nesting a plain `div` inside the
+  > motion wrapper (wrapper = transform animation, inner div = all visual styling). Temp test
+  > mounted 3 VideoCanvases in App.tsx, verified 3 clearly distinct animated panels (red/white/
+  > gold), then removed. `pnpm typecheck` clean (client + party).
 
 - [ ] **7.2 — Feed pager + TAP CORE (the new Home, local deck).** Rebuild `screens/HomeFeed/` per
   `06` §3: vertical snap pager over a local NPC deck (`feedMinDeck` cards), full-bleed

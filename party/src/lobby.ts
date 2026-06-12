@@ -51,6 +51,33 @@ type LobbyServerMessage =
 // (ephemeral, dropped on disconnect like pre-4.5b behavior).
 type ChannelEntry = ChannelSummary & { userId?: string };
 
+// Phase 7 — The Feed (03 §6.5); unused server-side until 7.3
+type FeedBoostId =
+  | "coin_surge" | "fan_magnet" | "like_storm" | "lucky_taps" | "hype_seed";
+
+type VideoCard = {
+  videoId: string;
+  handle: string;
+  creatorLevel: number;
+  topic: string;
+  captionId: string;
+  boost: FeedBoostId;
+  postedAt: number;
+  tapCount: number;
+  npc?: boolean;
+};
+
+// (7.3) merge into LobbyClientMessage / LobbyServerMessage when wired
+type _LobbyClientMessageFeed =
+  | { type: "postVideo"; card: VideoCard }
+  | { type: "getFeed" }
+  | { type: "engage"; videoId: string; taps: number };
+
+type _LobbyServerMessageFeed =
+  | { type: "feed"; cards: VideoCard[] }
+  | { type: "videoPosted"; card: VideoCard }
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };
+
 // Mirrored from client/src/features/social/trends.ts (04 §6: heat 0..1).
 const TREND_POOL = [
   "dancing", "cooking", "gaming", "comedy", "fitness",

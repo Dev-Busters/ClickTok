@@ -86,4 +86,35 @@ export const BALANCE = {
     featuredMinDirectory: 3,   // lobby pads the directory up to this many cards (real first)
     featuredDropMult: 0.5,     // watch-drop multiplier on featured streams (gradeMult fixed at 1)
   },
+
+  // Phase 7 — The Feed (04 §13)
+  feed: {
+    // §13.1 combo
+    comboPerTap: 0.005,            // comboMult = 1 + min(combo, comboCap) × this
+    comboCap: 100,                 // → max ×1.5
+    comboMilestones: [10, 25, 50, 100],
+
+    // §13.2 boosts
+    boostCoinSurge: 0.5,           // +50% coins per tap
+    boostFanMagnet: 0.5,           // +50% followers per tap
+    boostLikeStorm: 1.0,           // +100% (×2) likes per tap
+    luckyTapChance: 0.08,
+    luckyTapMult: 10,
+    hypeSeedTapsPer: 50,
+    hypeSeedHype: 5,
+    hypeSeedCap: 25,
+
+    // §13.3 publishing
+    publishBurstTaps: 25,
+    publishCooldownSec: 120,
+
+    // §13.4 royalties
+    royaltyLikesPerTap: 0.5,
+
+    // §13.5 the pool (SERVER values mirrored in party/src/lobby.ts when wired)
+    feedPoolCap: 50,
+    feedMinDeck: 10,
+    engageMaxTapsPerMsg: 120,
+    serverPublishCooldownSec: 60,
+  },
 } as const;

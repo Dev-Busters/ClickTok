@@ -1,0 +1,87 @@
+import type { VideoCard, FeedBoostId } from "../../party/types";
+import { BOOST_IDS } from "./boosts";
+
+// Caption template pool: stable ids → template strings.
+// {topic} is substituted at render time. Server whitelists these ids exactly.
+export const CAPTION_TEMPLATES: Record<string, string> = {
+  algo_chose:      "{topic} hits different 💀",
+  pov_algo:        "POV: the algorithm chose you",
+  no_sleep:        "no sleep just {topic} 📱",
+  real_talk:       "real talk: {topic} is everything",
+  not_ready:       "you're not ready for this {topic}",
+  main_character:  "main character moment ✨",
+  trend_check:     "trend check: {topic} edition",
+  ratio_check:     "ratio this if you love {topic}",
+  lowkey_obsessed: "lowkey obsessed with {topic} rn",
+  its_giving:      "it's giving {topic} vibes 💅",
+  no_thoughts:     "no thoughts just {topic}",
+  out_here:        "out here doing {topic} things",
+  this_is_it:      "this is it. this is {topic}.",
+  unhinged:        "unhinged {topic} content as promised",
+  literally_me:    "literally me doing {topic}",
+  your_sign:       "your sign to get into {topic}",
+  day_one:         "day one {topic} fan behavior",
+  caught_in_4k:    "caught in 4K loving {topic}",
+  not_me:          "not me obsessing over {topic} again",
+  vibes_check:     "{topic} vibes check ✅",
+};
+
+export const CAPTION_IDS = Object.keys(CAPTION_TEMPLATES);
+
+const NPC_HANDLES = [
+  "nightowl99", "pixelbabe", "coastalvibes", "groovylama",
+  "cryptoKween", "sunrisesteph", "retrowave88", "noodlebrain",
+  "glitchguru", "wanderlust_kai", "beatmaker7", "cozycottage",
+  "speedrunQueen", "aestheticAce", "chillhopfan", "doomscrolling",
+  "pastelPunk", "legallycringe", "hotpocket_irl", "vibecheck404",
+];
+
+const NPC_TOPICS = [
+  "dancing", "cooking", "gaming", "comedy", "fitness",
+  "fashion", "music", "lifehacks", "pets", "trending",
+];
+
+// Minimal seeded PRNG (mulberry32) so NPC decks are stable across renders.
+function mkRng(seed: number) {
+  let s = (seed >>> 0) + 1;
+  return (): number => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) >>> 0;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function pick<T>(arr: readonly T[], r: number): T {
+  return arr[Math.floor(r * arr.length)];
+}
+
+export function generateNpcCard(index: number): VideoCard {
+  const rand = mkRng(index);
+  const topic  = pick(NPC_TOPICS, rand());
+  const handle = pick(NPC_HANDLES, rand());
+  const boost  = pick(BOOST_IDS, rand()) as FeedBoostId;
+  const captionId = pick(CAPTION_IDS, rand());
+  const creatorLevel = 1 + Math.floor(rand() * 4);
+
+  return {
+    videoId:      `npc-${index}`,
+    handle,
+    creatorLevel,
+    topic,
+    captionId,
+    boost,
+    postedAt:  Date.now() - Math.floor(rand() * 3_600_000),
+    tapCount:  Math.floor(rand() * 250),
+    npc:       true,
+  };
+}
+
+export function generateNpcDeck(count: number): VideoCard[] {
+  return Array.from({ length: count }, (_, i) => generateNpcCard(i));
+}
+
+export function formatCaption(captionId: string, topic: string): string {
+  const template = CAPTION_TEMPLATES[captionId] ?? captionId;
+  return template.replace(/\{topic\}/g, topic);
+}

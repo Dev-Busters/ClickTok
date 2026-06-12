@@ -109,3 +109,30 @@ export type StreamServerMessage =
   | { type: "realChat"; fromHandle: string; preset: QuickChatId }
   | { type: "realGift"; fromHandle: string; tier: GiftTier; atRunSec: number }
   | { type: "voteTally"; pollId: string; tally: number[] };
+
+// ——— Phase 7 — The Feed (03 §6.5) ———
+export type FeedBoostId =
+  | "coin_surge" | "fan_magnet" | "like_storm" | "lucky_taps" | "hype_seed";
+
+export type VideoCard = {
+  videoId: string;           // client-generated uuid (like streamId)
+  handle: string;            // poster handle (or NPC name)
+  creatorLevel: number;
+  topic: string;             // trend topic at post time
+  captionId: string;         // preset caption template id — NEVER free text
+  boost: FeedBoostId;        // rolled at publish time
+  postedAt: number;          // ms epoch — SERVER-stamped on postVideo
+  tapCount: number;          // global engagement counter — SERVER-owned
+  npc?: boolean;             // server-generated filler (no royalties)
+};
+
+// Lobby room — Phase 7 message additions (merge into LobbyClientMessage in 7.3):
+export type LobbyClientMessageFeed =
+  | { type: "postVideo"; card: VideoCard }
+  | { type: "getFeed" }
+  | { type: "engage"; videoId: string; taps: number };
+
+export type LobbyServerMessageFeed =
+  | { type: "feed"; cards: VideoCard[] }
+  | { type: "videoPosted"; card: VideoCard }
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };
