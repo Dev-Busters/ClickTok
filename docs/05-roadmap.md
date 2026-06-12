@@ -552,7 +552,7 @@ by meta progression, with run-to-run variety.
 > so a player can always cheat **their own** wallet — the goal here is that players cannot spoof
 > *each other* or the shared state (leaderboard, directory, Algorithm, shoutouts).
 
-- [ ] **4.5c-1 — Party-server hardening (no new infra).** In `party/src/stream.ts`: pin the
+- [x] **4.5c-1 — Party-server hardening (no new infra).** In `party/src/stream.ts`: pin the
   streamer role — the first `open` wins until that connection closes; only the pinned connection's
   `snapshot`/`pollOpen`/`pollClose`/`shoutout`/`end` are honored (drop streamer-typed messages
   from viewers, and viewer-typed messages from the streamer); recompute `shoutout.followers`
@@ -568,6 +568,15 @@ by meta progression, with run-to-run variety.
   forged `shoutout` value, a 9999-tap message (capped to 8), `endLive` on someone else's stream,
   and a `feedAlgorithm` flood (meter rises by ≤ the clamped, rate-limited amount). Normal
   two-window play (stream + spectate + gift + poll) still works; typecheck.
+  > note: `HARDEN` const block (exactly §12.7) added to both party files, comment-linked to that
+  > section. `SHOUTOUT_FOLLOWERS_PER_LEVEL = 50` added as a separate server-side const in
+  > `stream.ts` (linked to §12.3) since it's not part of the `HARDEN` block but is needed for
+  > server-side recomputation. The `open` handler allows the same connection to re-send `open`
+  > (updates `streamerSummary`) — "first open wins" means first *connection* wins; re-sending from
+  > the pinned conn is harmless and lets the summary stay fresh. `feedAlgorithm` `"streamStarted"`
+  > kind is not clamped (it's a fixed server-side increment with no client-controlled magnitude).
+  > `pnpm typecheck` passes; 13/13 probe assertions pass (`probe-4.5c1.mjs`, run against local
+  > PartyKit dev server at 127.0.0.1:1999).
 
 - [ ] **4.5c-2 — Verified identity (Supabase JWT → PartyKit).** Client: append the Supabase
   `access_token` to BOTH party sockets' connection URLs (PartySocket `query: { token }`, value

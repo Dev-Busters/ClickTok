@@ -71,6 +71,15 @@ const ALGO = {
   blessedThreshold: 400,
 };
 
+// 04 §12.7 — server hardening clamps (server-side only; not in client BALANCE)
+const HARDEN = {
+  maxTapsPerMsg: 8,               // tapMaxPerSec × tapBatchSec, ×2 slack for timer jitter
+  minQuickChatIntervalMs: 2000,   // client cooldown is 3s; server allows slack (stream room)
+  maxFeedWatchSec: 60,            // max watchSec per feedAlgorithm message
+  maxFeedGiftCoins: 800,          // = lion, the largest single gift
+  minFeedIntervalMs: 1000,        // per-connection feedAlgorithm rate limit
+};
+
 // Periodic alarm so decay/rotation progress even with no live messages.
 const ALARM_INTERVAL_MS = 30 * 1000;
 
@@ -104,6 +113,8 @@ export default class LobbyServer implements Party.Server {
   private connKeys = new Map<string, string>();
   // userId → ms epoch of last Supabase write (debounce)
   private lastPersist = new Map<string, number>();
+  // connection id → ms epoch of last feedAlgorithm message (rate limit, 04 §12.7)
+  private feedAlgoLastMs = new Map<string, number>();
 
   private trends: TrendInfo[] = generateTrends();
   private rotatesAt = Date.now() + TREND_ROTATION_MS;
@@ -155,91 +166,118 @@ export default class LobbyServer implements Party.Server {
   }
 
   async onMessage(message: string, sender: Party.Connection) {
-    const msg: LobbyClientMessage = JSON.parse(message);
-    const now = Date.now();
+    try {
+      const msg: LobbyClientMessage = JSON.parse(message);
+      const now = Date.now();
 
-    switch (msg.type) {
-      case "hello": {
-        // 4.5b: key by the stable Supabase userId when known, so a reconnect
-        // (or a restart that reloaded from Supabase) finds the same entry.
-        const key = msg.userId ?? sender.id;
-        this.connKeys.set(sender.id, key);
-        const existing = this.channels.get(key);
-        this.channels.set(key, {
-          id: key,
-          handle: msg.handle,
-          followers: existing?.followers ?? 0,
-          likes: existing?.likes ?? 0,
-          rank: existing?.rank ?? 0,
-          live: existing?.live,
-          trend: existing?.trend,
-          userId: msg.userId,
-        });
-        break;
-      }
-
-      case "goLive": {
-        this.streams.set(msg.summary.streamId, msg.summary);
-        this.streamerConns.set(sender.id, msg.summary.streamId);
-        const ch = this.channels.get(this.connKeys.get(sender.id) ?? sender.id);
-        if (ch) ch.live = true;
-        this.broadcastDirectory();
-        this.bumpTrendHeat(now, msg.summary.topic);
-        break;
-      }
-
-      case "liveUpdate":
-        if (this.streams.has(msg.summary.streamId)) {
-          this.streams.set(msg.summary.streamId, msg.summary);
-          this.broadcastDirectory();
+      switch (msg.type) {
+        case "hello": {
+          // 4.5b: key by the stable Supabase userId when known, so a reconnect
+          // (or a restart that reloaded from Supabase) finds the same entry.
+          // Key is bound once at hello; subsequent score messages cannot change it.
+          const key = msg.userId ?? sender.id;
+          this.connKeys.set(sender.id, key);
+          const existing = this.channels.get(key);
+          this.channels.set(key, {
+            id: key,
+            handle: msg.handle,
+            followers: existing?.followers ?? 0,
+            likes: existing?.likes ?? 0,
+            rank: existing?.rank ?? 0,
+            live: existing?.live,
+            trend: existing?.trend,
+            userId: msg.userId,
+          });
+          break;
         }
-        break;
 
-      case "endLive": {
-        this.streams.delete(msg.streamId);
-        this.streamerConns.delete(sender.id);
-        const ch = this.channels.get(this.connKeys.get(sender.id) ?? sender.id);
-        if (ch) ch.live = false;
-        this.broadcastDirectory();
-        break;
+        case "goLive": {
+          // Reject if this streamId is already owned by a different connection (04 §12.7).
+          if (this.streams.has(msg.summary.streamId)) {
+            const ownerConnId = [...this.streamerConns.entries()]
+              .find(([, sid]) => sid === msg.summary.streamId)?.[0];
+            if (ownerConnId && ownerConnId !== sender.id) break; // hijack attempt — drop
+          }
+          this.streams.set(msg.summary.streamId, msg.summary);
+          this.streamerConns.set(sender.id, msg.summary.streamId);
+          const ch = this.channels.get(this.connKeys.get(sender.id) ?? sender.id);
+          if (ch) ch.live = true;
+          this.broadcastDirectory();
+          this.bumpTrendHeat(now, msg.summary.topic);
+          break;
+        }
+
+        case "liveUpdate":
+          // Honor only when the sender owns this streamId (04 §12.7).
+          if (this.streamerConns.get(sender.id) === msg.summary.streamId) {
+            this.streams.set(msg.summary.streamId, msg.summary);
+            this.broadcastDirectory();
+          }
+          break;
+
+        case "endLive": {
+          // Honor only when the sender owns this streamId (04 §12.7).
+          if (this.streamerConns.get(sender.id) !== msg.streamId) break;
+          this.streams.delete(msg.streamId);
+          this.streamerConns.delete(sender.id);
+          const ch = this.channels.get(this.connKeys.get(sender.id) ?? sender.id);
+          if (ch) ch.live = false;
+          this.broadcastDirectory();
+          break;
+        }
+
+        case "score": {
+          // Use the key bound at hello; ignore any score.userId switch attempt (04 §12.7).
+          const key = this.connKeys.get(sender.id) ?? sender.id;
+          const existing = this.channels.get(key);
+          const ch: ChannelEntry = {
+            id: key,
+            handle: existing?.handle ?? "",
+            followers: msg.followers,
+            likes: msg.likes,
+            rank: existing?.rank ?? 0,
+            live: existing?.live,
+            trend: msg.trend ?? existing?.trend,
+            userId: existing?.userId,  // preserve what was set at hello; never from score
+          };
+          this.channels.set(key, ch);
+          this.broadcastLeaderboard();
+          if (ch.trend) this.broadcastTrendLeaderboard(ch.trend);
+          if (ch.userId) await this.persistScore(ch.userId, ch);
+          break;
+        }
+
+        case "getTrendLeaderboard":
+          sender.send(JSON.stringify({
+            type: "trendLeaderboard",
+            trend: msg.trend,
+            channels: this.trendRankedChannels(msg.trend),
+          } satisfies LobbyServerMessage));
+          break;
+
+        case "feedAlgorithm": {
+          // Per-connection rate limit (04 §12.7): drop excess messages.
+          const lastFeed = this.feedAlgoLastMs.get(sender.id) ?? 0;
+          if (now - lastFeed < HARDEN.minFeedIntervalMs) break;
+          this.feedAlgoLastMs.set(sender.id, now);
+          // Clamp unbounded amounts (04 §12.7).
+          const rawAmount = msg.amount;
+          const amount =
+            msg.kind === "watchSec" ? Math.min(rawAmount, HARDEN.maxFeedWatchSec) :
+            msg.kind === "giftCoins" ? Math.min(rawAmount, HARDEN.maxFeedGiftCoins) :
+            rawAmount; // "streamStarted" — fixed value on the server, no exploit surface
+          if (amount > 0) this.feedAlgorithm(now, msg.kind, amount);
+          break;
+        }
       }
-
-      case "score": {
-        const key = msg.userId ?? this.connKeys.get(sender.id) ?? sender.id;
-        this.connKeys.set(sender.id, key);
-        const existing = this.channels.get(key);
-        const ch: ChannelEntry = {
-          id: key,
-          handle: existing?.handle ?? "",
-          followers: msg.followers,
-          likes: msg.likes,
-          rank: existing?.rank ?? 0,
-          live: existing?.live,
-          trend: msg.trend ?? existing?.trend,
-          userId: msg.userId ?? existing?.userId,
-        };
-        this.channels.set(key, ch);
-        this.broadcastLeaderboard();
-        if (ch.trend) this.broadcastTrendLeaderboard(ch.trend);
-        if (ch.userId) await this.persistScore(ch.userId, ch);
-        break;
-      }
-
-      case "getTrendLeaderboard":
-        sender.send(JSON.stringify({
-          type: "trendLeaderboard",
-          trend: msg.trend,
-          channels: this.trendRankedChannels(msg.trend),
-        } satisfies LobbyServerMessage));
-        break;
-
-      case "feedAlgorithm":
-        this.feedAlgorithm(now, msg.kind, msg.amount);
-        break;
+    } catch {
+      // Malformed message — silently drop.
     }
   }
 
   async onClose(conn: Party.Connection) {
+    this.feedAlgoLastMs.delete(conn.id);
+
     const streamId = this.streamerConns.get(conn.id);
     if (streamId) {
       this.streams.delete(streamId);

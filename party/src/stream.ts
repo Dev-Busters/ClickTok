@@ -71,8 +71,22 @@ type StreamServerMessage =
   | { type: "realGift"; fromHandle: string; tier: GiftTier; atRunSec: number }
   | { type: "voteTally"; pollId: string; tally: number[] };
 
+// 04 §12.7 — server hardening clamps (server-side only; not in client BALANCE)
+const HARDEN = {
+  maxTapsPerMsg: 8,               // tapMaxPerSec × tapBatchSec, ×2 slack for timer jitter
+  minQuickChatIntervalMs: 2000,   // client cooldown is 3s; server allows slack
+  maxFeedWatchSec: 60,            // max watchSec per feedAlgorithm message (lobby)
+  maxFeedGiftCoins: 800,          // = lion, the largest single gift (lobby)
+  minFeedIntervalMs: 1000,        // per-connection feedAlgorithm rate limit (lobby)
+};
+
+// Mirrored from BALANCE.social (04 §12.3); used for server-side shoutout recomputation.
+const SHOUTOUT_FOLLOWERS_PER_LEVEL = 50;
+
 export default class StreamServer implements Party.Server {
   private streamerConnId: string | null = null;
+  // Summary from the streamer's `open` message — used to recompute shoutout server-side.
+  private streamerSummary: LiveStreamSummary | null = null;
   // connId → viewer handle
   private viewers = new Map<string, string>();
   private lastGrade: Grade | null = null;
@@ -80,6 +94,8 @@ export default class StreamServer implements Party.Server {
   private latestClockSec = 0;
   // pollId → (connId → choiceIndex) — per-voter record for live tally computation
   private votesByPoll = new Map<string, Map<string, number>>();
+  // connId → ms epoch of last quickChat (per-connection rate limit, 04 §12.7)
+  private lastQuickChatMs = new Map<string, number>();
 
   constructor(readonly party: Party.Room) {}
 
@@ -98,138 +114,178 @@ export default class StreamServer implements Party.Server {
   }
 
   async onMessage(message: string, sender: Party.Connection) {
-    const msg: StreamClientMessage = JSON.parse(message);
+    try {
+      const msg: StreamClientMessage = JSON.parse(message);
+      const isStreamer = sender.id === this.streamerConnId;
 
-    switch (msg.type) {
-      case "open":
-        this.streamerConnId = sender.id;
-        break;
+      switch (msg.type) {
 
-      case "snapshot": {
-        this.latestClockSec = msg.snap.clockSec;
-        const realViewers = this.viewers.size;
-        const out: StreamServerMessage = { type: "snapshot", snap: msg.snap, realViewers };
-        // Broadcast to all spectators (exclude the streamer).
-        this.party.broadcast(JSON.stringify(out), [sender.id]);
-        // Echo the current real-viewer count back to the streamer.
-        sender.send(JSON.stringify({ type: "viewerCount", realViewers } satisfies StreamServerMessage));
-        break;
-      }
+        // ——— Role pinning ————————————————————————————————————————————————————
 
-      case "end": {
-        this.lastGrade = msg.grade;
-        const out: StreamServerMessage = { type: "ended", grade: msg.grade };
-        this.party.broadcast(JSON.stringify(out), [sender.id]);
-        break;
-      }
+        case "open":
+          // First open wins until that connection closes.
+          if (this.streamerConnId === null) {
+            this.streamerConnId = sender.id;
+            this.streamerSummary = msg.summary;
+          } else if (this.streamerConnId === sender.id) {
+            // Same connection re-opening — update summary (e.g., updated viewers).
+            this.streamerSummary = msg.summary;
+          }
+          // else: a viewer attempting to hijack — silently drop.
+          break;
 
-      case "watch": {
-        this.viewers.set(sender.id, msg.handle);
-        const streamer = this.streamerConnId
-          ? this.party.getConnection(this.streamerConnId)
-          : null;
-        streamer?.send(
-          JSON.stringify({ type: "viewerCount", realViewers: this.viewers.size } satisfies StreamServerMessage)
-        );
-        break;
-      }
+        // ——— Streamer-only messages ——————————————————————————————————————————
 
-      // ——— Viewer interaction (4.3) ————————————————————————————————————————
+        case "snapshot": {
+          if (!isStreamer) break;
+          this.latestClockSec = msg.snap.clockSec;
+          const realViewers = this.viewers.size;
+          const out: StreamServerMessage = { type: "snapshot", snap: msg.snap, realViewers };
+          // Broadcast to all spectators (exclude the streamer).
+          this.party.broadcast(JSON.stringify(out), [sender.id]);
+          // Echo the current real-viewer count back to the streamer.
+          sender.send(JSON.stringify({ type: "viewerCount", realViewers } satisfies StreamServerMessage));
+          break;
+        }
 
-      case "hypeTap": {
-        const streamer = this.streamerConnId
-          ? this.party.getConnection(this.streamerConnId)
-          : null;
-        if (streamer) {
-          streamer.send(JSON.stringify({
-            type: "realHype",
-            fromHandle: this.viewers.get(sender.id) ?? "?",
-            taps: msg.taps,
+        case "end": {
+          if (!isStreamer) break;
+          this.lastGrade = msg.grade;
+          // Clear poll state so stale votes from the ended run can't affect the next run.
+          this.votesByPoll.clear();
+          const out: StreamServerMessage = { type: "ended", grade: msg.grade };
+          this.party.broadcast(JSON.stringify(out), [sender.id]);
+          break;
+        }
+
+        case "pollOpen": {
+          if (!isStreamer) break;
+          const out: StreamServerMessage = { type: "poll", poll: msg.poll };
+          this.party.broadcast(JSON.stringify(out), [sender.id]);
+          break;
+        }
+
+        case "pollClose": {
+          if (!isStreamer) break;
+          // Send final tally to ALL so spectators can claim vote-win rewards
+          // (deviation from 03 §6 voteTally → streamer only; see 4.3 note).
+          const tally = this.computeTally(msg.pollId);
+          this.party.broadcast(JSON.stringify({
+            type: "voteTally",
+            pollId: msg.pollId,
+            tally,
           } satisfies StreamServerMessage));
+          this.votesByPoll.delete(msg.pollId);
+          break;
         }
-        break;
-      }
 
-      case "quickChat": {
-        const streamer = this.streamerConnId
-          ? this.party.getConnection(this.streamerConnId)
-          : null;
-        if (streamer) {
-          streamer.send(JSON.stringify({
-            type: "realChat",
-            fromHandle: this.viewers.get(sender.id) ?? "?",
-            preset: msg.preset,
+        case "shoutout": {
+          if (!isStreamer) break;
+          // Recompute followers server-side from the pinned open summary (04 §12.7).
+          // The client-sent `followers` value is ignored.
+          const creatorLevel = this.streamerSummary?.creatorLevel ?? 1;
+          const followers = SHOUTOUT_FOLLOWERS_PER_LEVEL * creatorLevel;
+          const out: StreamServerMessage = { type: "shoutout", handle: msg.handle, followers };
+          this.party.broadcast(JSON.stringify(out), [sender.id]);
+          break;
+        }
+
+        // ——— Viewer-only messages ————————————————————————————————————————————
+
+        case "watch": {
+          if (isStreamer) break;
+          this.viewers.set(sender.id, msg.handle);
+          const streamer = this.streamerConnId
+            ? this.party.getConnection(this.streamerConnId)
+            : null;
+          streamer?.send(
+            JSON.stringify({ type: "viewerCount", realViewers: this.viewers.size } satisfies StreamServerMessage)
+          );
+          break;
+        }
+
+        case "hypeTap": {
+          if (isStreamer) break;
+          const streamer = this.streamerConnId
+            ? this.party.getConnection(this.streamerConnId)
+            : null;
+          if (streamer) {
+            // Clamp taps to prevent a forged high-tap message from flooding hype (04 §12.7).
+            const taps = Math.min(Math.max(1, msg.taps), HARDEN.maxTapsPerMsg);
+            streamer.send(JSON.stringify({
+              type: "realHype",
+              fromHandle: this.viewers.get(sender.id) ?? "?",
+              taps,
+            } satisfies StreamServerMessage));
+          }
+          break;
+        }
+
+        case "quickChat": {
+          if (isStreamer) break;
+          const now = Date.now();
+          const lastChat = this.lastQuickChatMs.get(sender.id) ?? 0;
+          if (now - lastChat < HARDEN.minQuickChatIntervalMs) break;
+          this.lastQuickChatMs.set(sender.id, now);
+          const streamer = this.streamerConnId
+            ? this.party.getConnection(this.streamerConnId)
+            : null;
+          if (streamer) {
+            streamer.send(JSON.stringify({
+              type: "realChat",
+              fromHandle: this.viewers.get(sender.id) ?? "?",
+              preset: msg.preset,
+            } satisfies StreamServerMessage));
+          }
+          break;
+        }
+
+        case "sendGift": {
+          if (isStreamer) break;
+          const streamer = this.streamerConnId
+            ? this.party.getConnection(this.streamerConnId)
+            : null;
+          if (streamer) {
+            streamer.send(JSON.stringify({
+              type: "realGift",
+              fromHandle: this.viewers.get(sender.id) ?? "?",
+              tier: msg.tier,
+              atRunSec: this.latestClockSec,
+            } satisfies StreamServerMessage));
+          }
+          break;
+        }
+
+        case "vote": {
+          if (isStreamer) break;
+          if (!this.votesByPoll.has(msg.pollId)) {
+            this.votesByPoll.set(msg.pollId, new Map());
+          }
+          this.votesByPoll.get(msg.pollId)!.set(sender.id, msg.choiceIndex);
+          const tally = this.computeTally(msg.pollId);
+          // Deviation from 03 §6: broadcast to ALL (not streamer only) so spectators
+          // see live tally bars and receive vote-win coin rewards.
+          this.party.broadcast(JSON.stringify({
+            type: "voteTally",
+            pollId: msg.pollId,
+            tally,
           } satisfies StreamServerMessage));
+          break;
         }
-        break;
       }
-
-      case "sendGift": {
-        const streamer = this.streamerConnId
-          ? this.party.getConnection(this.streamerConnId)
-          : null;
-        if (streamer) {
-          streamer.send(JSON.stringify({
-            type: "realGift",
-            fromHandle: this.viewers.get(sender.id) ?? "?",
-            tier: msg.tier,
-            atRunSec: this.latestClockSec,
-          } satisfies StreamServerMessage));
-        }
-        break;
-      }
-
-      case "vote": {
-        if (!this.votesByPoll.has(msg.pollId)) {
-          this.votesByPoll.set(msg.pollId, new Map());
-        }
-        this.votesByPoll.get(msg.pollId)!.set(sender.id, msg.choiceIndex);
-        const tally = this.computeTally(msg.pollId);
-        // Deviation from 03 §6 (voteTally → streamer only): broadcast to ALL so
-        // spectators can display live tally bars and receive vote-win rewards.
-        this.party.broadcast(JSON.stringify({
-          type: "voteTally",
-          pollId: msg.pollId,
-          tally,
-        } satisfies StreamServerMessage));
-        break;
-      }
-
-      case "pollOpen": {
-        // Streamer opened a choice event as a poll — broadcast to spectators only.
-        const out: StreamServerMessage = { type: "poll", poll: msg.poll };
-        this.party.broadcast(JSON.stringify(out), [sender.id]);
-        break;
-      }
-
-      case "pollClose": {
-        // Streamer resolved the choice. Send final tally to ALL so spectators can
-        // claim vote-win rewards (deviation: spec sends voteTally → streamer only).
-        const tally = this.computeTally(msg.pollId);
-        this.party.broadcast(JSON.stringify({
-          type: "voteTally",
-          pollId: msg.pollId,
-          tally,
-        } satisfies StreamServerMessage));
-        this.votesByPoll.delete(msg.pollId);
-        break;
-      }
-
-      case "shoutout": {
-        // Streamer shouts out top gifter — broadcast to all spectators.
-        const out: StreamServerMessage = { type: "shoutout", handle: msg.handle, followers: msg.followers };
-        this.party.broadcast(JSON.stringify(out), [sender.id]);
-        break;
-      }
+    } catch {
+      // Malformed message — silently drop.
     }
   }
 
   async onClose(conn: Party.Connection) {
+    this.lastQuickChatMs.delete(conn.id);
     if (conn.id === this.streamerConnId) {
       // Streamer disconnected — notify spectators with the last known grade or FLOP.
       const grade = this.lastGrade ?? "FLOP";
       this.party.broadcast(JSON.stringify({ type: "ended", grade } satisfies StreamServerMessage));
       this.streamerConnId = null;
+      this.streamerSummary = null;
     } else if (this.viewers.has(conn.id)) {
       this.viewers.delete(conn.id);
       const streamer = this.streamerConnId
