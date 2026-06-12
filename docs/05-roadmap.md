@@ -548,6 +548,55 @@ by meta progression, with run-to-run variety.
 
 ---
 
+## PHASE 5 — Ship it (deployment + pre-launch hygiene)
+
+Architecture (decided 2026-06-11): **client → Vercel** (static Vite build), **realtime server →
+PartyKit Cloud** via `partykit deploy` (PartyKit is a stateful WebSocket platform on Cloudflare —
+it cannot run on Vercel), **Supabase** is already cloud-hosted. Secrets NEVER go in git: local
+values live in `party/.env` / `client/.env` (both gitignored, already filled); production copies
+are pushed to each platform's own env store. Interactive CLI logins (`partykit login`,
+`vercel login`) are completed by the human operator when prompted.
+
+- [ ] **5.0 — Fix the Shell hooks-order bug.** Console shows "React has detected a change in the
+  order of Hooks" for `Shell` (`client/src/app/Shell.tsx`), pre-existing on `main` (see 4.5b note).
+  Reproduce via `pnpm dev` → console → navigate Home → go live → end → back. Find the conditional
+  hook (likely around the Live/spectate overlay switch on `phase`); restructure so every hook runs
+  unconditionally each render (move early returns below hooks, or split a child component).
+  **DoD:** warning no longer appears across a full navigate → live → results → back cycle;
+  `pnpm typecheck` passes.
+
+- [ ] **5.1 — Deploy the PartyKit server.** From `party/`: `npx partykit login` (operator completes
+  the GitHub OAuth), then `npx partykit deploy` (project name `clicktok` per `partykit.json`).
+  Push the two secrets the lobby needs, reading values from the local `party/.env` (do NOT echo
+  them into logs or commit them): `npx partykit env add SUPABASE_URL`, `npx partykit env add
+  SUPABASE_SERVICE_ROLE_KEY`, then redeploy so the env takes effect. Record the deployed host
+  (`clicktok.<partykit-username>.partykit.dev`) in a `> note:` under this task.
+  **DoD:** `curl https://<host>` (or opening a websocket from a local client pointed at it via
+  `VITE_PARTYKIT_HOST=<host> pnpm dev:client`) reaches the deployed lobby; leaderboard writes land
+  in Supabase `leaderboard_scores`.
+
+- [ ] **5.2 — Deploy the client to Vercel.** Create/link a Vercel project for this repo (CLI
+  `vercel` from repo root, or the Vercel MCP/skill if connected). Settings: **Root Directory =
+  `client`**, framework Vite (auto-detected), pnpm monorepo (Vercel detects
+  `pnpm-workspace.yaml`; if install fails, set Install Command to `pnpm install` and enable
+  "Include files outside Root Directory"). Set project env vars (Production):
+  `VITE_PARTYKIT_HOST=<host from 5.1>`, `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (same
+  values as local `client/.env` — the anon key is public-safe by design; the service-role key
+  must NEVER be set here). Deploy to production.
+  **DoD:** the production URL loads the game; onboarding → post → go live works; no console
+  errors about localhost:1999.
+
+- [ ] **5.3 — Production smoke test + Supabase URL config.** Add the Vercel production URL to
+  Supabase Auth (dashboard → Authentication → URL Configuration → Site URL / Redirect URLs) so
+  auth flows work on the prod domain (the Supabase MCP cannot change this — operator does it in
+  the dashboard if no tool exposes it). Then a two-browser test against the production URL:
+  window A goes live; window B sees A in LIVE NOW, joins, sends a hype tap + quick-chat + gift;
+  A sees them glowing in-feed; B gets a watch-drop on stream end; leaderboard shows both and
+  still shows them after `partykit deploy` is re-run (durability).
+  **DoD:** all of the above pass on production; record the prod URL in a `> note:`.
+
+---
+
 ## How to update this file
 When you finish a task: change `[ ]`→`[x]`, and if you deviated from the spec, add a one-line
 `> note:` under it explaining what changed and why (so the next model and the docs stay honest).
