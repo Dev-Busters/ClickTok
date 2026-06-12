@@ -890,7 +890,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > + `VITE_POSTHOG_HOST` pushed to Vercel production via CLI; `POSTHOG_API_KEY` pushed to
   > PartyKit via `npx partykit env add` + redeployed; prod event verified end-to-end.
 
-- [ ] **6.8 — Share-link + head polish.** `client/index.html` has no meta description and no
+- [x] **6.8 — Share-link + head polish.** `client/index.html` has no meta description and no
   social-card tags, so links posted on stream/Discord render bare. Add: `meta description`
   (one sentence from the README blurb), `theme-color` (`#0a0a0a`-ish to match the dark frame),
   `og:title`, `og:description`, `og:type=website`, `og:url=https://clicktok-one.vercel.app`,
@@ -901,6 +901,11 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   missing, add a simple one in the same palette).
   **DoD:** `pnpm build` clean; after push + auto-deploy, `curl` the prod HTML and verify the
   tags are present and `og.png` returns 200; commit, push.
+  > note: `favicon.svg` already existed. OG image saved as `og.jpg` (JPEG, 70KB) rather than
+  > `og.png` — PNG of the gradient-heavy CRT design exceeded 240KB at max compression; JPEG
+  > hits 70KB at quality 90, well under the ~150KB target. All `og:image` / `twitter:image`
+  > refs updated to `/og.jpg`. All 13 meta tags present in prod HTML confirmed via `curl`;
+  > `og.jpg` returns HTTP 200.
 
 - [ ] **6.9 — Cold new-player QA sweep (prod). Run LAST, after 6.7/6.8/3.5 land.** Play
   https://clicktok-one.vercel.app as a total stranger on a fresh profile (incognito), once at
