@@ -27,6 +27,7 @@ export type LiveStreamSummary = {
   realViewers: number;
   hype: number;                          // 0..100
   startedAt: number;                     // ms epoch
+  featured?: boolean;                    // (6.1) lobby-generated sim filler card
 };
 
 export type AlgorithmTier = "STARVED" | "FED" | "BLESSED";

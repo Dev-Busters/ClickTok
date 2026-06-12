@@ -16,6 +16,7 @@ type LiveStreamSummary = {
   realViewers: number;
   hype: number;
   startedAt: number;
+  featured?: boolean;  // (6.1) lobby-generated sim filler card
 };
 
 type ChannelSummary = {
@@ -80,6 +81,17 @@ const HARDEN = {
   minFeedIntervalMs: 1000,        // per-connection feedAlgorithm rate limit
 };
 
+// 04 §12.8 — featured sim streams (task 6.1): cold-start filler
+const FEATURED_MIN_DIRECTORY = 3;
+// Rotate one featured card every this many alarm ticks (30s × 6 = 3 min).
+const FEATURED_ROTATE_EVERY = 6;
+
+const FEATURED_HANDLES = [
+  "dancer_pro", "cookmaster", "gamezilla", "comedyking", "fitqueen",
+  "fashionstar", "musicvibe", "lifehackz", "petlover", "trendwatch",
+  "sunsetvibes", "nightowl99",
+];
+
 // Periodic alarm so decay/rotation progress even with no live messages.
 const ALARM_INTERVAL_MS = 30 * 1000;
 
@@ -124,9 +136,14 @@ export default class LobbyServer implements Party.Server {
   private algoMeter = 0;
   private algoLastUpdate = Date.now();
 
+  // (6.1) featured filler cards — generated at startup, drifted each alarm tick.
+  private featuredCards: LiveStreamSummary[] = [];
+  private alarmCount = 0;
+
   constructor(readonly party: Party.Room) {}
 
   async onStart() {
+    this.featuredCards = this.generateFeaturedCards(FEATURED_MIN_DIRECTORY);
     await this.party.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
     await this.loadLeaderboard();
   }
@@ -137,6 +154,13 @@ export default class LobbyServer implements Party.Server {
     const rotated = this.maybeRotateTrends(now);
     this.broadcastAlgorithm();
     if (rotated) this.broadcastTrends();
+
+    // (6.1) Drift featured cards and occasionally rotate one out.
+    this.alarmCount += 1;
+    this.driftFeaturedCards();
+    if (this.alarmCount % FEATURED_ROTATE_EVERY === 0) this.rotateFeaturedCard();
+    this.broadcastDirectory();
+
     await this.party.storage.setAlarm(now + ALARM_INTERVAL_MS);
   }
 
@@ -167,7 +191,7 @@ export default class LobbyServer implements Party.Server {
     // Send the current world state immediately so the new client has a picture.
     conn.send(JSON.stringify({
       type: "directory",
-      streams: [...this.streams.values()],
+      streams: this.buildDirectory(),
     } satisfies LobbyServerMessage));
     conn.send(JSON.stringify({
       type: "trends",
@@ -329,6 +353,44 @@ export default class LobbyServer implements Party.Server {
     }
   }
 
+  // (6.1) Generate a set of featured filler cards from the handle/topic pools.
+  private generateFeaturedCards(count: number): LiveStreamSummary[] {
+    const handles = shuffle(FEATURED_HANDLES);
+    const topics = shuffle(TREND_POOL);
+    return Array.from({ length: count }, (_, i) => {
+      const creatorLevel = 2 + Math.floor(Math.random() * 3); // 2..4
+      const startViewers = Math.round(10 * Math.pow(10, (creatorLevel - 1) * 0.5));
+      return {
+        streamId: `featured-${i}-${Math.random().toString(36).slice(2, 8)}`,
+        handle: handles[i % handles.length],
+        creatorLevel,
+        topic: topics[i % topics.length],
+        viewers: startViewers + Math.floor(Math.random() * startViewers),
+        realViewers: 0,
+        hype: 30 + Math.floor(Math.random() * 50),
+        startedAt: Date.now() - Math.floor(Math.random() * 120_000),
+        featured: true,
+      };
+    });
+  }
+
+  // (6.1) Slightly drift viewers/hype each alarm tick so the rail feels alive.
+  private driftFeaturedCards() {
+    this.featuredCards = this.featuredCards.map(c => ({
+      ...c,
+      hype: Math.min(90, Math.max(10, c.hype + (Math.random() - 0.45) * 6)),
+      viewers: Math.max(5, Math.round(c.viewers * (1 + (Math.random() - 0.45) * 0.08))),
+    }));
+  }
+
+  // (6.1) Replace the oldest card with a fresh one (keeps the pool rotating).
+  private rotateFeaturedCard() {
+    if (this.featuredCards.length === 0) return;
+    const fresh = this.generateFeaturedCards(1);
+    // Replace the first card (longest-standing) with the fresh one.
+    this.featuredCards = [...this.featuredCards.slice(1), fresh[0]];
+  }
+
   // 04 §12.5: meter ×0.5 every algoHalfLifeHours, applied lazily.
   private decayAlgo(now: number) {
     const elapsedHours = (now - this.algoLastUpdate) / 3_600_000;
@@ -474,10 +536,19 @@ export default class LobbyServer implements Party.Server {
     }
   }
 
+  // (6.1) Pad real streams with featured fillers up to FEATURED_MIN_DIRECTORY.
+  // Real streams always appear first; fillers fill remaining slots.
+  private buildDirectory(): LiveStreamSummary[] {
+    const real = [...this.streams.values()];
+    if (real.length >= FEATURED_MIN_DIRECTORY) return real;
+    const needed = FEATURED_MIN_DIRECTORY - real.length;
+    return [...real, ...this.featuredCards.slice(0, needed)];
+  }
+
   private broadcastDirectory() {
     this.party.broadcast(JSON.stringify({
       type: "directory",
-      streams: [...this.streams.values()],
+      streams: this.buildDirectory(),
     } satisfies LobbyServerMessage));
   }
 

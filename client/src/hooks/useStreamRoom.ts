@@ -283,7 +283,8 @@ export function useSpectatorRoom() {
   const applyShoutout = useGameStore(s => s.applyShoutout);
 
   useEffect(() => {
-    if (!spectating || !handle) return;
+    // (6.1) Featured streams are driven by useSimSpectator — no real socket needed.
+    if (!spectating || !handle || spectating.featured) return;
 
     // 4.5c-2: append Supabase access_token so the stream room can verify identity.
     const socket = new PartySocket({

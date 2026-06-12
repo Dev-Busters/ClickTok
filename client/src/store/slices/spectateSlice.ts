@@ -107,22 +107,31 @@ export const createSpectateSlice: StateCreator<FullState, [], [], SpectateSlice>
     const watchSec = Math.max(0, Math.round((Date.now() - watchStartedAt) / 1000));
     const { social: s } = BALANCE;
     const creatorLevel = spectating.creatorLevel;
+    // (6.1) Featured streams: gradeMult fixed at 1, no jackpot, no shoutout,
+    // drop ×featuredDropMult (04 §12.8).
+    const isFeatured = !!spectating.featured;
 
     // Leaving before stream ends → gradeMult = 1, no diamond (04 §12.4).
     type GradeKey = keyof typeof s.dropGradeMult;
     const streamEnded = endedGrade != null;
-    const gradeMult = streamEnded && endedGrade in s.dropGradeMult
-      ? s.dropGradeMult[endedGrade as GradeKey]
-      : 1;
+    const gradeMult = isFeatured ? 1 : (
+      streamEnded && endedGrade in s.dropGradeMult
+        ? s.dropGradeMult[endedGrade as GradeKey]
+        : 1
+    );
 
-    const baseCoins = Math.round(watchSec * s.dropCoinsPerSecPerLevel * creatorLevel * gradeMult);
+    const rawCoins = Math.round(watchSec * s.dropCoinsPerSecPerLevel * creatorLevel * gradeMult);
     // 04 §12.2: early-backer jackpot — if gifts sent ≤30s AND grade ≥ A.
-    const jackpotCoins = streamEnded &&
+    // No jackpot for featured streams (no real streamer to back).
+    const jackpotCoins = !isFeatured && streamEnded &&
       (endedGrade === "S" || endedGrade === "A") &&
       myEarlyGiftCoins > 0
         ? Math.round(myEarlyGiftCoins * s.earlyBackerJackpotMult)
         : 0;
-    const coins = baseCoins + jackpotCoins;
+    // Apply featuredDropMult as a final multiplier on the whole coin payout.
+    const coins = isFeatured
+      ? Math.round((rawCoins + jackpotCoins) * s.featuredDropMult)
+      : rawCoins + jackpotCoins;
     const likes = Math.round(watchSec * s.dropLikesPerSec);
     const followers = Math.min(
       s.dropFollowerCap,
@@ -142,7 +151,7 @@ export const createSpectateSlice: StateCreator<FullState, [], [], SpectateSlice>
       followers,
       likes,
       jackpotCoins,
-      shoutoutFollowers: pendingShoutoutFollowers,
+      shoutoutFollowers: isFeatured ? 0 : pendingShoutoutFollowers,
     };
 
     set({

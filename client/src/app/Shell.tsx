@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useLobby } from "../hooks/useLobby";
 import { useStreamerRoom, useSpectatorRoom } from "../hooks/useStreamRoom";
+import { useSimSpectator } from "../hooks/useSimSpectator";
 import { useCloudSync } from "../hooks/useCloudSync";
 import { useGameStore, type IdleReport } from "../store";
 import { HomeFeed } from "../screens/HomeFeed";
@@ -37,6 +38,7 @@ export function Shell() {
   useLobby();
   useStreamerRoom();
   useSpectatorRoom();
+  useSimSpectator();
   useCloudSync();
 
   return (

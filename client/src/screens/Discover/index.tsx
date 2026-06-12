@@ -45,20 +45,22 @@ function LiveNowCard({ stream }: { stream: LiveStreamSummary }) {
         <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: '#fff' }}>
           {initials}
         </span>
-        {/* LIVE badge */}
+        {/* LIVE / FEATURED badge */}
         <div style={{
           position: 'absolute',
           bottom: '-6px',
-          background: 'var(--red)',
-          color: '#fff',
-          fontSize: '9px',
+          background: stream.featured ? 'rgba(37,244,238,0.18)' : 'var(--red)',
+          border: stream.featured ? '1px solid var(--cyan)' : 'none',
+          color: stream.featured ? 'var(--cyan)' : '#fff',
+          fontSize: '8px',
           fontWeight: 700,
           fontFamily: 'var(--font-ui)',
           padding: '1px 5px',
           borderRadius: '3px',
           letterSpacing: '0.05em',
+          whiteSpace: 'nowrap',
         }}>
-          LIVE
+          {stream.featured ? '✨ FEATURED' : 'LIVE'}
         </div>
       </div>
 
@@ -128,6 +130,8 @@ function LiveNowRail() {
   const setSheet = useGameStore(s => s.setSheet);
 
   const sorted = [...liveDirectory].sort((a, b) => {
+    // Real streams always sort before featured fillers (06 §4).
+    if (!!a.featured !== !!b.featured) return a.featured ? 1 : -1;
     if (b.creatorLevel !== a.creatorLevel) return b.creatorLevel - a.creatorLevel;
     return b.viewers - a.viewers;
   });

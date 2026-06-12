@@ -709,7 +709,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
 > independently shippable; production stays live throughout, so verify nothing regresses solo play
 > before checking a box.
 
-- [ ] **6.1 — Featured sim streams (cold-start filler).** `01` §7.4 promises sim "featured
+- [x] **6.1 — Featured sim streams (cold-start filler).** `01` §7.4 promises sim "featured
   streams" so an empty directory never looks dead. Lobby: pad the `directory` broadcast up to
   `featuredMinDirectory` cards with `featured: true` entries (a server-side pool of ≥8 fake
   handles/topics; `creatorLevel` rolled 2–4 each; viewers/hype drift a little on each alarm tick;
@@ -726,6 +726,15 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   shows `featuredMinDirectory` badged cards; joining one plays a live-feeling stream (meters and
   feed move, taps/gifts respond); the drop pays the ×0.5 formula; going live in a second window
   shows the real stream above the fillers; typecheck.
+  > note: `useSimSpectator` hook (new, mounted in Shell alongside `useSpectatorRoom`) drives the
+  > sim; `useSpectatorRoom` bails early when `spectating.featured === true` so only one driver is
+  > active. Badge label is "✨ FEATURED" (font-size: 8px; slightly wider than the avatar, which is
+  > acceptable at absolute positioning). Lobby `buildDirectory()` pads with featured fillers on
+  > both `onConnect` send and `broadcastDirectory`; `onAlarm` drifts + rotates and re-broadcasts.
+  > `leaveStream` in `spectateSlice` checks `spectating.featured`: `gradeMult = 1` (fixed),
+  > `jackpotCoins = 0`, `shoutoutFollowers = 0`, final coins `×featuredDropMult`. Verified in
+  > preview: 3 badged cards, feed events + drifting meters confirmed at 6.7s clockSec, drop math
+  > `round(33 × 0.15 × 2 × 0.5) = 5` confirmed. `pnpm typecheck` clean.
 
 - [ ] **6.2 — Lobby efficiency: broadcast debounce + persist flush.** Every `score` message
   (clients send one every ~2s) currently triggers a full `leaderboard` broadcast to every

@@ -81,5 +81,9 @@ export const BALANCE = {
     algoBlessedThreshold: 400,     //  ≥400 → BLESSED: ×1.25 + guaranteed 2nd run modifier
     algoFedMult: 1.10,
     algoBlessedMult: 1.25,
+
+    // §12.8 Featured sim streams (task 6.1)
+    featuredMinDirectory: 3,   // lobby pads the directory up to this many cards (real first)
+    featuredDropMult: 0.5,     // watch-drop multiplier on featured streams (gradeMult fixed at 1)
   },
 } as const;
