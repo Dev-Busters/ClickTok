@@ -10,4 +10,10 @@ export const ELEMENT_CATALOG: ElementDef[] = [
     tagline: "Tap the rings in rhythm — PERFECT timing pays the most.",
     requires: BALANCE.elements.beatSync.unlock,
   },
+  {
+    id: "duet_loop",
+    name: "DUET LOOP",
+    tagline: "Tap the core to arm a pod, then tap it back — chain it for FLOW.",
+    requires: BALANCE.elements.duetLoop.unlock,
+  },
 ];

@@ -32,7 +32,7 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   publishReadyAt: 0,
 
   engageTap: () => {
-    const { tapPower, multiplier, followerConversion, wallet, combo } = get();
+    const { tapPower, multiplier, followerConversion, wallet, combo, activeWave } = get();
     // 04 §13.1: comboMult = 1 + min(combo, comboCap) × comboPerTap
     const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
     const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * comboMult;
@@ -49,6 +49,19 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
       combo: combo + 1,
       lastTapAt: Date.now(),
     });
+
+    // 01 §8.2 / 04 §13.2: a TAP CORE tap arms the next DUET LOOP pod (energy beam).
+    if (activeWave?.element === "duet_loop" && activeWave.armedIndex === null
+      && activeWave.completed < BALANCE.elements.duetLoop.pods) {
+      set({
+        activeWave: {
+          ...activeWave,
+          armedIndex: activeWave.completed,
+          armedAt: Date.now(),
+          firstArmedAt: activeWave.firstArmedAt ?? Date.now(),
+        },
+      });
+    }
   },
 
   decayCombo: (dt) => {

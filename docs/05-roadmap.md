@@ -1002,6 +1002,23 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
 > (7.1's `features/feed/boosts.ts` + the `BALANCE.feed` boost constants are superseded — they get
 > reworked into §13.5 mods at 7.5; `VideoCanvas`/`npcVideos` carry forward unchanged.)
 
+> **TOKEN DISCIPLINE — binding for every Phase 7 task (added after 7.3 consumed two sessions):**
+> 1. **Read narrowly.** Read CLAUDE.md, this header block, YOUR task's block, and ONLY the doc
+>    sections your task names (locate via grep, read those line ranges — never whole docs, never
+>    the whole roadmap). Do not re-read files you just edited; do not re-open files to "confirm."
+> 2. **Checkpoint commits.** Commit every time typecheck is green on a coherent piece
+>    (`feat(task 7.x wip): <piece>`). NEVER end a session with uncommitted work: if a usage limit
+>    approaches, commit what compiles and add a `> handoff:` line under the task (what's done /
+>    what's left / next file to touch) so the next session resumes cheaply instead of
+>    re-deriving state from the diff.
+> 3. **Verify math headlessly.** Formula-exactness, payouts, migrations: throwaway `npx tsx`
+>    script importing the REAL modules; paste the resulting numbers into the note. The browser
+>    preview is ONE pass at the end, for visuals/interactions only. No screenshots unless
+>    something is visually broken — prefer `preview_snapshot`/console logs (text) over images.
+> 4. **Multiplayer checks: probe first.** Raw-WS node probe (pattern `probe-6.6.mjs`) proves the
+>    server contract cheaply; only after it passes, ONE two-window browser pass.
+> 5. One task per session; `/clear` between tasks; never start the next task in the same session.
+
 - [x] **7.1 — VideoCard plumbing + the VideoCanvas visual.** Types from `03` §6.5 (`VideoCard`,
   `FeedBoostId` — mirror into `party/src/lobby.ts` now, unused server-side until 7.3). New
   `components/VideoCanvas.tsx` (`06` §8: seed+topic → deterministic layered animated visual,
@@ -1094,21 +1111,28 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   scheduler alternates them; the chain pays formula-exact (pods + FLOW verified); timeout stalls
   without penalty; framework diff outside `features/elements/` is ≈zero; typecheck.
 
-- [ ] **7.5 — Video pager + server pool + mechanic mods.** The player-video layer per `01` §8.3:
-  rework `features/feed/boosts.ts` → `mods.ts` (`FeedModId` catalog per `04` §13.5 table;
-  `VideoCard.boost` → `mod` — mirror BOTH type files; bump nothing persisted). Client: vertical
-  snap pager per `06` §3 (swipe changes backdrop video + active mod banner; combo resets; waves
-  reschedule; TAP CORE/element stage persist), mods modify element/core/scheduler params ONLY
-  while their card is on screen, locked-element mods inert but advertised. Server
-  (`party/src/lobby.ts`): pool (cap `feedPoolCap`), `postVideo` (stamp `postedAt`, zero
-  `tapCount`, whitelist `captionId`, rate-limit `serverPublishCooldownSec`), `getFeed` → `feed`
-  (NPC-padded to `feedMinDeck`), `videoPosted` broadcast. Create-sheet POST → `publishVideo()`
-  (burst + 120s countdown per `04` §13.3). Offline: local NPC deck, all mods still function.
-  **Refs:** `01` §8.3, `03` §6.5, `04` §13.3+13.5, `06` §3, `02` §6. **DoD:** two windows: A
-  POSTs → card in B's deck ≈2s with A's handle/mod; a `wide_window` card observably widens
-  grading and `wave_rush` halves the gap (verify against constants); swipe resets combo; probe:
-  forged `captionId` + cooldown-violating `postVideo` dropped; offline deck full and playable;
-  typecheck; `npx partykit deploy`.
+- [ ] **7.5a — Mods catalog + video pager (client-only).** First half of the player-video layer
+  per `01` §8.3 — NO server work in this task. Rework `features/feed/boosts.ts` → `mods.ts`
+  (`FeedModId` catalog per `04` §13.5 table; `VideoCard.boost` → `mod` — mirror BOTH type files
+  now, the server consumes them in 7.5b; nothing persisted changes). Vertical snap pager per
+  `06` §3 over a LOCAL NPC deck only (`feedMinDeck` cards from `npcVideos`): swipe changes
+  backdrop video + active mod banner; combo resets; waves reschedule; TAP CORE/element stage
+  persist across swipes. Mods modify element/core/scheduler params ONLY while their card is
+  on screen; mods referencing locked elements are inert but advertised.
+  **Refs:** `01` §8.3, `03` §6.5, `04` §13.5, `06` §3. **DoD:** tsx check (not browser):
+  `wide_window` widens the grade windows and `wave_rush` halves the wave gap, asserted against
+  the §13.5 constants; one preview pass: swiping changes video+banner and resets combo, deck
+  full and playable offline; typecheck.
+
+- [ ] **7.5b — Server video pool + publish flow.** Second half: server (`party/src/lobby.ts`):
+  pool (cap `feedPoolCap`), `postVideo` (stamp `postedAt`, zero `tapCount`, whitelist
+  `captionId`, rate-limit `serverPublishCooldownSec`), `getFeed` → `feed` reply (NPC-padded to
+  `feedMinDeck`), `videoPosted` broadcast — types were already mirrored in 7.5a. Client:
+  create-sheet POST → `publishVideo()` (burst + 120s countdown per `04` §13.3); the pager
+  consumes the server feed when connected and falls back to the 7.5a local deck offline.
+  **Refs:** `01` §8.3, `03` §6.5, `04` §13.3, `02` §6. **DoD:** probe: forged `captionId` and
+  cooldown-violating `postVideo` dropped, valid post lands in the `feed` reply; ONE two-window
+  pass: A POSTs → card in B's deck ≈2s with A's handle/mod; typecheck; `npx partykit deploy`.
 
 - [ ] **7.6 — Engagement royalties.** Client: batch `tapsThisCard`, send `engage` on swipe-away/
   unmount/tab-change. Server: `Number.isFinite` + clamp to `engageMaxTapsPerMsg`, bump the card's
@@ -1136,8 +1160,9 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   unmistakable button treatment (rail buttons get micro-labels; any icon-only control gets a
   caption) — audit against `01` §8.5's rule.
   **Refs:** `01` §8.5, `03` §6.5 (uiSlice note), `06` §3, `02` §4. **DoD:** fresh profile sees
-  the overlay exactly once (reload → never again; old save migrates clean); a screenshot pass of
-  all 5 tabs + Live shows no unlabeled interactive elements; typecheck.
+  the overlay exactly once (reload → never again; old save migrates clean — verify the migration
+  via tsx, not the browser); an audit of all 5 tabs + Live (text `preview_snapshot`s, NOT image
+  screenshots) shows no unlabeled interactive elements; typecheck.
 
 ---
 

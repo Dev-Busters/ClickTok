@@ -4,6 +4,7 @@ import type { ElementId, ElementWave, BeatGrade } from "../../features/elements/
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { BALANCE } from "../../features/economy/balance";
 import { ringScale, gradeForScale, GRADE_MULT } from "../../features/elements/beatSync";
+import { armProgress, isFlowed } from "../../features/elements/duetLoop";
 
 export type ElementsSlice = {
   ownedElements: Partial<Record<ElementId, boolean>>; // ⚠ PERSISTED — SAVE_VERSION bump +
@@ -45,7 +46,15 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
       const rings = Array.from({ length: BALANCE.elements.beatSync.rings }, (_, i) => ({ id: i }));
       set({ activeWave: { element: "beat_sync", startedAt: Date.now(), rings }, lastSpawnedElement: id });
     }
-    // duet_loop wave: task 7.4
+    if (id === "duet_loop") {
+      set({
+        activeWave: {
+          element: "duet_loop", startedAt: Date.now(),
+          armedIndex: null, armedAt: null, firstArmedAt: null, completed: 0,
+        },
+        lastSpawnedElement: id,
+      });
+    }
   },
 
   tapRing: (ringId) => {
@@ -80,7 +89,35 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
   },
 
   tapDuetPod: () => {
-    // duet_loop wave: task 7.4
+    const { activeWave, tapPower, multiplier, followerConversion, combo, wallet } = get();
+    if (!activeWave || activeWave.element !== "duet_loop") return;
+    if (activeWave.armedIndex === null) return;
+
+    const cfg = BALANCE.elements.duetLoop;
+    const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
+    const completed = activeWave.completed + 1;
+
+    // 04 §13.2: pod tap pays podPayout; the final pod ALSO pays flowBonus if the
+    // chain completed within flowSec of the wave's first core tap.
+    let k = cfg.podPayout * comboMult;
+    if (isFlowed(activeWave.firstArmedAt, completed)) {
+      k += cfg.flowBonus * comboMult;
+    }
+
+    const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * k;
+    const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k;
+    const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * k;
+
+    set({
+      wallet: {
+        ...wallet,
+        coins: wallet.coins + coinsGain,
+        followers: wallet.followers + followersGain,
+        totalFollowers: wallet.totalFollowers + followersGain,
+        likes: wallet.likes + likesGain,
+      },
+      activeWave: { ...activeWave, armedIndex: null, armedAt: null, completed },
+    });
   },
 
   expireOrResolveWave: () => {
@@ -119,6 +156,20 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
           });
         }
         set({ activeWave: null, nextWaveAt: Date.now() + BALANCE.elements.waveIdleGapSec * 1000 });
+      }
+      return;
+    }
+
+    if (activeWave?.element === "duet_loop") {
+      const cfg = BALANCE.elements.duetLoop;
+      if (activeWave.completed >= cfg.pods) {
+        set({ activeWave: null, nextWaveAt: Date.now() + BALANCE.elements.waveIdleGapSec * 1000 });
+        return;
+      }
+      // 04 §13.2: armed pod untapped for armTimeoutSec gutters back to dormant
+      // — no penalty, the chain just stalls (completed/firstArmedAt untouched).
+      if (activeWave.armedIndex !== null && activeWave.armedAt !== null && armProgress(activeWave.armedAt) >= 1) {
+        set({ activeWave: { ...activeWave, armedIndex: null, armedAt: null } });
       }
       return;
     }

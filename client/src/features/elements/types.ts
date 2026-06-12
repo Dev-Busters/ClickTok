@@ -16,4 +16,6 @@ export type ElementWave =
       rings: { id: number; grade?: BeatGrade }[] } //  grading both derive from (now - startedAt)
   | { element: "duet_loop"; startedAt: number;
       armedIndex: number | null;                  // pod lit and waiting for its tap
+      armedAt: number | null;          // ms epoch the current pod was armed — armTimeoutSec clock
+      firstArmedAt: number | null;     // ms epoch of the wave's FIRST core tap — flowSec clock
       completed: number };                        // pods finished (0..duetCircles)
