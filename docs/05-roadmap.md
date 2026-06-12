@@ -1023,7 +1023,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > mounted 3 VideoCanvases in App.tsx, verified 3 clearly distinct animated panels (red/white/
   > gold), then removed. `pnpm typecheck` clean (client + party).
 
-- [ ] **7.2 — TAP CORE + combo (the new Home, no pager yet).** Rebuild `screens/HomeFeed/` per
+- [x] **7.2 — TAP CORE + combo (the new Home, no pager yet).** Rebuild `screens/HomeFeed/` per
   `06` §3 layout: full-bleed `VideoCanvas` backdrop (NPC-seeded via `npcVideos`, slow ambient
   rotation; `intensity` fed by combo) under a dark scrim; **TAP CORE** dead center with shockwave/
   particles/floating `+N`s, combo ring with milestone re-tiering AND visible idle drain
@@ -1034,6 +1034,20 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   formula-exact amounts at combo 0 and 100 (worked example `04` §13.1); idling 2.5s visibly
   drains the ring and the multiplier follows; milestone tiers recolor the core; smooth on a
   390px viewport; typecheck.
+  > note: new `store/slices/feedSlice.ts` (`FeedSlice`: `combo`, `lastTapAt`, `engageTap`,
+  > `decayCombo`; stub 7.5-7.6 fields/actions); `decayCombo(dt)` is called from
+  > `channelSlice.tick(dt)` (same pattern as `checkMilestones()`). Added `comboDecayDelaySec: 2.5`
+  > and `comboDecayPerSec: 25` to `BALANCE.feed` (were specified in `04` §13.1 but missing from
+  > `balance.ts`). `HomeFeed` rebuilt: VideoCanvas backdrop (NPC-seeded, 15s ambient rotation,
+  > intensity = 0.15 + combo/comboCap × 0.85), dark scrim, top stat strip (followers hero +
+  > currency pills), element stage placeholder (35% zone, no content until 7.3), TAP CORE (140px
+  > centered, SVG combo ring at RING_R=80 with stroke-dashoffset fill, 4-tier milestone
+  > recoloring dim→cyan→red→gold, shockwave + 6 particles on tap, floating +N coins+followers),
+  > right rail and GO LIVE pill kept unchanged. `engageTap` verified formula-exact: 5 taps from
+  > combo=0 → 121.2 coins (matches Σ 24×comboMult); 10 taps → 245.4 coins ✓; decay:
+  > combo=100 with lastTapAt 3s stale, one decayCombo(0.016) tick → 99.6 (expected 99.6) ✓.
+  > Milestone recolor at combo=10 → cyan ring visible in preview; combo=100 → gold ring ✓.
+  > `pnpm typecheck` passes (client + party).
 
 - [ ] **7.3 — Element framework + BEAT SYNC.** The pluggable element system per `01` §8.2:
   `features/elements/` (catalog of `ElementDef`s, per-element components), `elementsSlice`

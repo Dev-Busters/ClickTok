@@ -93,6 +93,8 @@ export const BALANCE = {
     comboPerTap: 0.005,            // comboMult = 1 + min(combo, comboCap) × this
     comboCap: 100,                 // → max ×1.5
     comboMilestones: [10, 25, 50, 100],
+    comboDecayDelaySec: 2.5,       // idle grace before the combo starts draining
+    comboDecayPerSec: 25,          // drain rate (full 100 combo gone in 4s of idling)
 
     // §13.2 boosts
     boostCoinSurge: 0.5,           // +50% coins per tap
