@@ -3,7 +3,7 @@ export const BALANCE = {
   basePostPower: 1,
   postFollowerConversion: 0.6,   // followers per post = postPower * this
   postLikeConversion: 0.4,
-  postCoinConversion: 1.0,       // coins per post = postPower * this
+  postCoinConversion: 6.0,       // coins per post = postPower * this
 
   // passive / idle
   idleCapSec: 8 * 3600,          // max 8h of offline income granted on return
@@ -28,8 +28,8 @@ export const BALANCE = {
     hypeWaveViewerBoost: 0.15,  // ride a wave → +15% viewers
     trollViewerDrainPerSec: 0.03, // -3% viewers/sec while a troll is active
     trollHypeDrainPerSec: 4,
-    giftCoinValue: { rose: 5, heart: 20, galaxy: 120, lion: 800 },
-    giftDiamondValue: { rose: 0, heart: 0, galaxy: 1, lion: 8 },
+    giftCoinValue: { rose: 7, heart: 28, galaxy: 160, lion: 1000 },
+    giftDiamondValue: { rose: 0, heart: 0, galaxy: 0, lion: 0 },
     // base gift tier weights (shift upward by giftQuality)
     giftWeights: { rose: 60, heart: 28, galaxy: 10, lion: 2 },
   },
@@ -37,7 +37,7 @@ export const BALANCE = {
   // run scoring → rewards
   scoring: {
     followerYieldCoeff: 1.0,    // see § Run scoring
-    completionDiamondBase: 2,
+    completionDiamondBase: 5,
     hypeBonusCoeff: 0.01,       // +1% rewards per hype point at end
   },
 

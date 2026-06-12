@@ -379,7 +379,7 @@ by meta progression, with run-to-run variety.
 - [~] **3.4 — Prestige ("Rebrand"). DEFERRED — DO NOT BUILD.** (User decision 2026-06-10: no
   prestige mechanics for now; multiplayer is the priority. Spec stub in `01` §4.4 retained for a
   possible post-multiplayer revisit.) **Skip this task.**
-- [ ] **3.5 — Balance pass.** Tune `BALANCE` against the guidance in `04` §11 using real playthroughs.
+- [x] **3.5 — Balance pass.** Tune `BALANCE` against the guidance in `04` §11 using real playthroughs.
   > method (2026-06-12, since no human playtesting before launch): do this with a **headless sim
   > harness**, not manual grinding. Write `client/scripts/simBalance.ts` (run via `npx tsx`)
   > that imports the REAL modules — `balance.ts`, `computeRunParams`, the run-tick/scoring
@@ -398,6 +398,33 @@ by meta progression, with run-to-run variety.
   > (post → buy → go live → results) to sanity-check feel, then typecheck, commit, push
   > (auto-deploys). Keep the sim script committed — it's the regression harness for every
   > future balance change.
+  >
+  > **before→after** (`client/src/features/economy/balance.ts`):
+  > | constant | before | after | target fixed |
+  > |---|---|---|---|
+  > | `postCoinConversion` | 1.0 | **6.0** | (a) ring_light was 50 posts, now 9 |
+  > | `giftCoinValue.rose` | 5 | **7** | (c) run:idle ratio |
+  > | `giftCoinValue.heart` | 20 | **28** | (c) run:idle ratio |
+  > | `giftCoinValue.galaxy` | 120 | **160** | (c) run:idle ratio |
+  > | `giftCoinValue.lion` | 800 | **1000** | (c) run:idle ratio |
+  > | `giftDiamondValue.galaxy` | 1 | **0** | (d) diamond overflow |
+  > | `giftDiamondValue.lion` | 8 | **0** | (d) diamond overflow |
+  > | `completionDiamondBase` | 2 | **5** | (d) flat 5 💎 per run |
+  >
+  > **diamond design note:** setting `giftDiamondValue` to all-zero was required because the
+  > quality-shift formula (§7) combined with high gift rates at late game (~600+ gifts/run at 1M
+  > followers) overflows the 2–10 target with any non-zero value, even at tiny base probabilities.
+  > The quality-shift pumps mass toward lion regardless of starting weight. Fixing this with
+  > variable-per-quality diamonds would require a cap or scale-factor in the scoring formula —
+  > that is a formula change, so it was deferred. Diamonds are now a flat run-completion reward
+  > (`completionDiamondBase = 5`); flops still give 0. All other targets hit purely via BALANCE.
+  >
+  > **sim results** (`npx tsx client/scripts/simBalance.ts`): all 5 targets PASS.
+  > (a) 9 posts ✓ · (b) 41s/0.7 min ✓ · (c) ∞/2.32×/8.40× ✓ · (d) 5.0 everywhere ✓ · (e) 35s max gap ✓.
+  >
+  > **manual playthrough** (preview): post (+6 coins/tap ✓) → buy ring_light (50 coins, tapPower 1→4 ✓)
+  > → GO LIVE → run ran with hype decay/feed ✓ → END → results (+5 💎, rewards formula matched ✓)
+  > → BACK TO CHANNEL (rewards persisted ✓). Zero console errors. `pnpm typecheck` passes.
 
 ---
 
