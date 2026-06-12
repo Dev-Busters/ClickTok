@@ -99,6 +99,8 @@ const ALARM_INTERVAL_MS = 30 * 1000;
 const LEADERBOARD_LOAD_LIMIT = 100;     // rows pulled into memory on startup
 const LEADERBOARD_DISPLAY_LIMIT = 10;   // rows sent to clients per view
 const PERSIST_MIN_INTERVAL_MS = 10 * 1000; // per-user write-through debounce
+// 6.2: at most one leaderboard broadcast per 2s; trailing edge (state read at fire time).
+const LEADERBOARD_DEBOUNCE_MS = 2 * 1000;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -129,6 +131,10 @@ export default class LobbyServer implements Party.Server {
   private lastPersist = new Map<string, number>();
   // connection id → ms epoch of last feedAlgorithm message (rate limit, 04 §12.7)
   private feedAlgoLastMs = new Map<string, number>();
+  // 6.2: trailing-edge debounce for leaderboard broadcasts
+  private leaderboardTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingTrendBroadcasts = new Set<string>();
+  private trendLeaderboardTimer: ReturnType<typeof setTimeout> | null = null;
 
   private trends: TrendInfo[] = generateTrends();
   private rotatesAt = Date.now() + TREND_ROTATION_MS;
@@ -346,6 +352,8 @@ export default class LobbyServer implements Party.Server {
         ch.live = false;
         this.broadcastDirectory();
       }
+      // 6.2: flush any score skipped by the debounce so disconnect never drops the final values.
+      await this.persistScore(ch.userId, ch, true);
     } else {
       // Guest entry, no stable identity — drop it like pre-4.5b behavior.
       this.channels.delete(key);
@@ -506,12 +514,13 @@ export default class LobbyServer implements Party.Server {
 
   // 4.5b: write-through, debounced per user so a restart never loses more
   // than ~PERSIST_MIN_INTERVAL_MS of progress.
-  private async persistScore(userId: string, ch: ChannelEntry) {
+  // 6.2: force=true bypasses the debounce (used in onClose to flush trailing writes).
+  private async persistScore(userId: string, ch: ChannelEntry, force = false) {
     const config = this.supabaseConfig();
     if (!config) return;
     const now = Date.now();
     const last = this.lastPersist.get(userId) ?? 0;
-    if (now - last < PERSIST_MIN_INTERVAL_MS) return;
+    if (!force && now - last < PERSIST_MIN_INTERVAL_MS) return;
     this.lastPersist.set(userId, now);
     try {
       await fetch(`${config.url}/rest/v1/leaderboard_scores`, {
@@ -567,19 +576,33 @@ export default class LobbyServer implements Party.Server {
     } satisfies LobbyServerMessage));
   }
 
+  // 6.2: debounced — at most one broadcast per LEADERBOARD_DEBOUNCE_MS; reads latest state at fire time.
   private broadcastLeaderboard() {
-    this.party.broadcast(JSON.stringify({
-      type: "leaderboard",
-      channels: this.rankedChannels(),
-    } satisfies LobbyServerMessage));
+    if (this.leaderboardTimer !== null) return;
+    this.leaderboardTimer = setTimeout(() => {
+      this.leaderboardTimer = null;
+      this.party.broadcast(JSON.stringify({
+        type: "leaderboard",
+        channels: this.rankedChannels(),
+      } satisfies LobbyServerMessage));
+    }, LEADERBOARD_DEBOUNCE_MS);
   }
 
+  // 6.2: debounced — accumulates pending trends, fires once per LEADERBOARD_DEBOUNCE_MS.
   private broadcastTrendLeaderboard(trend: string) {
-    this.party.broadcast(JSON.stringify({
-      type: "trendLeaderboard",
-      trend,
-      channels: this.trendRankedChannels(trend),
-    } satisfies LobbyServerMessage));
+    this.pendingTrendBroadcasts.add(trend);
+    if (this.trendLeaderboardTimer !== null) return;
+    this.trendLeaderboardTimer = setTimeout(() => {
+      this.trendLeaderboardTimer = null;
+      for (const t of this.pendingTrendBroadcasts) {
+        this.party.broadcast(JSON.stringify({
+          type: "trendLeaderboard",
+          trend: t,
+          channels: this.trendRankedChannels(t),
+        } satisfies LobbyServerMessage));
+      }
+      this.pendingTrendBroadcasts.clear();
+    }, LEADERBOARD_DEBOUNCE_MS);
   }
 }
 

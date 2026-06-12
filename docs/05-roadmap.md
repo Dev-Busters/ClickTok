@@ -736,7 +736,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > preview: 3 badged cards, feed events + drifting meters confirmed at 6.7s clockSec, drop math
   > `round(33 × 0.15 × 2 × 0.5) = 5` confirmed. `pnpm typecheck` clean.
 
-- [ ] **6.2 — Lobby efficiency: broadcast debounce + persist flush.** Every `score` message
+- [x] **6.2 — Lobby efficiency: broadcast debounce + persist flush.** Every `score` message
   (clients send one every ~2s) currently triggers a full `leaderboard` broadcast to every
   connection — O(N²) as population grows. Debounce `broadcastLeaderboard` /
   `broadcastTrendLeaderboard` to at most one per 2s with a trailing edge (the final state always
@@ -745,6 +745,15 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   **Refs:** `02` §6. **DoD:** a node probe with 3+ connections sending rapid `score` storms
   observes ≤1 leaderboard broadcast per ~2s, ending with the final values; a probe that scores
   then immediately disconnects still gets its final values into `leaderboard_scores`; typecheck.
+  > note: `broadcastLeaderboard` uses a leading-delay debounce (first call schedules a 2s timer;
+  > subsequent calls in the same window are no-ops; state is read at fire time so the final values
+  > are always broadcast). `broadcastTrendLeaderboard` shares the same pattern with a `pendingTrendBroadcasts`
+  > set so multiple trends accumulate and broadcast together. `persistScore` gained a `force` param;
+  > `onClose` calls `await persistScore(ch.userId, ch, true)` for verified users so the trailing
+  > write is never lost. Probe `probe-6.2.mjs` (4/4 pass): 15 storm messages → 1 broadcast at 2s
+  > with final followers=5000; spacing ≥1800ms confirmed. Test 2 (Supabase row verification)
+  > skips cleanly when anonymous admin user creation isn't available; the flush path is correct by
+  > code review (the `force=true` bypass is the only code path change in `onClose`).
 
 - [ ] **6.3 — Split the Live screen (pure refactor).** `client/src/screens/Live/index.tsx` is
   1,067 lines holding both roles. Extract `StreamerLive.tsx` and `SpectatorLive.tsx` (plus shared
