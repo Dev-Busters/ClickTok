@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "partysocket": "^1.0.0"
+    "partysocket": "^1.0.0",
+    "posthog-node": "^5.36.17"
   },
   "devDependencies": {
     "partykit": "^0.0.111",

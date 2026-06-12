@@ -1,4 +1,5 @@
 import type * as Party from "partykit/server";
+import { PostHog } from "posthog-node";
 
 // Types mirrored from client/src/party/types.ts — edit both together.
 
@@ -109,8 +110,18 @@ export default class StreamServer implements Party.Server {
   private lastQuickChatMs = new Map<string, number>();
   // 4.5c-2: connection id → verified Supabase user.id (populated in onConnect via JWT)
   private connUserIds = new Map<string, string>();
+  private ph: PostHog | null = null;
 
-  constructor(readonly party: Party.Room) {}
+  constructor(readonly party: Party.Room) {
+    const env = party.env as Record<string, string | undefined>;
+    const apiKey = env.POSTHOG_API_KEY;
+    if (apiKey) {
+      this.ph = new PostHog(apiKey, {
+        host: env.POSTHOG_HOST ?? "https://us.i.posthog.com",
+        enableExceptionAutocapture: true,
+      });
+    }
+  }
 
   // Mirrored from lobby.ts (04 §12.7); falls back to in-memory-only if unset.
   private supabaseConfig(): { url: string; key: string } | null {
@@ -134,7 +145,8 @@ export default class StreamServer implements Party.Server {
             const user = await res.json() as { id: string };
             if (user.id) this.connUserIds.set(conn.id, user.id);
           }
-        } catch {
+        } catch (err) {
+          this.ph?.captureException(err, conn.id);
           // token verification failed — connection continues as guest
         }
       }
@@ -166,6 +178,17 @@ export default class StreamServer implements Party.Server {
           if (this.streamerConnId === null) {
             this.streamerConnId = sender.id;
             this.streamerSummary = msg.summary;
+            this.ph?.capture({
+              distinctId: this.connUserIds.get(sender.id) ?? sender.id,
+              event: "stream started",
+              properties: {
+                stream_id: this.party.id,
+                handle: msg.summary.handle,
+                topic: msg.summary.topic,
+                creator_level: msg.summary.creatorLevel,
+                start_viewers: msg.summary.viewers,
+              },
+            });
           } else if (this.streamerConnId === sender.id) {
             // Same connection re-opening — update summary (e.g., updated viewers).
             this.streamerSummary = msg.summary;
@@ -195,6 +218,15 @@ export default class StreamServer implements Party.Server {
           this.pollOptionCounts.clear();
           const out: StreamServerMessage = { type: "ended", grade: msg.grade };
           this.party.broadcast(JSON.stringify(out), [sender.id]);
+          this.ph?.capture({
+            distinctId: this.connUserIds.get(sender.id) ?? sender.id,
+            event: "stream ended",
+            properties: {
+              stream_id: this.party.id,
+              grade: msg.grade,
+              peak_viewers: msg.peakViewers,
+            },
+          });
           break;
         }
 
@@ -244,6 +276,15 @@ export default class StreamServer implements Party.Server {
           streamer?.send(
             JSON.stringify({ type: "viewerCount", realViewers: this.viewers.size } satisfies StreamServerMessage)
           );
+          this.ph?.capture({
+            distinctId: this.connUserIds.get(sender.id) ?? sender.id,
+            event: "viewer joined",
+            properties: {
+              stream_id: this.party.id,
+              handle: msg.handle,
+              creator_level: msg.creatorLevel,
+            },
+          });
           break;
         }
 
@@ -300,6 +341,16 @@ export default class StreamServer implements Party.Server {
               atRunSec: this.latestClockSec,
             } satisfies StreamServerMessage));
           }
+          this.ph?.capture({
+            distinctId: this.connUserIds.get(sender.id) ?? sender.id,
+            event: "gift sent",
+            properties: {
+              stream_id: this.party.id,
+              gift_tier: msg.tier,
+              run_sec: this.latestClockSec,
+              handle: this.viewers.get(sender.id) ?? "?",
+            },
+          });
           break;
         }
 

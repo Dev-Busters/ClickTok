@@ -15,6 +15,7 @@
     "framer-motion": "^11.0.0",
     "partysocket": "^1.0.0",
     "pixi.js": "^7.4.2",
+    "posthog-js": "^1.386.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zustand": "^5.0.0"

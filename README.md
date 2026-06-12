@@ -72,6 +72,7 @@ npx partykit deploy            # project name "clicktok" per partykit.json
 # push secrets (values from your local party/.env), then redeploy
 npx partykit env add SUPABASE_URL
 npx partykit env add SUPABASE_SERVICE_ROLE_KEY
+npx partykit env add POSTHOG_API_KEY   # optional telemetry
 npx partykit deploy
 ```
 
@@ -84,7 +85,7 @@ vercel            # link/create the project from repo root
 - Root Directory: `client`
 - Framework: Vite (auto-detected)
 - Production env vars: `VITE_PARTYKIT_HOST` (the deployed PartyKit host), `VITE_SUPABASE_URL`,
-  `VITE_SUPABASE_ANON_KEY`
+  `VITE_SUPABASE_ANON_KEY`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` (last two optional)
 - Deploy to production: `vercel --prod`
 
 ## Environment variables
@@ -95,7 +96,11 @@ No secret values below — names only. See `client/.env.example` and `party/.env
 - `VITE_PARTYKIT_HOST`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_POSTHOG_KEY` (optional — no key means no telemetry, no console noise)
+- `VITE_POSTHOG_HOST` (optional — defaults to `https://us.i.posthog.com`)
 
 **`party/.env`** (optional locally; required in production for durable leaderboards)
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `POSTHOG_API_KEY` (optional — party rooms run silently without it)
+- `POSTHOG_HOST` (optional — defaults to `https://us.i.posthog.com`)

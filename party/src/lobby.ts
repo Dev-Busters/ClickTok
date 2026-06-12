@@ -1,4 +1,5 @@
 import type * as Party from "partykit/server";
+import { PostHog } from "posthog-node";
 
 // Types mirrored from client/src/party/types.ts — edit both together.
 
@@ -166,8 +167,18 @@ export default class LobbyServer implements Party.Server {
   // (6.1) featured filler cards — generated at startup, drifted each alarm tick.
   private featuredCards: LiveStreamSummary[] = [];
   private alarmCount = 0;
+  private ph: PostHog | null = null;
 
-  constructor(readonly party: Party.Room) {}
+  constructor(readonly party: Party.Room) {
+    const env = party.env as Record<string, string | undefined>;
+    const apiKey = env.POSTHOG_API_KEY;
+    if (apiKey) {
+      this.ph = new PostHog(apiKey, {
+        host: env.POSTHOG_HOST ?? "https://us.i.posthog.com",
+        enableExceptionAutocapture: true,
+      });
+    }
+  }
 
   async onStart() {
     this.featuredCards = this.generateFeaturedCards(FEATURED_MIN_DIRECTORY);
@@ -206,7 +217,8 @@ export default class LobbyServer implements Party.Server {
             const user = await res.json() as { id: string };
             if (user.id) this.connUserIds.set(conn.id, user.id);
           }
-        } catch {
+        } catch (err) {
+          this.ph?.captureException(err, conn.id);
           // token verification failed — connection continues as guest
         }
       }
@@ -260,6 +272,23 @@ export default class LobbyServer implements Party.Server {
             trend: existing?.trend,
             userId: verifiedId,  // only set if JWT-verified; never from msg.userId
           });
+          if (verifiedId) {
+            this.ph?.identify({
+              distinctId: verifiedId,
+              properties: {
+                $set: { handle: msg.handle, creator_level: msg.creatorLevel },
+              },
+            });
+          }
+          this.ph?.capture({
+            distinctId: key,
+            event: "player connected",
+            properties: {
+              handle: msg.handle,
+              creator_level: msg.creatorLevel,
+              authenticated: !!verifiedId,
+            },
+          });
           break;
         }
 
@@ -276,6 +305,16 @@ export default class LobbyServer implements Party.Server {
           if (ch) ch.live = true;
           this.broadcastDirectory();
           this.bumpTrendHeat(now, msg.summary.topic);
+          this.ph?.capture({
+            distinctId: this.connUserIds.get(sender.id) ?? sender.id,
+            event: "lobby stream started",
+            properties: {
+              stream_id: msg.summary.streamId,
+              topic: msg.summary.topic,
+              creator_level: msg.summary.creatorLevel,
+              start_viewers: msg.summary.viewers,
+            },
+          });
           break;
         }
 
@@ -295,6 +334,11 @@ export default class LobbyServer implements Party.Server {
           const ch = this.channels.get(this.connKeys.get(sender.id) ?? sender.id);
           if (ch) ch.live = false;
           this.broadcastDirectory();
+          this.ph?.capture({
+            distinctId: this.connUserIds.get(sender.id) ?? sender.id,
+            event: "lobby stream ended",
+            properties: { stream_id: msg.streamId },
+          });
           break;
         }
 

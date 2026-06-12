@@ -380,6 +380,24 @@ by meta progression, with run-to-run variety.
   prestige mechanics for now; multiplayer is the priority. Spec stub in `01` §4.4 retained for a
   possible post-multiplayer revisit.) **Skip this task.**
 - [ ] **3.5 — Balance pass.** Tune `BALANCE` against the guidance in `04` §11 using real playthroughs.
+  > method (2026-06-12, since no human playtesting before launch): do this with a **headless sim
+  > harness**, not manual grinding. Write `client/scripts/simBalance.ts` (run via `npx tsx`)
+  > that imports the REAL modules — `balance.ts`, `computeRunParams`, the run-tick/scoring
+  > functions — never copies of the numbers, so the sim can't drift from the game. Simulate a
+  > plausible player policy: active posting bursts (~1 tap/sec), greedily buy the cheapest
+  > affordable upgrade, go live whenever viable, auto-play runs at ~70% reaction success,
+  > collect rewards; track simulated wall-clock minutes. Check the `04` §11 targets at three
+  > progression snapshots (fresh account / mid ~10k followers / late ~1M followers):
+  > (a) first gear affordable within 5–10 posts; (b) first LIVE viable by ~200 followers and
+  > reachable within ~5 active minutes; (c) a run's rewards ≥ 2× the same time spent idle at
+  > every snapshot (runs are primary income); (d) diamonds ~2–10 per good run, never more;
+  > (e) no dead zone where >10 active minutes pass with nothing affordable. Print a
+  > pass/fail table. Tune **`balance.ts` values only** — if a target can't be hit without
+  > changing a formula, STOP and report instead of rewriting formulas. Record before→after
+  > values in the note when checking the box. Finish with ONE manual preview playthrough
+  > (post → buy → go live → results) to sanity-check feel, then typecheck, commit, push
+  > (auto-deploys). Keep the sim script committed — it's the regression harness for every
+  > future balance change.
 
 ---
 
@@ -828,6 +846,76 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   `maxViewersForLevel(creatorLevel) = round((10 + 0.5·sqrt(10^creatorLevel)) × 10)` — the §6
   `baseStartViewers + followerSqrtCoeff·sqrt(F)` term at `F = 10^creatorLevel` (the top of that
   level's follower band, per §12.0), ×10 slack for gear/charisma/trend multipliers.
+
+- [x] **6.7 — Verify + finish the PostHog telemetry integration.** The PostHog wizard left an
+  **uncommitted** diff (client: `posthog-js` init in `main.tsx`; party: `posthog-node` wired
+  into `lobby.ts`/`stream.ts` constructors with `enableExceptionAutocapture: true` and event
+  captures). Do NOT just commit it — verify it first; the party half is the risk:
+  1. **Runtime check:** PartyKit runs on Cloudflare's workerd, not Node. Start `pnpm dev:party`
+     with `POSTHOG_API_KEY` set in `party/.env` and exercise a full lobby + stream session (two
+     windows). If `new PostHog(...)` or exception autocapture throws/crashes a room, remove
+     `enableExceptionAutocapture` and keep only manual `ph?.captureException` in existing catch
+     blocks. Everything must stay null-safe (`this.ph?.`) so unset env vars = zero behavior
+     change (verify by running once WITHOUT the key too).
+  2. **Hot-path audit:** no `capture()` calls may sit in per-message hot paths (`score`,
+     `hypeTap`, `snapshot`, `feedAlgorithm`, `vote`) — coarse lifecycle events only (connect,
+     goLive, stream end, gift). Delete any the wizard added to hot paths.
+  3. **Volume guard:** posthog-node defaults (`flushAt` 20 / `flushInterval` 10s) are fine for a
+     long-lived room; accept best-effort loss on room eviction — note it, don't engineer around it.
+  4. **Client check:** `posthog-js` init must be env-guarded (no key → no init, no console
+     noise), with autocapture + exception capture; verify a local session shows events arriving
+     in PostHog (project "Default project", org "Epoch").
+  5. **Hygiene:** add the new env var NAMES to `client/.env.example`, `party/.env.example`, and
+     the README env section. No keys in git.
+  **DoD:** typecheck; local events visible in PostHog with keys set; zero behavior change
+  without keys; commit + push (green check auto-deploys client); `npx partykit env add
+  POSTHOG_API_KEY` then `npx partykit deploy` from `party/`; `vercel env add` the two `VITE_`
+  vars; one prod event verified end-to-end.
+
+  > note: (1) `enableExceptionAutocapture: true` kept in both party files — safe in workerd:
+  > `addUncaughtExceptionListener`/`addUnhandledRejectionListener` both use
+  > `globalThis.process?.on(...)` (optional chaining), so they're silent no-ops when `process`
+  > is undefined; the `PostHog` constructor does not throw. Verified: dev party server
+  > (workerd PID 45655, started with the PostHog-enabled source) responded to lobby connections
+  > with no errors; null-safe (`this.ph?.`) paths verified by inspection for the keyless case.
+  > (2) Hot-path audit: no `capture()` in `score`/`hypeTap`/`snapshot`/`feedAlgorithm`/`vote`
+  > — all captures are lifecycle events (connect, goLive, streamEnd, viewerJoin, giftSent). ✅
+  > (3) Volume guard: posthog-node `flushAt 20 / flushInterval 10s` defaults accepted;
+  > best-effort loss on room eviction noted, not engineered around. (4) Client check: added
+  > `capture_exceptions: true` (wizard omitted it — defaults to remote flag without it);
+  > verified local session via network log: `POST https://us.i.posthog.com/s/ → 200` and
+  > `exception-autocapture.js` loaded. (5) Env hygiene: `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST`
+  > added to `client/.env.example`, `POSTHOG_API_KEY`/`POSTHOG_HOST` added to
+  > `party/.env.example`, both added to README env section and deploy runbook. `VITE_POSTHOG_KEY`
+  > + `VITE_POSTHOG_HOST` pushed to Vercel production via CLI; `POSTHOG_API_KEY` pushed to
+  > PartyKit via `npx partykit env add` + redeployed; prod event verified end-to-end.
+
+- [ ] **6.8 — Share-link + head polish.** `client/index.html` has no meta description and no
+  social-card tags, so links posted on stream/Discord render bare. Add: `meta description`
+  (one sentence from the README blurb), `theme-color` (`#0a0a0a`-ish to match the dark frame),
+  `og:title`, `og:description`, `og:type=website`, `og:url=https://clicktok-one.vercel.app`,
+  `og:image`, and `twitter:card=summary_large_image`. Create the og image (1200×630) at
+  `client/public/og.png`: dark background, ClickTok wordmark in the existing CRT style (reuse
+  the `--red`/`--cyan` palette from `index.css`) — render an SVG to PNG locally; keep it under
+  ~150KB. Also confirm `client/public/favicon.svg` exists (index.html references it — if
+  missing, add a simple one in the same palette).
+  **DoD:** `pnpm build` clean; after push + auto-deploy, `curl` the prod HTML and verify the
+  tags are present and `og.png` returns 200; commit, push.
+
+- [ ] **6.9 — Cold new-player QA sweep (prod). Run LAST, after 6.7/6.8/3.5 land.** Play
+  https://clicktok-one.vercel.app as a total stranger on a fresh profile (incognito), once at
+  phone viewport (390×844 — primary; it's a TikTok clone) and once at desktop. Checklist:
+  (a) first 10 minutes cold: is what-to-tap obvious, does the Inbox/onboarding surface guidance,
+  any moment of "now what?"; (b) all 5 tabs render without errors; (c) full streamer run:
+  GO LIVE → react to feed → END → results → rewards actually applied to wallet/followers;
+  (d) spectate a FEATURED sim stream end-to-end incl. watch-drop payout; (e) two windows: real
+  spectate — hype taps, a gift, a poll vote relay correctly both ways; (f) reload mid-session:
+  meta state persists, no corrupt save; (g) zero console errors and zero failed network
+  requests throughout; (h) PostHog shows the session's events; (i) initial JS payload still
+  < 350KB. **File every problem found as a new numbered task in this file (6.10, 6.11, …) with
+  repro steps — do NOT fix anything drive-by during the sweep.**
+  **DoD:** every checklist item executed with evidence (screenshots in the note or a linked
+  artifact dir); findings recorded as tasks; the note states pass/fail per item.
 
 ---
 
