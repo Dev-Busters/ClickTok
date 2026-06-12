@@ -755,12 +755,21 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > skips cleanly when anonymous admin user creation isn't available; the flush path is correct by
   > code review (the `force=true` bypass is the only code path change in `onClose`).
 
-- [ ] **6.3 — Split the Live screen (pure refactor).** `client/src/screens/Live/index.tsx` is
+- [x] **6.3 — Split the Live screen (pure refactor).** `client/src/screens/Live/index.tsx` is
   1,067 lines holding both roles. Extract `StreamerLive.tsx` and `SpectatorLive.tsx` (plus shared
   pieces like the results/drop sheets) so each file is ≲400 lines; `index.tsx` becomes the mode
   switch. **Zero behavior change** — move code, don't edit logic; resist drive-by fixes.
   **Refs:** `06` §7. **DoD:** typecheck; a full streamer run AND a spectate session verified in
   preview with no visual or behavioral diffs.
+  > note: pure move, no logic changes. New files in `screens/Live/`: `shared.ts` (`hypeColor`/
+  > `formatTimer`, used by both modes), `SpectatorFeed.tsx` (`SpecFeedItem`/`SpectatorFeed` +
+  > chat-name/gift-emoji helpers), `DropSheet.tsx`, `ViewerActionBar.tsx` (incl. quick-chat/gift
+  > consts), `SpectatorLive.tsx`, `StreamerLive.tsx` (incl. `ShoutoutButton`/`GRADE_COLOR`).
+  > `index.tsx` is now just the `spectating`/`pendingDrop` mode-switch (16 lines). Largest file is
+  > `StreamerLive.tsx` at 391 lines. Verified in preview: a featured-sim spectate session (gift
+  > drawer, hype tap, LEAVE → WATCH DROP sheet → Discover) and a full streamer run (GO LIVE →
+  > modifiers/hype/feed → END → results overlay with grade/rewards/boon pick → BACK TO CHANNEL,
+  > rewards applied to wallet) both worked with zero console errors.
 
 - [ ] **6.4 — README.** Root `README.md`: what the game is (one paragraph + the prod URL),
   quickstart (`pnpm install`, `pnpm dev`, copy `client/.env.example` + `party/.env.example` and
