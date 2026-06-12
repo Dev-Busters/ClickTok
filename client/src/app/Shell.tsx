@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useGameLoop } from "../hooks/useGameLoop";
 import { useLobby } from "../hooks/useLobby";
 import { useStreamerRoom, useSpectatorRoom } from "../hooks/useStreamRoom";
@@ -9,10 +9,11 @@ import { HomeFeed } from "../screens/HomeFeed";
 import { Discover } from "../screens/Discover";
 import { Inbox } from "../screens/Inbox";
 import { Profile } from "../screens/Profile";
-import { Live } from "../screens/Live";
 import { CreateSheet } from "../screens/Create";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
+
+const Live = lazy(() => import("../screens/Live").then(m => ({ default: m.Live })));
 
 const WELCOME_BACK_THRESHOLD_SEC = 60;
 
@@ -58,7 +59,9 @@ export function Shell() {
       }}
     >
       {phase === 'live' || phase === 'results' || spectating !== null || pendingDrop !== null ? (
-        <Live />
+        <Suspense fallback={<div style={{ position: 'absolute', inset: 0, background: 'var(--bg)' }} />}>
+          <Live />
+        </Suspense>
       ) : (
         <>
           <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>

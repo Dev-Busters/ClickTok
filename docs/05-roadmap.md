@@ -780,12 +780,20 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   **Refs:** `CLAUDE.md`, `05` Phase 5 notes. **DoD:** a fresh clone reaches a running local game
   following only the README.
 
-- [ ] **6.5 — Code-split the bundle.** The client ships one ~640KB JS chunk. `React.lazy` the
+- [x] **6.5 — Code-split the bundle.** The client ships one ~640KB JS chunk. `React.lazy` the
   Live screen (Suspense fallback matching the dark phone frame) and add a Rollup `manualChunks`
   vendor split (react/react-dom, framer-motion, @supabase/supabase-js). Don't split further than
   that — diminishing returns.
   **DoD:** initial JS chunk < 350KB (`pnpm build` output); full play-through (post → go live →
   results → spectate) works in preview with no chunk-load errors.
+  > note: `Shell.tsx` lazy-imports `screens/Live` (`Live = lazy(() => import("../screens/Live")...)`)
+  > with a `Suspense` fallback (`position:absolute; inset:0; background: var(--bg)`) matching the
+  > dark phone-frame background. `vite.config.ts` adds `build.rollupOptions.output.manualChunks`
+  > for `vendor-react` (react/react-dom), `vendor-framer-motion`, `vendor-supabase`. Result:
+  > initial entry chunk 657KB → 286.45KB (well under 350KB); Live screen is its own 33.75KB lazy
+  > chunk. Verified in preview: post → GO LIVE (streamer run, modifiers/hype/feed) → END → results
+  > → boon pick → BACK TO CHANNEL, then Discover → spectate a FEATURED sim stream → LEAVE → WATCH
+  > DROP → BACK TO DISCOVER — all worked with zero console errors and zero failed network requests.
 
 - [x] **6.6 — Stream-room input validation (4.5c follow-up).** Code review (2026-06-12) found
   unvalidated viewer inputs in `party/src/stream.ts` that 4.5c-1 missed:
