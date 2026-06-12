@@ -542,9 +542,48 @@ by meta progression, with run-to-run variety.
   > of Hooks" console warning for `Shell` reproduces on clean `main` too — not a regression from
   > this change, left as-is.
 
-- [ ] **4.5c — Server-side reward validation.** Move viewer-reward granting (drops/jackpots/
-  shoutouts, currently client-trusted per `01` §7.4) behind server-side checks.
-  **DoD:** spoofed reward messages are rejected.
+> **4.5c re-scope (2026-06-11, post-ship security review):** a review of `party/src/stream.ts` +
+> `lobby.ts` found the trust gaps are broader than "reward validation": no role checks (any viewer
+> can hijack `open`, broadcast `end` to kick spectators, or forge `shoutout` follower grants), no
+> ownership checks (`liveUpdate`/`endLive` accept any sender; `score` trusts a client-sent
+> `userId` and persists forgeries via the service role), unbounded amounts (`hypeTap.taps`,
+> `feedAlgorithm`), and unguarded `JSON.parse` in both `onMessage`s. Split into c-1 (hardening, no
+> new infra) and c-2 (verified identity). NOTE the accepted limit: saves are a client-pushed blob,
+> so a player can always cheat **their own** wallet — the goal here is that players cannot spoof
+> *each other* or the shared state (leaderboard, directory, Algorithm, shoutouts).
+
+- [ ] **4.5c-1 — Party-server hardening (no new infra).** In `party/src/stream.ts`: pin the
+  streamer role — the first `open` wins until that connection closes; only the pinned connection's
+  `snapshot`/`pollOpen`/`pollClose`/`shoutout`/`end` are honored (drop streamer-typed messages
+  from viewers, and viewer-typed messages from the streamer); recompute `shoutout.followers`
+  server-side per `04` §12.7 (ignore the client value); clamp `hypeTap.taps` to
+  `HARDEN.maxTapsPerMsg`; enforce `minQuickChatIntervalMs` per connection; clear `votesByPoll` on
+  `end`. In `party/src/lobby.ts`: honor `liveUpdate`/`endLive` only when
+  `streamerConns.get(sender.id) === streamId`; reject `goLive` for a `streamId` already owned by
+  a *different* connection; bind the leaderboard key once at `hello` (a later `score.userId`
+  switch is ignored for that connection); clamp + rate-limit `feedAlgorithm` per `04` §12.7. Both
+  files: wrap the `onMessage` body in try/catch and silently drop malformed messages.
+  **Refs:** `04` §12.7, `03` §6, `02` §6. **DoD:** a raw-WebSocket node probe (like the 4.4/5.1
+  verifications) demonstrates each forgery is ignored: viewer `open` hijack, viewer-sent `end`,
+  forged `shoutout` value, a 9999-tap message (capped to 8), `endLive` on someone else's stream,
+  and a `feedAlgorithm` flood (meter rises by ≤ the clamped, rate-limited amount). Normal
+  two-window play (stream + spectate + gift + poll) still works; typecheck.
+
+- [ ] **4.5c-2 — Verified identity (Supabase JWT → PartyKit).** Client: append the Supabase
+  `access_token` to BOTH party sockets' connection URLs (PartySocket `query: { token }`, value
+  from `supabase.auth.getSession()`; omit when null). Server (lobby + stream room): in
+  `onConnect`, read `token` from the request URL and verify it via
+  `GET {SUPABASE_URL}/auth/v1/user` with headers `apikey: <SUPABASE_SERVICE_ROLE_KEY>`,
+  `Authorization: Bearer <token>` → on 200, bind the returned `user.id` to the connection (store
+  in a conn→userId map; one fetch per connection). Lobby: the verified id replaces any
+  client-sent `hello.userId`/`score.userId` as the leaderboard key (per the `03` §6 auth note);
+  connections without a verified id are guests — full gameplay, in-memory leaderboard only,
+  **never persisted** to Supabase. Preserve current behavior when Supabase env vars are unset
+  (local/offline dev: everyone is a guest).
+  **Refs:** `03` §6 (auth note), `02` §6. **DoD:** probe A (no token) sends `score` with probe
+  B's real `userId` → B's `leaderboard_scores` row is untouched and A appears only as an
+  in-memory guest; an authenticated socket's `score` persists to its own row; killing Supabase
+  env vars locally still yields a working lobby; typecheck for client + party.
 
 ---
 
@@ -641,6 +680,66 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > an outstanding manual step for the operator. The current auth flow uses
   > `signInAnonymously()` only, which does not require redirect URLs, so this does not block
   > any tested functionality but should be done before adding OAuth/email/magic-link flows.
+
+---
+
+## PHASE 6 — Liveness + hygiene (post-ship)
+
+> Recommended order across phases: **4.5c-1 → 4.5c-2 → 6.1 → 3.5 (balance pass, still open in
+> Phase 3 — do it here, with real prod playtests) → 6.2 → 6.3 → 6.4 → 6.5.** Every task is
+> independently shippable; production stays live throughout, so verify nothing regresses solo play
+> before checking a box.
+
+- [ ] **6.1 — Featured sim streams (cold-start filler).** `01` §7.4 promises sim "featured
+  streams" so an empty directory never looks dead. Lobby: pad the `directory` broadcast up to
+  `featuredMinDirectory` cards with `featured: true` entries (a server-side pool of ≥8 fake
+  handles/topics; `creatorLevel` rolled 2–4 each; viewers/hype drift a little on each alarm tick;
+  rotate fillers out/in every few minutes so the rail doesn't look frozen). Real streams always
+  sort first and displace fillers one-for-one. Client: featured cards show a small ✨ FEATURED
+  badge (`06` §4); tapping one opens spectator mode driven by a NEW client-local snapshot
+  simulator (`features/livestream/simSpectate.ts`) instead of a socket — synthesize
+  `RunStartParams` via `computeRunParams(metaFor(level), topic, heat)` with `metaFor(level)` =
+  `{ followers: 10^(level-1), skills 0, no gear }`, then reuse the existing event spawner to
+  push `SpectatorEvent`s + drifting meters through `applySnapshot` on a local interval. Viewer
+  economy per `04` §12.8 (taps/gifts work; no jackpot/shoutout; drop ×`featuredDropMult`). Sim
+  ends after `durationSec` → the normal drop sheet → back to Discover.
+  **Refs:** `01` §7.4, `03` §6, `04` §12.8, `06` §4. **DoD:** with zero real streams, Discover
+  shows `featuredMinDirectory` badged cards; joining one plays a live-feeling stream (meters and
+  feed move, taps/gifts respond); the drop pays the ×0.5 formula; going live in a second window
+  shows the real stream above the fillers; typecheck.
+
+- [ ] **6.2 — Lobby efficiency: broadcast debounce + persist flush.** Every `score` message
+  (clients send one every ~2s) currently triggers a full `leaderboard` broadcast to every
+  connection — O(N²) as population grows. Debounce `broadcastLeaderboard` /
+  `broadcastTrendLeaderboard` to at most one per 2s with a trailing edge (the final state always
+  broadcasts). Separately, `persistScore`'s 10s per-user debounce silently drops trailing writes —
+  in `onClose`, flush that connection's pending entry to Supabase bypassing the debounce.
+  **Refs:** `02` §6. **DoD:** a node probe with 3+ connections sending rapid `score` storms
+  observes ≤1 leaderboard broadcast per ~2s, ending with the final values; a probe that scores
+  then immediately disconnects still gets its final values into `leaderboard_scores`; typecheck.
+
+- [ ] **6.3 — Split the Live screen (pure refactor).** `client/src/screens/Live/index.tsx` is
+  1,067 lines holding both roles. Extract `StreamerLive.tsx` and `SpectatorLive.tsx` (plus shared
+  pieces like the results/drop sheets) so each file is ≲400 lines; `index.tsx` becomes the mode
+  switch. **Zero behavior change** — move code, don't edit logic; resist drive-by fixes.
+  **Refs:** `06` §7. **DoD:** typecheck; a full streamer run AND a spectate session verified in
+  preview with no visual or behavioral diffs.
+
+- [ ] **6.4 — README.** Root `README.md`: what the game is (one paragraph + the prod URL),
+  quickstart (`pnpm install`, `pnpm dev`, copy `client/.env.example` + `party/.env.example` and
+  fill from your own Supabase project), architecture map (Vercel client + PartyKit realtime +
+  Supabase persistence, with the prod hosts), the docs/ read order + roadmap workflow for
+  contributors/models, and the deploy runbook (the 5.1/5.2 commands). **No secrets** — env var
+  *names* only.
+  **Refs:** `CLAUDE.md`, `05` Phase 5 notes. **DoD:** a fresh clone reaches a running local game
+  following only the README.
+
+- [ ] **6.5 — Code-split the bundle.** The client ships one ~640KB JS chunk. `React.lazy` the
+  Live screen (Suspense fallback matching the dark phone frame) and add a Rollup `manualChunks`
+  vendor split (react/react-dom, framer-motion, @supabase/supabase-js). Don't split further than
+  that — diminishing returns.
+  **DoD:** initial JS chunk < 350KB (`pnpm build` output); full play-through (post → go live →
+  results → spectate) works in preview with no chunk-load errors.
 
 ---
 

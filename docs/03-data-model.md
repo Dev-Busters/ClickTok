@@ -241,6 +241,7 @@ export type ChannelSummary = {
   likes: number;
   rank: number;
   live?: boolean;            // is this player currently streaming
+  trend?: string;            // (4.5b) last trend streamed — drives the per-trend view
 };
 
 export type ClientMessage =
@@ -263,6 +264,7 @@ export type LiveStreamSummary = {        // a live run as advertised on Discover
   realViewers: number;
   hype: number;                          // 0..100
   startedAt: number;                     // ms epoch
+  featured?: boolean;                    // (6.1) lobby-generated sim filler card
 };
 
 export type AlgorithmTier = "STARVED" | "FED" | "BLESSED";
@@ -300,18 +302,25 @@ export type RunSnapshot = {              // streamer → server → spectators, 
 };
 
 // ——— Lobby room ———
+// (4.5c-2) AUTH: both party sockets append the Supabase access token to the connection URL
+// (`?token=<access_token>`, PartySocket `query` option). The server verifies it and binds the
+// connection to the verified user id; the `userId` message fields below become advisory-only
+// (ignored whenever a verified id exists). Tokenless connections are guests: full gameplay,
+// in-memory leaderboard only, never persisted.
 export type LobbyClientMessage =
-  | { type: "hello"; handle: string; creatorLevel: number }
+  | { type: "hello"; handle: string; creatorLevel: number; userId?: string }
   | { type: "goLive"; summary: LiveStreamSummary }     // add me to the directory
   | { type: "liveUpdate"; summary: LiveStreamSummary } // refresh viewers/hype on my card
   | { type: "endLive"; streamId: string }
-  | { type: "score"; followers: number; likes: number }            // (4.4) leaderboard
+  | { type: "score"; followers: number; likes: number; userId?: string; trend?: string } // (4.4/4.5b)
+  | { type: "getTrendLeaderboard"; trend: string }                                       // (4.5b)
   | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number };
 
 export type LobbyServerMessage =
   | { type: "directory"; streams: LiveStreamSummary[] }
   | { type: "trends"; trends: { topic: string; heat: number }[]; rotatesAt: number } // (4.4)
   | { type: "leaderboard"; channels: ChannelSummary[] }                              // (4.4)
+  | { type: "trendLeaderboard"; trend: string; channels: ChannelSummary[] }          // (4.5b)
   | { type: "algorithm"; state: AlgorithmState };
 
 // ——— Stream room (streamer and viewers are both clients of the same room) ———

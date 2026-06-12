@@ -378,3 +378,39 @@ Client folds the tier multiplier into `multiplier` via `recomputeStats()` (like 
   before size.
 - Keep `realViewerWeight` high enough that ONE real viewer is felt by the streamer (~+5 viewers is
   a visible bump early game, noise late game — revisit as population grows).
+
+### 12.7 Server hardening clamps (task 4.5c-1)
+
+Per-message/per-connection limits the party servers enforce; anything over the clamp is capped,
+anything under the interval is dropped. These live **server-side only** — mirror them as a small
+const block in `party/src/stream.ts` / `party/src/lobby.ts` (comment-linked to this section), not
+in the client `BALANCE`.
+
+```ts
+const HARDEN = {
+  maxTapsPerMsg: 8,               // tapMaxPerSec × tapBatchSec, ×2 slack for timer jitter
+  minQuickChatIntervalMs: 2000,   // client cooldown is 3s; server allows slack
+  maxFeedWatchSec: 60,            // max watchSec per feedAlgorithm message
+  maxFeedGiftCoins: 800,          // = lion, the largest single gift
+  minFeedIntervalMs: 1000,        // per-connection feedAlgorithm rate limit
+};
+```
+
+Shoutout values are **recomputed server-side**: `shoutoutFollowersPerLevel × creatorLevel` from
+the streamer's pinned `open` summary — the client-sent `followers` number is ignored.
+
+### 12.8 Featured sim streams (task 6.1 — cold-start filler, `01` §7.4)
+
+```ts
+// add to BALANCE.social:
+featuredMinDirectory: 3,   // lobby pads the directory up to this many cards (real first)
+featuredDropMult: 0.5,     // watch-drop multiplier on featured streams (gradeMult fixed at 1)
+```
+
+Featured streams are lobby-generated cards (`featured: true`, creatorLevel rolled 2–4) played
+back by a **client-local simulator** — no network, no other players. Economy on a featured
+stream: hype taps pay the normal §12.1 micro-reward; gifts spend coins and pay the §12.2
+clout-back but there is **no early-backer jackpot and no shoutout** (no real streamer to back);
+the watch-drop is `×featuredDropMult` with `gradeMult = 1`. Net effect: featured streams are
+worth watching when nobody's live, strictly worse than any real stream — filler never outcompetes
+people.

@@ -54,6 +54,8 @@ Trends + leaderboard (and the future multiplayer surface).
   Profile), `@handle`, a red **LIVE** badge, `#topic`, viewer count, a thin hype bar. Sorted by
   creator level then viewers. Tap → join as spectator (4.2; display-only in 4.1). Empty state:
   "nobody's live — be the first" + a GO LIVE shortcut.
+  (Phase 6.1) sim filler cards (`featured: true`) carry a small **✨ FEATURED** badge in place of
+  the red LIVE badge; real streams always render first.
 - **(Phase 4.4) The Algorithm bar:** a world-boss-style meter across the top of the screen —
   segmented bar with the FED/BLESSED thresholds ticked, current tier label glowing (`--cyan` FED,
   `--gold` BLESSED), and the active buff ("ALL INCOME ×1.10"). Feeds from `socialSlice.algorithm`.
