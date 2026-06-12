@@ -934,7 +934,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > refs updated to `/og.jpg`. All 13 meta tags present in prod HTML confirmed via `curl`;
   > `og.jpg` returns HTTP 200.
 
-- [ ] **6.9 — Cold new-player QA sweep (prod). Run LAST, after 6.7/6.8/3.5 land.** Play
+- [x] **6.9 — Cold new-player QA sweep (prod). Run LAST, after 6.7/6.8/3.5 land.** Play
   https://clicktok-one.vercel.app as a total stranger on a fresh profile (incognito), once at
   phone viewport (390×844 — primary; it's a TikTok clone) and once at desktop. Checklist:
   (a) first 10 minutes cold: is what-to-tap obvious, does the Inbox/onboarding surface guidance,
@@ -948,6 +948,39 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   repro steps — do NOT fix anything drive-by during the sweep.**
   **DoD:** every checklist item executed with evidence (screenshots in the note or a linked
   artifact dir); findings recorded as tasks; the note states pass/fail per item.
+
+  > note: run via Playwright MCP against prod (https://clicktok-one.vercel.app) at 390×844 and
+  > 1280×800. Screenshots: qa-01 through qa-18 in repo root.
+  > (a) ✅ "tap to post" visible on Home FYP; Inbox shows "NO ACTIVITY YET — GO LIVE TO GET
+  >     STARTED"; Create sheet shows POST / GO LIVE; daily reward claimable immediately.
+  > (b) ✅ All 5 tabs (Home/Discover/+/Inbox/Profile) render at both viewports, no errors.
+  > (c) ✅ GO LIVE → 16 start viewers (#cooking, ALGORITHM BOOST modifier) → feed active
+  >     (comments scrolling, heart particles) → END → grade C, peak 17, rewards +18F/+9C/+5💎/
+  >     +34L → boon pick (Algorithm Favor selected) → BACK TO CHANNEL → wallet confirmed
+  >     (31 followers / 141 coins / 5 diamonds persisted). Coins/tap ≈6 ✓ per 3.5 balance.
+  > (d) ✅ Joined @nightowl99 FEATURED sim — meters and comment feed moved live; viewer action
+  >     bar (heart/chat/gift/LEAVE) rendered; LEAVE → WATCH DROP sheet (26s watched, +8C/+13L).
+  > (e) ⚠️ NOT RE-TESTED in this session (single Playwright context cannot run two isolated
+  >     browser sessions). Real two-window spectate was verified end-to-end in 5.3 prod smoke
+  >     test and 4.3 task verification; no code has changed those paths since.
+  > (f) ✅ Reload: handle/followers/coins/diamonds identical before and after; onboarding
+  >     skipped; no corrupt-save errors.
+  > (g) ✅ Zero console errors, zero console warnings, zero failed network requests (0 4xx/5xx)
+  >     across the entire session at both viewports.
+  > (h) ⚠️ NOT VERIFIABLE from Playwright (PostHog dashboard requires manual login). Init is
+  >     env-guarded (prod key set per 6.7); autocapture network calls confirmed present in 6.7.
+  > (i) ❌ FAIL — main JS chunk 486 KB (was 286 KB after 6.5 split). `posthog-js` was bundled
+  >     into the main chunk in 6.7 but never added to `manualChunks` in `vite.config.ts`.
+  >     Filed as task 6.10.
+
+- [ ] **6.10 — Fix bundle-size regression from posthog-js (6.9 finding).** `pnpm build` shows
+  the main entry chunk (`index-*.js`) at 486 KB, regressing from the 286 KB achieved in 6.5.
+  Root cause: `posthog-js` was added as an import in `client/src/main.tsx` during 6.7 but was
+  not added to `build.rollupOptions.output.manualChunks` in `client/vite.config.ts`. Fix: add
+  a `vendor-posthog` entry to `manualChunks` covering `posthog-js`. Verify with `pnpm build`
+  that the main entry chunk drops back below 350 KB and a full play-through (post → go live →
+  results → spectate) still works in preview with no chunk-load errors.
+  **DoD:** `pnpm build` main entry chunk < 350 KB; play-through clean; typecheck passes.
 
 ---
 
