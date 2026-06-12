@@ -1049,7 +1049,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > Milestone recolor at combo=10 → cyan ring visible in preview; combo=100 → gold ring ✓.
   > `pnpm typecheck` passes (client + party).
 
-- [ ] **7.3 — Element framework + BEAT SYNC.** The pluggable element system per `01` §8.2:
+- [x] **7.3 — Element framework + BEAT SYNC.** The pluggable element system per `01` §8.2:
   `features/elements/` (catalog of `ElementDef`s, per-element components), `elementsSlice`
   (`03` §6.5) with `ownedElements` **PERSISTED (⚠ SAVE_VERSION bump + migration defaulting `{}`;
   old saves must load)**, the one-wave-at-a-time scheduler (`waveIdleGapSec`, round-robin,
@@ -1064,6 +1064,25 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   across reload when met (old save migrates clean); waves spawn on schedule; driving the wave
   clock manually proves each grade window pays its exact multiple; all-PERFECT pays the bonus;
   typecheck.
+  > note: `ELEMENT_CATALOG` (`features/elements/catalog.ts`) contains only `beat_sync` —
+  > `duet_loop` stays catalog-less until 7.4 adds its wave case (per that task's own framing).
+  > `ElementsSlice.tapDuetPod` is a no-op stub for 7.4, matching `feedSlice`'s
+  > stub-for-future-task precedent. Added an ephemeral `lastSpawnedElement: ElementId | null`
+  > field (not in `03`§6.5) so the round-robin scheduler is generic with 1 element today and
+  > needs no further changes when 7.4 adds the second. Ring taps do NOT increment `combo`/
+  > `lastTapAt` — only TAP CORE taps build combo per `04`§13.1; ring taps consume the current
+  > comboMult. A ring auto-resolves to MISS once it has shrunk *past* the OK window
+  > (`1 - scale > windowOk`), not merely before it has appeared. Shared ring-scale/grade math
+  > lives in `features/elements/beatSync.ts`, imported by both `elementsSlice` (grading) and
+  > `BeatSyncWave` (visual) so they derive from the same number per spec.
+  > Verified in browser preview: locked pod shows "2.5K 🪙 · needs 1K followers"; unlock sheet
+  > blocks UNLOCK below the gate/cost and enables it once met; unlock spends coins, sets
+  > `ownedElements.beat_sync`, persists across reload (localStorage `version: 4`); a v3 save
+  > (no `ownedElements`) migrates to `ownedElements: {}` (verified via `migrate()` directly with
+  > `tsx`, since the running game loop's autosave made live-localStorage injection races
+  > unreliable). Manually driving `activeWave.startedAt` proved PERFECT/GOOD/OK ring taps pay
+  > exact `4×/2×/1×` of the base unit, an untapped expired ring resolves to MISS (pays 0), and
+  > an all-PERFECT wave adds the `perfectWaveBonus` (5×) on top.
 
 - [ ] **7.4 — DUET LOOP (the second element — proves the framework).** Implement per `04` §13.2 +
   `06` §3: dormant pods, `engageTap()` arms the next pod (energy beam), armed-pod tap pays

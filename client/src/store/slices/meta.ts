@@ -2,9 +2,10 @@ import type { Wallet } from "../../features/economy/types";
 import type { VideoPost } from "../../features/channel/types";
 import type { SkillId } from "../../features/skills/types";
 import type { InboxNotification } from "../../features/inbox/types";
+import type { ElementId } from "../../features/elements/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -38,7 +39,13 @@ export type PersistedV3 = Omit<PersistedV2, "version"> & {
   milestonesReached: number[];
 };
 
-export type PersistedState = PersistedV3;
+// 7.3: adds the element framework's unlocked-elements set.
+export type PersistedV4 = Omit<PersistedV3, "version"> & {
+  version: 4;
+  ownedElements: Partial<Record<ElementId, boolean>>;
+};
+
+export type PersistedState = PersistedV4;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -62,6 +69,7 @@ export function toPersistedState(state: FullState): PersistedState {
     notifications: state.notifications,
     lastDailyClaimAt: state.lastDailyClaimAt,
     milestonesReached: state.milestonesReached,
+    ownedElements: state.ownedElements,
   };
 }
 
@@ -82,7 +90,7 @@ const V1_TO_V2_UPGRADE_MAP: Record<string, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -121,6 +129,16 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       notifications: [],
       lastDailyClaimAt: null,
       milestonesReached: [],
+    };
+  }
+
+  if (version < 4) {
+    const v3 = state as PersistedV3;
+    state = {
+      ...v3,
+      version: 4,
+      // v3 saves predate the element framework (7.3) — nothing unlocked yet.
+      ownedElements: {},
     };
   }
 

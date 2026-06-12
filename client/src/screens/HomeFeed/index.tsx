@@ -6,6 +6,7 @@ import { computeRunParams } from "../../features/livestream/computeRunParams";
 import { avatarGradient } from "../../lib/avatar";
 import { formatCount } from "../../lib/format";
 import { VideoCanvas } from "../../components/VideoCanvas";
+import { ElementStage } from "../../components/ElementStage";
 import { generateNpcCard } from "../../features/feed/npcVideos";
 
 // ── Combo-tier visual progression ───────────────────────────────────────────
@@ -159,15 +160,8 @@ export function HomeFeed() {
         </div>
       </div>
 
-      {/* ── Element stage (upper ~35%, waves spawn here at 7.3) ─────────── */}
-      {/* Locked pods will dock at the top of this zone in task 7.3 */}
-      <div style={{
-        position: 'absolute',
-        top: 56, left: 0, right: 0,
-        height: '35%',
-        pointerEvents: 'none',
-        // no visible content until 7.3
-      }} />
+      {/* ── Element stage (upper ~35%, waves spawn here) ────────────────── */}
+      <ElementStage />
 
       {/* ── TAP CORE — dead center ───────────────────────────────────────── */}
       <div style={{

@@ -72,6 +72,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     // milestone from any source (taps, passive income, idle income, runs).
     get().checkMilestones();
     get().decayCombo(dt);
+    get().expireOrResolveWave();
 
     const { passiveFollowersPerSec, multiplier, wallet, comments } = get();
     const gained = passiveFollowersPerSec * multiplier * dt;

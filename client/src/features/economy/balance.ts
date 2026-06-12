@@ -119,4 +119,31 @@ export const BALANCE = {
     engageMaxTapsPerMsg: 120,
     serverPublishCooldownSec: 60,
   },
+
+  // Phase 7.3 — the element framework (04 §13.2)
+  elements: {
+    waveIdleGapSec: 6,             // scheduler: breathing room between waves (one wave at a time)
+
+    // BEAT SYNC (timing rings) — unlock: 2,500 coins, gated at 1,000 followers
+    beatSync: {
+      unlock: { coins: 2500, followers: 1000 },
+      rings: 3,
+      shrinkSec: 1.6,              // ring travels scale 2.2 → 1.0 in this time
+      staggerSec: 0.45,            // spawn offset between rings — THE rhythm
+      windowPerfect: 0.08,         // |ringScale − 1| ≤ → PERFECT  ×4 gainPerPost
+      windowGood: 0.20,            //                  → GOOD     ×2
+      windowOk: 0.40,              //                  → OK       ×1   (worse/expired = MISS ×0)
+      perfectWaveBonus: 5,         // all-3-PERFECT: +5 × gainPerPost on top
+    },
+
+    // DUET LOOP (call-and-response) — unlock: 10,000 coins, gated at 5,000 followers
+    duetLoop: {
+      unlock: { coins: 10000, followers: 5000 },
+      pods: 3,
+      armTimeoutSec: 2.5,          // an armed pod fades back to dormant if not tapped
+      podPayout: 3,                // each pod tap pays 3 × gainPerPost (core taps pay normal)
+      flowSec: 4.0,                // full chain (core→pod ×3, 6 taps) inside this → FLOW
+      flowBonus: 6,                // +6 × gainPerPost
+    },
+  },
 } as const;
