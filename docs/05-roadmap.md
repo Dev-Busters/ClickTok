@@ -557,15 +557,26 @@ values live in `party/.env` / `client/.env` (both gitignored, already filled); p
 are pushed to each platform's own env store. Interactive CLI logins (`partykit login`,
 `vercel login`) are completed by the human operator when prompted.
 
-- [ ] **5.0 — Fix the Shell hooks-order bug.** Console shows "React has detected a change in the
+- [x] **5.0 — Fix the Shell hooks-order bug.** Console shows "React has detected a change in the
   order of Hooks" for `Shell` (`client/src/app/Shell.tsx`), pre-existing on `main` (see 4.5b note).
   Reproduce via `pnpm dev` → console → navigate Home → go live → end → back. Find the conditional
   hook (likely around the Live/spectate overlay switch on `phase`); restructure so every hook runs
   unconditionally each render (move early returns below hooks, or split a child component).
   **DoD:** warning no longer appears across a full navigate → live → results → back cycle;
   `pnpm typecheck` passes.
+  > note: investigated — every hook in `Shell` and its child hooks (`useGameLoop`, `useLobby`,
+  > `useStreamerRoom`, `useSpectatorRoom`, `useCloudSync`) is called unconditionally at the top
+  > level; the `phase`/`spectating`/`pendingDrop` branch only affects JSX, not hook calls. Mapped
+  > the warning's "Previous render" hook list (76 entries, diverging at #76: `useEffect` vs
+  > `useCallback`) against `useLobby`'s hook positions and found it matches exactly the *pre-4.5b*
+  > 9-selector version of `useLobby` (before `setTrendLeaderboard`/`activeTrend` were added),
+  > while "Next render" matches the current 11-selector version — i.e. it was a stale-fiber
+  > Fast-Refresh artifact from editing `useLobby.ts` mid-session, not a Rules-of-Hooks violation
+  > in the source. Confirmed by restarting the dev server fresh and running multiple full
+  > navigate → live → results → back cycles (+ tab switches): zero hooks-order warnings.
+  > No code change required. `pnpm typecheck` passes.
 
-- [ ] **5.1 — Deploy the PartyKit server.** From `party/`: `npx partykit login` (operator completes
+- [x] **5.1 — Deploy the PartyKit server.** From `party/`: `npx partykit login` (operator completes
   the GitHub OAuth), then `npx partykit deploy` (project name `clicktok` per `partykit.json`).
   Push the two secrets the lobby needs, reading values from the local `party/.env` (do NOT echo
   them into logs or commit them): `npx partykit env add SUPABASE_URL`, `npx partykit env add
@@ -574,8 +585,17 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   **DoD:** `curl https://<host>` (or opening a websocket from a local client pointed at it via
   `VITE_PARTYKIT_HOST=<host> pnpm dev:client`) reaches the deployed lobby; leaderboard writes land
   in Supabase `leaderboard_scores`.
+  > note: deployed to `clicktok.dev-busters.partykit.dev` (already logged in as `dev-busters` via
+  > Clerk, no interactive login needed). Pushed `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` from
+  > `party/.env` via `npx partykit env add` (values never echoed/logged), then redeployed.
+  > Verified via a raw WebSocket connection to `wss://clicktok.dev-busters.partykit.dev/parties/lobby/lobby`:
+  > received `directory`/`trends`/`algorithm`/`leaderboard` on connect, and the `leaderboard`
+  > payload already contained the real entries (`harrowed`, `algo_test_a`) previously persisted
+  > to Supabase locally — confirming the deployed room's `onStart()` → `loadLeaderboard()`
+  > correctly restores durable leaderboard state from `leaderboard_scores`. A `score` message with
+  > a fake (non-`auth.users`) `userId` correctly did NOT persist (FK constraint), as expected.
 
-- [ ] **5.2 — Deploy the client to Vercel.** Create/link a Vercel project for this repo (CLI
+- [x] **5.2 — Deploy the client to Vercel.** Create/link a Vercel project for this repo (CLI
   `vercel` from repo root, or the Vercel MCP/skill if connected). Settings: **Root Directory =
   `client`**, framework Vite (auto-detected), pnpm monorepo (Vercel detects
   `pnpm-workspace.yaml`; if install fails, set Install Command to `pnpm install` and enable
@@ -585,8 +605,16 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   must NEVER be set here). Deploy to production.
   **DoD:** the production URL loads the game; onboarding → post → go live works; no console
   errors about localhost:1999.
+  > note: deployed via `vercel --prod --yes`. Production URL: `https://clicktok-one.vercel.app`
+  > (preview alias `clicktok-e2t8wabhf-artbyharrowed-1247s-projects.vercel.app`). Confirmed
+  > Root Directory=`client`, all three env vars set on Production. Verified the built bundle
+  > references `clicktok.dev-busters.partykit.dev` with zero `localhost:1999` occurrences.
+  > Browser smoke test (Chrome DevTools MCP): onboarding (handle entry) → home feed loads with
+  > live `~10 viewers` from the deployed PartyKit lobby → GO LIVE starts a run with working
+  > hype meter, timer, modifiers, and live heart/comment feed. No console errors (only a
+  > pre-existing minor a11y warning: "form field element should have an id or name attribute").
 
-- [ ] **5.3 — Production smoke test + Supabase URL config.** Add the Vercel production URL to
+- [x] **5.3 — Production smoke test + Supabase URL config.** Add the Vercel production URL to
   Supabase Auth (dashboard → Authentication → URL Configuration → Site URL / Redirect URLs) so
   auth flows work on the prod domain (the Supabase MCP cannot change this — operator does it in
   the dashboard if no tool exposes it). Then a two-browser test against the production URL:
@@ -594,6 +622,25 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   A sees them glowing in-feed; B gets a watch-drop on stream end; leaderboard shows both and
   still shows them after `partykit deploy` is re-run (durability).
   **DoD:** all of the above pass on production; record the prod URL in a `> note:`.
+
+  > note: prod URL `https://clicktok-one.vercel.app`. Two isolated browser contexts
+  > (`prodtest_user` streaming, `prodtest_spec` spectating) against production:
+  > A went LIVE → B saw A in Discover → LIVE NOW, joined as spectator → B sent a hype tap (❤️)
+  > and quick-chat ("W"), both appeared glowing in A's live feed in real time → B earned coins
+  > via a watch-drop on a prior stream's end (+6 coins/+11 likes for 21s watched) and used them
+  > to send a 🌹 Rose gift → gift appeared in A's feed, A's coin count rose +5, and A's results
+  > screen showed "TOP GIFTER @prodtest_spec" with a working SHOUT OUT button → B received a
+  > watch-drop on this stream's end too. Discover → TOP CREATORS showed both `prodtest_user`
+  > and `prodtest_spec`, and TRENDING (#lifehacks) showed `prodtest_user`. Ran `npx partykit
+  > deploy` to redeploy the lobby room, then re-checked Discover: both accounts still present
+  > in TOP CREATORS (durability confirmed — Supabase-backed leaderboard survives a PartyKit
+  > redeploy). No console errors throughout (only the pre-existing minor a11y warning noted in
+  > 5.2). **Supabase Auth URL config not completed by this task** — the Supabase MCP is not
+  > connected in this environment, so adding `https://clicktok-one.vercel.app` to
+  > Authentication → URL Configuration → Site URL / Redirect URLs in the Supabase dashboard is
+  > an outstanding manual step for the operator. The current auth flow uses
+  > `signInAnonymously()` only, which does not require redirect URLs, so this does not block
+  > any tested functionality but should be done before adding OAuth/email/magic-link flows.
 
 ---
 
