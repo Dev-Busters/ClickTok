@@ -222,7 +222,55 @@ game — the simplest, most legible "players affect everyone" mechanic.
 Architecture rule still stands: run scoring and trend state stay expressible as messages a server
 could authoritatively own later. See `02` § Multiplayer-readiness.
 
-## 8. Out of scope (for now — note so models don't build them)
+## 8. The Feed — the clicker becomes a video feed (Phase 7; design LOCKED 2026-06-12)
+
+**Origin: first human playtest (2026-06-12).** Findings: players don't know what's tappable or
+why; the center of every screen is blank; the clicker has no fiction. This redesign fixes all
+three with one structure: **the Home screen becomes a real TikTok-style vertical video feed, and
+the clicker lives at its center.**
+
+### 8.1 The structure
+- Home is a **full-bleed vertical pager of videos** — one video fills the screen; **swipe up** for
+  the next, swipe down to go back, exactly like TikTok. Since we have no real video, a "video" is
+  a procedurally animated visual (the `VideoCanvas`: deterministic from the video's id/topic —
+  layered drifting gradients/shapes + a topic glyph), with the poster's `@handle`, caption, and
+  topic tag overlaid like a TikTok post.
+- **Videos are posted by other players.** The ＋ sheet's POST action publishes a `VideoCard` to a
+  shared server pool; everyone's feed draws from it. NPC-generated videos pad the pool when real
+  content is thin (same cold-start pattern as featured streams). Captions are **preset templates
+  only — never free text** (same moderation rule as quick-chat).
+- **The center of the video is the TAP CORE** — the clicker. A large, obviously-tappable pulsing
+  target. Tapping it ("engaging") earns the existing per-tap gains (economy unchanged, `04` §1).
+  Floating `+N` numbers, heart bursts, and a combo ring make every tap legible.
+
+### 8.2 Why you tap, why you swipe (the new tension)
+- **Combo:** consecutive taps on the same video build a combo that multiplies gains (caps at
+  ×1.5 at 100 taps) and visually evolves the TAP CORE at milestones. Swiping resets it.
+- **Boosts:** every video carries a visible **boost** that applies *while you tap with it on
+  screen* — e.g. +50% coins, +50% followers, ×2 likes, lucky ×10 taps, or seeding your next run
+  with bonus starting hype. Numbers in `04` §13.
+- The tension: **stay** and build your combo, or **swipe** hunting a better boost. That's the
+  whole TikTok dopamine loop, made mechanical.
+- **Royalties:** when other players tap your video, you earn likes in real time (and your video's
+  public tap counter climbs). Posting feeds others' boosts; their engagement feeds you back —
+  the same "players are content for each other" principle as §7.
+
+### 8.3 Posting (semantic change)
+Tapping no longer "posts" (the 3.3-era tap-to-post is retired). **Tap = engage** (the
+moment-to-moment clicker income); **POST (＋ sheet) = publish a video** — it grants a burst of
+gains (a fistful of taps' worth at once) on a cooldown, and puts your card in everyone's feed.
+
+### 8.4 No more blank centers (applies to every mode)
+The `VideoCanvas` visual also becomes the **Live stage backdrop** (streamer and spectator),
+seeded by the streamer's identity/topic, with intensity that scales with hype. Rule going
+forward: **no screen ships with a dead center** — something animated and meaningful occupies it.
+
+### 8.5 First-run legibility (from the same playtest)
+A one-time 3-step coach-mark overlay on first Home visit (TAP THE CORE → SWIPE for new
+boosts → GO LIVE for the real rewards), an idle "TAP" pulse hint, and an affordance rule:
+**every interactive element shows a visible label** — if it's a button, it must look like one.
+
+## 9. Out of scope (for now — note so models don't build them)
 
 - Real video/audio, real TikTok API integration, real accounts of real creators.
 - Monetization/IAP, ads.

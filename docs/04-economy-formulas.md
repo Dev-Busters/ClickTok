@@ -414,3 +414,78 @@ clout-back but there is **no early-backer jackpot and no shoutout** (no real str
 the watch-drop is `×featuredDropMult` with `gradeMult = 1`. Net effect: featured streams are
 worth watching when nobody's live, strictly worse than any real stream — filler never outcompetes
 people.
+
+## 13. Phase 7 — The Feed (`01` §8, types in `03` §6.5)
+
+> The engage tap reuses §1's `gainPerPost` **unchanged** — boosts and combo multiply it. Add the
+> constants to `BALANCE` as `BALANCE.feed`; the two SERVER-marked values mirror into
+> `party/src/lobby.ts` alongside `HARDEN` (§12.7), not into the client bundle.
+
+```ts
+// merge into BALANCE (§0 / balance.ts):
+feed: {
+  // §13.1 combo
+  comboPerTap: 0.005,            // comboMult = 1 + min(combo, comboCap) × this
+  comboCap: 100,                 // → max ×1.5
+  comboMilestones: [10, 25, 50, 100], // TAP CORE visual evolution stages
+
+  // §13.2 boosts (flat v1; post-MVP candidate: scale by poster creatorLevel)
+  boostCoinSurge: 0.5,           // +50% coins per tap
+  boostFanMagnet: 0.5,           // +50% followers per tap
+  boostLikeStorm: 1.0,           // +100% (×2) likes per tap
+  luckyTapChance: 0.08,          // lucky_taps: 8% per tap…
+  luckyTapMult: 10,              //   …pays ×10 (all three currencies)
+  hypeSeedTapsPer: 50,           // hype_seed: every 50 taps → +hypeSeedHype next-run start hype
+  hypeSeedHype: 5,
+  hypeSeedCap: 25,               // pendingHypeSeed cap (≈ half a hype_dance-fueled opening)
+
+  // §13.3 publishing
+  publishBurstTaps: 25,          // POST grants 25 × gainPerPost instantly (no boost/combo mult)
+  publishCooldownSec: 120,       // client-side gate (POST button shows countdown)
+
+  // §13.4 royalties
+  royaltyLikesPerTap: 0.5,       // poster earns likes = taps × this (live-only v1; NPC: none)
+
+  // §13.5 the pool
+  feedPoolCap: 50,               // SERVER: newest N cards kept
+  feedMinDeck: 10,               // pad with NPC cards up to this (server; client offline too)
+  engageMaxTapsPerMsg: 120,      // SERVER clamp (≈ tapMaxPerSec × a 15–30s stay, with slack)
+  serverPublishCooldownSec: 60,  // SERVER per-connection postVideo rate limit (client gate is 120)
+},
+```
+
+### 13.1 The engage tap (THE clicker formula)
+
+```
+boostMult(currency) = active card's boost, applied ONLY to its currency (coin_surge → coins,
+                      fan_magnet → followers, like_storm → likes; others see ×1)
+comboMult           = 1 + min(combo, comboCap) × comboPerTap
+luckyMult           = (boost is lucky_taps && roll < luckyTapChance) ? luckyTapMult : 1
+gain(currency)      = gainPerPost(currency) × boostMult(currency) × comboMult × luckyMult
+```
+Worked example: postPower-era `gainPerPost.coins = 10`, card boost `coin_surge`, combo 100:
+`10 × 1.5 × 1.5 = 22.5 → 22` coins/tap. Same tap at combo 0: `15`. Swiping away resets to `10`.
+
+`hype_seed`: while active, every `hypeSeedTapsPer` taps adds `hypeSeedHype` to
+`pendingHypeSeed` (cap `hypeSeedCap`); `startRun` adds it to the initial hype (base 50) and
+zeroes it. Ephemeral — lost on reload, by design.
+
+### 13.2–13.5 rules
+- **Boost rolled at publish** (uniform over the 5 ids) — the poster can't pick; rerolling by
+  re-posting is gated by the cooldown.
+- **Publish burst** is `publishBurstTaps × gainPerPost` with **no** boost/combo multipliers, so
+  POST ≈ a guaranteed quarter-combo's worth — strong, not dominant.
+- **Royalties** are live-only v1: the lobby relays `royalty` to the poster's connection if
+  present; offline engagement only bumps the card's public `tapCount`. NPC cards never pay.
+- **Caption templates:** `captionId` indexes a client-side pool of ~20 strings ("{topic} hits
+  different 💀", "POV: the algorithm chose you", …) — server whitelists ids exactly like
+  quick-chat presets (`§12.7` pattern). Unknown id ⇒ message dropped.
+- **Server clamps:** `engage.taps` capped at `engageMaxTapsPerMsg` and `Number.isFinite`-guarded;
+  `postVideo` rate-limited per connection at `serverPublishCooldownSec`; `card.tapCount`/
+  `postedAt` are server-stamped (client values ignored) — all per the §12.7 hardening doctrine.
+
+### 13.6 Tuning guidance
+- The feed should feel ~20–40% better than the old bare tap (boost+combo average), not 2×; runs
+  must stay the headline income (§11 still rules).
+- If players AFK-park on `coin_surge` cards, that's fine — combo caps and runs still dominate.
+- Watch the `lucky_taps` ×10 in PostHog (it's the visible dopamine spike); tune chance before mult.

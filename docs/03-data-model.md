@@ -400,6 +400,61 @@ export type SpectateSlice = {
 //   realViewers: number;
 //   realTapsLast5s: number;   // sliding window for hype-decay relief (04 §12.3)
 //   realGiftLog: { handle: string; coins: number; atRunSec: number }[]; // top gifter + jackpot
+
+## 6.5 The Feed (Phase 7 — see `01` §8; numbers in `04` §13)
+
+```ts
+// client/src/party/types.ts  (MIRROR in party/src/lobby.ts — edit both together)
+export type FeedBoostId =
+  | "coin_surge" | "fan_magnet" | "like_storm" | "lucky_taps" | "hype_seed";
+
+export type VideoCard = {
+  videoId: string;           // client-generated uuid (like streamId)
+  handle: string;            // poster handle (or NPC name)
+  creatorLevel: number;
+  topic: string;             // trend topic at post time
+  captionId: string;         // preset caption template id — NEVER free text (moderation)
+  boost: FeedBoostId;        // rolled at publish time
+  postedAt: number;          // ms epoch — SERVER-stamped on postVideo
+  tapCount: number;          // global engagement counter — SERVER-owned, client value ignored
+  npc?: boolean;             // server-generated filler (no royalties)
+};
+
+// Lobby room — Phase 7 message additions:
+export type LobbyClientMessageFeed =                 // merge into LobbyClientMessage
+  | { type: "postVideo"; card: VideoCard }           // server stamps postedAt, zeroes tapCount
+  | { type: "getFeed" }                              // request/response (like getTrendLeaderboard)
+  | { type: "engage"; videoId: string; taps: number }; // batched on swipe-away (clamped, 04 §13)
+
+export type LobbyServerMessageFeed =                 // merge into LobbyServerMessage
+  | { type: "feed"; cards: VideoCard[] }             // newest-first, NPC-padded to feedMinDeck
+  | { type: "videoPosted"; card: VideoCard }         // broadcast on accepted postVideo
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number }; // → poster only
+```
+
+```ts
+// store/slices/feedSlice.ts (Phase 7 — EPHEMERAL, never persisted)
+export type FeedSlice = {
+  deck: VideoCard[];           // current scroll deck (server feed; NPC-local fallback offline)
+  deckIndex: number;
+  combo: number;               // taps in a row on the current card (resets on swipe)
+  tapsThisCard: number;        // batched → `engage` on swipe-away/unmount
+  pendingHypeSeed: number;     // hype_seed accrual; consumed (and zeroed) by startRun
+  publishReadyAt: number;      // ms epoch — POST cooldown gate
+  setDeck: (cards: VideoCard[]) => void;
+  advance: (dir: 1 | -1) => void;          // swipe: flush engage batch, reset combo
+  engageTap: () => void;                   // THE clicker: gains × boost × combo (04 §13)
+  publishVideo: () => VideoCard | null;    // null if on cooldown; grants burst (04 §13.3)
+  applyRoyalty: (taps: number, fromHandle: string) => void; // likes += taps × royaltyLikesPerTap
+};
+```
+
+```ts
+// uiSlice — Phase 7 addition (PERSISTED — the one durable feed-adjacent field):
+//   coachMarksSeen: boolean;   // first-run overlay shown once, ever
+// ⚠ persisting it requires adding it to `partialize` + a SAVE_VERSION bump + migration
+// (default false for old saves), per `02` §4.
+```
 ```
 
 ## 7. UI slice & navigation
@@ -424,7 +479,8 @@ export type UiSlice = {
 export type FullState =
   ChannelSlice & UpgradesSlice & SkillsSlice & CatalogSlice &
   RunSlice & SocialSlice & UiSlice
-  & SpectateSlice; // Phase 4
+  & SpectateSlice  // Phase 4
+  & FeedSlice;     // Phase 7
 ```
 
 ## 9. Save shape & versioning

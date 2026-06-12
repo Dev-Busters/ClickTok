@@ -989,6 +989,81 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
 
 ---
 
+## PHASE 7 — The Feed (first-playtest redesign; design LOCKED 2026-06-12, `01` §8)
+
+> From the first human playtest: nothing was legible, centers were blank, the clicker had no
+> fiction. The fix: Home becomes a real swipeable video feed of other players' posts, with the
+> clicker (TAP CORE) at its center and per-video boosts. Design `01` §8 · types `03` §6.5 ·
+> numbers `04` §13 · UI `06` §3. Build in order — each task shippable, solo play never regresses.
+> Tasks touching `party/` end with `npx partykit deploy`; client changes deploy via push.
+
+- [ ] **7.1 — VideoCard plumbing + the VideoCanvas visual.** Types from `03` §6.5 (`VideoCard`,
+  `FeedBoostId` — mirror into `party/src/lobby.ts` now, unused server-side until 7.3). New
+  `components/VideoCanvas.tsx` (`06` §8: seed+topic → deterministic layered animated visual,
+  `intensity`/`dim` props, CSS/Framer only). New `features/feed/boosts.ts` (the 5 boost defs:
+  id, icon, name, effect line, multiplier wiring per `04` §13.2) and `features/feed/npcVideos.ts`
+  (NPC card generator: handle/caption pools, random topic/boost/level — caption TEMPLATES live
+  here too, exported with stable ids). No screen changes yet.
+  **Refs:** `03` §6.5, `04` §13.2, `06` §8. **DoD:** typecheck; temporarily mounting 3
+  `VideoCanvas`es with different seeds in the preview shows clearly distinct, animated, 60fps
+  visuals (then remove the temp mount); boost/NPC modules import cleanly.
+
+- [ ] **7.2 — Feed pager + TAP CORE (the new Home, local deck).** Rebuild `screens/HomeFeed/` per
+  `06` §3: vertical snap pager over a local NPC deck (`feedMinDeck` cards), full-bleed
+  `VideoCanvas` cards with poster overlay + boost banner, TAP CORE center with combo ring,
+  milestones, floating `+N`s, and idle TAP pulse. `feedSlice` (`03` §6.5): `engageTap()` grants
+  `gainPerPost × boost × combo (× lucky)` exactly per `04` §13.1 (verify against the worked
+  example); swipe resets combo + advances; `hype_seed` accrues `pendingHypeSeed` and `startRun`
+  consumes it. Retire tap-anywhere-to-post; keep stat strip, rail, GO LIVE pill. POST in the
+  Create sheet keeps its current behavior until 7.3.
+  **Refs:** `01` §8.1–8.3, `03` §6.5, `04` §13.1–13.2, `06` §3. **DoD:** in preview: tapping the
+  core pays the formula-exact amounts (check a coin_surge card at combo 0 and 100); swiping
+  changes video + boost and resets combo; a hype_seed card's accrual raises the next run's
+  starting hype; smooth swipes (no blank frames); typecheck.
+
+- [ ] **7.3 — Publish + the server feed pool.** Lobby (`party/src/lobby.ts`): in-memory pool
+  (cap `feedPoolCap`), handle `postVideo` (stamp `postedAt`, zero `tapCount`, whitelist
+  `captionId` against the template ids, rate-limit per connection at `serverPublishCooldownSec`),
+  `getFeed` → `feed` (newest-first, NPC-padded to `feedMinDeck` server-side), broadcast
+  `videoPosted`. Client: `useLobby` requests the feed on connect and merges `videoPosted` into
+  the deck; Create-sheet **POST** becomes `publishVideo()` (`04` §13.3: burst gain, 120s cooldown
+  with visible countdown on the button); offline fallback stays the local NPC deck.
+  **Refs:** `01` §8.1+8.3, `03` §6.5, `04` §13.3+13.5, `02` §6. **DoD:** two windows: A POSTs →
+  the card appears in B's deck within ~2s with A's handle/boost; POST again immediately → blocked
+  by cooldown both client- and server-side (probe: also a forged `captionId` and an immediate
+  repeat `postVideo` are dropped); offline solo deck still full; typecheck; `npx partykit deploy`.
+
+- [ ] **7.4 — Engagement royalties.** Client: batch `tapsThisCard`, send `engage` on swipe-away/
+  unmount/tab-change. Server: `Number.isFinite` + clamp to `engageMaxTapsPerMsg`, bump the card's
+  `tapCount`, relay `royalty` to the poster's connection when present (key by verified
+  userId/handle binding from 4.5c-2). Poster client: `applyRoyalty` grants
+  `taps × royaltyLikesPerTap` likes + a small toast ("@b binged your video +10 ❤️"); card tap
+  counters render on feed cards. NPC cards: counters only, never royalties.
+  **Refs:** `01` §8.2, `03` §6.5, `04` §13.4–13.5. **DoD:** two windows: B taps A's card 20×,
+  swipes → A's likes rise by the formula amount with a toast, the card's public counter rises for
+  both; probe: `engage` with `taps: 9999` clamps, `taps: "x"` drops; typecheck;
+  `npx partykit deploy`.
+
+- [ ] **7.5 — Live stage backdrop (kill the last blank center).** Render `VideoCanvas` behind
+  BOTH `StreamerLive` and `SpectatorLive` (seed = `streamId` + handle, topic = run topic) with
+  `intensity` driven by current hype and a dark scrim preserving HUD/feed legibility (`06` §7).
+  Also seed it on the featured-sim spectator path.
+  **Refs:** `01` §8.4, `06` §7–8. **DoD:** preview: streamer run + spectate (real or featured)
+  both show the animated stage that visibly energizes as hype climbs; HUD/feed still readable;
+  no fps regression with a busy feed; typecheck.
+
+- [ ] **7.6 — First-run coach marks + affordance pass.** Three-step overlay per `06` §3 anchored
+  to TAP CORE / swipe zone / GO LIVE pill; `uiSlice.coachMarksSeen` persisted (⚠ `partialize` +
+  SAVE_VERSION bump + migration defaulting false, per `02` §4 — old saves must load). Affordance
+  sweep across ALL screens: every interactive element gets a visible text label or an
+  unmistakable button treatment (rail buttons get micro-labels; any icon-only control gets a
+  caption) — audit against `01` §8.5's rule.
+  **Refs:** `01` §8.5, `03` §6.5 (uiSlice note), `06` §3, `02` §4. **DoD:** fresh profile sees
+  the overlay exactly once (reload → never again; old save migrates clean); a screenshot pass of
+  all 5 tabs + Live shows no unlabeled interactive elements; typecheck.
+
+---
+
 ## How to update this file
 When you finish a task: change `[ ]`→`[x]`, and if you deviated from the spec, add a one-line
 `> note:` under it explaining what changed and why (so the next model and the docs stay honest).

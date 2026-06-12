@@ -31,18 +31,34 @@ TikTok's 5-slot bar. Fixed to bottom, dark, hairline top border.
 - Active tab: label/icon in `--text`; inactive in `--dim`. Small label under each icon (TikTok
   style). Tap → `setTab` / for ＋ → `setSheet('create')`.
 
-## 3. Home — "For You" (`screens/HomeFeed/`)
+## 3. Home — "For You" feed pager (`screens/HomeFeed/`; Phase 7 redesign — `01` §8)
 
-The hub. TikTok's home is the vertical video feed; ours blends that with the posting clicker.
+TikTok's home IS a vertical video feed — as of Phase 7, so is ours, with the clicker at its
+center. (The 3.3-era single-card tap-to-post layout is superseded.)
 
-- **Header:** centered "For You" / "Following" pill toggle (cosmetic for now), LIVE indicator if a
-  run is available. Keep the small `@handle` + LIVE dot from the current top bar.
-- **Hero:** the big follower count (reuse current `StatsBar` hero treatment) + passive/sec line.
-- **Post action:** the existing tap button, reframed as **"＋ Post"** / "Create" — the active
-  clicker. Floating `+N` feedback stays (current `TapButton`). Each tap = a post (`04` §1).
-- **(Phase 1.5) Feed:** below the fold, a vertical list/grid of your recent videos (catalog) with
-  view counts ticking — visually echoes the FYP. Optional for MVP.
-- **LIVE-readiness chip (Phase 1.3):** small panel "You'd start at ~N viewers on #trend → Go LIVE".
+- **The pager:** one `VideoCard` fills the screen edge-to-edge. **Swipe up** (touch drag / mouse
+  drag / wheel) snap-advances to the next card with a TikTok-style vertical slide; swipe down goes
+  back. Preload ±1 card so swiping never shows a blank. Deck from `feedSlice.deck`
+  (server pool, NPC-padded; local NPC deck offline — `04` §13.5).
+- **The video (`VideoCanvas`):** full-bleed procedural animation, deterministic from
+  `videoId`/`topic` (layered drifting gradients + shapes in the CRT palette + a big faint topic
+  glyph). Overlaid TikTok-style: poster `@handle` (+ tiny avatar) bottom-left with the caption
+  and `#topic` tag, the sound-marquee line, and the card's **tap counter** (`formatCount`, 👆)
+  as social proof. NPC cards look identical to real ones (no badge — the feed fiction holds).
+- **TAP CORE (the clicker, dead center):** a large (~140px hit area) circular pulsing target —
+  unmistakably a button (ring, glow, idle pulse, "TAP" micro-label until first tap of the
+  session). Each tap: heart/coin burst + floating `+N` per currency + a 1–2px screen-kick.
+  A **combo ring** wraps it, filling toward `comboCap`; at each `comboMilestones` stage the core
+  visibly evolves (size/glow/particle tier). Combo counter ("×1.32") rides above the ring.
+- **Boost banner:** a slim pill above the TAP CORE: boost icon + name + effect ("🪙 COIN SURGE
+  — +50% coins while you tap"). It's the reason to care which video is on screen; make it read
+  at a glance. New-card entrance animates the banner in.
+- **Kept from the current build:** top stat strip (followers hero + currency pills), right action
+  rail, the **GO LIVE pill** (with ~viewers projection), and bottom nav. The rail's like/comment
+  buttons now act on the current card (cosmetic counts ok v1).
+- **First-run coach marks (Phase 7.6):** 3-step dimmed overlay anchored to real elements —
+  (1) TAP CORE "Tap to earn", (2) swipe gesture hint "Swipe for new boosts", (3) GO LIVE pill
+  "Streams pay 10×". Advances per tap, never shows again (`uiSlice.coachMarksSeen`, persisted).
 
 ## 4. Discover (`screens/Discover/`)
 
@@ -103,8 +119,11 @@ This is a TikTok LIVE screen. Full-screen, hides the BottomNav.
   small chips.
 - **Hype meter:** a prominent bar (0–100) — the momentum gauge. Color shifts toward `--red`/`--gold`
   as it climbs. This is the player's main feedback.
-- **Center/background:** the "stage" — keep it simple (the creator avatar / a stylized camera view).
-  Particle/gift visuals float here (DOM/Framer Motion; escalate to Pixi only if needed).
+- **Center/background:** the "stage" — **(Phase 7.5)** the `VideoCanvas` procedural visual,
+  seeded by the streamer's `streamId`/`handle` + topic, runs full-bleed behind everything (both
+  streamer and spectator views) with animation intensity scaling with hype, under a dark scrim
+  that keeps feed/meter legibility. No dead center (`01` §8.4). Particle/gift visuals float here
+  (DOM/Framer Motion; escalate to Pixi only if needed).
 - **The feed (right/bottom, TikTok LIVE style):** comments scroll up from the bottom-left. Gifts
   float up as tappable icons (Rose/Heart/Galaxy/Lion ascending) — **tap to collect**. Trolls appear
   as angry comments with a small health/timer; hype waves appear as a brief full-width "RIDE THE
@@ -143,6 +162,9 @@ The **same Live screen layout**, driven by `spectateSlice.liveSnapshot` instead 
 
 Build these once, reuse everywhere:
 - `Sheet` — bottom sheet (Framer Motion slide-up) for Create / Welcome Back / Results / Boon pick.
+- `VideoCanvas` — (Phase 7) the procedural "video" visual: deterministic from a seed string +
+  topic; props for `intensity` (0–1, drives animation energy) and `dim`. Used by feed cards AND
+  the Live stage backdrop. Pure CSS/Framer animation; must hold 60fps on a phone.
 - `StatPill` — label + value + optional icon, `formatCount`.
 - `CurrencyRow` — the followers/likes/coins/diamonds cluster.
 - `ProgressBar` — used for hype, cooldowns, trend heat.
