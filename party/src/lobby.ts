@@ -102,6 +102,27 @@ const PERSIST_MIN_INTERVAL_MS = 10 * 1000; // per-user write-through debounce
 // 6.2: at most one leaderboard broadcast per 2s; trailing edge (state read at fire time).
 const LEADERBOARD_DEBOUNCE_MS = 2 * 1000;
 
+// 6.6: rough sanity ceiling for goLive/liveUpdate `viewers` at a given creatorLevel —
+// 04 §6 startViewers = (baseStartViewers + followerSqrtCoeff*sqrt(F) + gear) × multipliers,
+// where F maxes out around 10^creatorLevel (04 §12.0). ×10 leaves slack for gear/charisma/
+// trend multipliers while still rejecting forged absurd numbers.
+function maxViewersForLevel(creatorLevel: number): number {
+  const level = Number.isFinite(creatorLevel) ? Math.max(1, Math.floor(creatorLevel)) : 1;
+  const maxFollowers = Math.pow(10, level);
+  const baseViewers = 10 + 0.5 * Math.sqrt(maxFollowers);
+  return Math.round(baseViewers * 10);
+}
+
+// 6.6: clamp/sanitize a viewer-supplied LiveStreamSummary before it's stored and broadcast
+// to the directory — a forged card otherwise shows absurd numbers (NaN, 1e9, etc.).
+function sanitizeSummary(summary: LiveStreamSummary): LiveStreamSummary {
+  const viewers = Number.isFinite(summary.viewers)
+    ? Math.max(0, Math.min(summary.viewers, maxViewersForLevel(summary.creatorLevel)))
+    : 0;
+  const hype = Number.isFinite(summary.hype) ? Math.max(0, Math.min(100, summary.hype)) : 0;
+  return { ...summary, viewers, hype };
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -249,7 +270,7 @@ export default class LobbyServer implements Party.Server {
               .find(([, sid]) => sid === msg.summary.streamId)?.[0];
             if (ownerConnId && ownerConnId !== sender.id) break; // hijack attempt — drop
           }
-          this.streams.set(msg.summary.streamId, msg.summary);
+          this.streams.set(msg.summary.streamId, sanitizeSummary(msg.summary));
           this.streamerConns.set(sender.id, msg.summary.streamId);
           const ch = this.channels.get(this.connKeys.get(sender.id) ?? sender.id);
           if (ch) ch.live = true;
@@ -261,7 +282,7 @@ export default class LobbyServer implements Party.Server {
         case "liveUpdate":
           // Honor only when the sender owns this streamId (04 §12.7).
           if (this.streamerConns.get(sender.id) === msg.summary.streamId) {
-            this.streams.set(msg.summary.streamId, msg.summary);
+            this.streams.set(msg.summary.streamId, sanitizeSummary(msg.summary));
             this.broadcastDirectory();
           }
           break;
@@ -278,6 +299,9 @@ export default class LobbyServer implements Party.Server {
         }
 
         case "score": {
+          // 6.6: non-numeric followers/likes would become NaN in the leaderboard,
+          // sort, and Supabase writes — drop the whole message.
+          if (!Number.isFinite(msg.followers) || !Number.isFinite(msg.likes)) break;
           // Use the key bound at hello; ignore any score.userId switch attempt (04 §12.7).
           // 4.5c-2: ground-truth identity comes from the verified JWT, not client-sent fields.
           const key = this.connKeys.get(sender.id) ?? sender.id;
@@ -309,6 +333,8 @@ export default class LobbyServer implements Party.Server {
           break;
 
         case "feedAlgorithm": {
+          // 6.6: a non-numeric amount would poison Math.min into NaN below.
+          if (!Number.isFinite(msg.amount)) break;
           // Per-connection rate limit (04 §12.7): drop excess messages.
           const lastFeed = this.feedAlgoLastMs.get(sender.id) ?? 0;
           if (now - lastFeed < HARDEN.minFeedIntervalMs) break;

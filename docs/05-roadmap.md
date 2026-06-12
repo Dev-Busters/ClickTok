@@ -778,6 +778,40 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   **DoD:** initial JS chunk < 350KB (`pnpm build` output); full play-through (post → go live →
   results → spectate) works in preview with no chunk-load errors.
 
+- [x] **6.6 — Stream-room input validation (4.5c follow-up).** Code review (2026-06-12) found
+  unvalidated viewer inputs in `party/src/stream.ts` that 4.5c-1 missed:
+  1. **`vote.choiceIndex` is unbounded — room-killing DoS.** `computeTally` does `tally[idx]`,
+     so `{type:"vote", choiceIndex: 1e9}` creates a ~1-billion-slot sparse array that
+     `JSON.stringify` then explodes on. Fix: record `options.length` per poll at `pollOpen`,
+     and drop votes where `!Number.isInteger(choiceIndex) || choiceIndex < 0 || >= optionCount`
+     or the `pollId` is unknown (unknown pollIds currently also accumulate Maps in
+     `votesByPoll` forever — only accept votes for polls opened by the streamer and not closed).
+  2. **`sendGift.tier` relayed verbatim — NaN coin poisoning.** An invented tier reaches the
+     client where `BALANCE.run.giftCoinValue[tier]` is `undefined`, so `collected.coins` becomes
+     `NaN` and propagates into the wallet/save on endRun. Fix: whitelist the four `GiftTier`
+     values server-side; drop anything else.
+  3. **`quickChat.preset` relayed verbatim — arbitrary chat injection.** The client renders
+     `QUICK_CHAT_TEXT[preset] ?? preset`, so a forged preset string shows as literal chat text
+     from any handle (no XSS — React escapes — but spam/impersonation). Fix: whitelist the
+     preset ids server-side (mirror `QUICK_CHAT_TEXT` keys from
+     `client/src/features/livestream/quickChat.ts`; keep both in sync per the types convention).
+  4. **Lobby numeric guards.** In `party/src/lobby.ts`, `score.followers/likes` and
+     `feedAlgorithm.amount` accept any JSON value; non-numbers become `NaN` in the leaderboard,
+     sort, and Supabase writes. Guard with `Number.isFinite` (drop the message otherwise). Also
+     clamp `goLive`/`liveUpdate` summary `viewers`/`hype` to sane ranges (e.g. viewers ≤ 10×
+     what `04` §6 allows at `creatorLevel`, hype 0–100) so a forged directory card can't show
+     absurd numbers.
+  **Refs:** `04` §12.7, `02` §6. **DoD:** a node probe (pattern-match `probe-4.5c1.mjs`) sends
+  each forged payload (1e9 choiceIndex, unknown pollId, fake gift tier, raw-text preset,
+  non-numeric score/amount) and asserts: no crash, nothing invalid relayed/broadcast, valid
+  messages still work; typecheck; `npx partykit deploy` from `party/` after the box is checked.
+
+  **Note:** implemented as `probe-6.6.mjs` (12/12 pass; `probe-4.5c1.mjs` regression still
+  13/13). Item 4's "≤ 10× what `04` §6 allows at `creatorLevel`" is implemented as
+  `maxViewersForLevel(creatorLevel) = round((10 + 0.5·sqrt(10^creatorLevel)) × 10)` — the §6
+  `baseStartViewers + followerSqrtCoeff·sqrt(F)` term at `F = 10^creatorLevel` (the top of that
+  level's follower band, per §12.0), ×10 slack for gear/charisma/trend multipliers.
+
 ---
 
 ## How to update this file

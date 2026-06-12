@@ -4,6 +4,8 @@ import type * as Party from "partykit/server";
 
 type GiftTier = "rose" | "heart" | "galaxy" | "lion";
 
+type QuickChatId = "w" | "fire" | "icon" | "ratio" | "cooked" | "real_one";
+
 type LiveStreamSummary = {
   streamId: string;
   handle: string;
@@ -56,7 +58,7 @@ type StreamClientMessage =
   // viewer →
   | { type: "watch"; handle: string; creatorLevel: number }
   | { type: "hypeTap"; taps: number }
-  | { type: "quickChat"; preset: string }
+  | { type: "quickChat"; preset: QuickChatId }
   | { type: "sendGift"; tier: GiftTier }
   | { type: "vote"; pollId: string; choiceIndex: number };
 
@@ -67,7 +69,7 @@ type StreamServerMessage =
   | { type: "ended"; grade: Grade }
   | { type: "viewerCount"; realViewers: number }
   | { type: "realHype"; fromHandle: string; taps: number }
-  | { type: "realChat"; fromHandle: string; preset: string }
+  | { type: "realChat"; fromHandle: string; preset: QuickChatId }
   | { type: "realGift"; fromHandle: string; tier: GiftTier; atRunSec: number }
   | { type: "voteTally"; pollId: string; tally: number[] };
 
@@ -83,6 +85,12 @@ const HARDEN = {
 // Mirrored from BALANCE.social (04 §12.3); used for server-side shoutout recomputation.
 const SHOUTOUT_FOLLOWERS_PER_LEVEL = 50;
 
+// 6.6: whitelists for viewer-controlled enum fields — mirror client/src/party/types.ts
+// (GiftTier) and client/src/hooks/useStreamRoom.ts QUICK_CHAT_TEXT keys (QuickChatId).
+// Keep all three in sync.
+const VALID_GIFT_TIERS: readonly GiftTier[] = ["rose", "heart", "galaxy", "lion"];
+const VALID_QUICK_CHAT_PRESETS: readonly QuickChatId[] = ["w", "fire", "icon", "ratio", "cooked", "real_one"];
+
 export default class StreamServer implements Party.Server {
   private streamerConnId: string | null = null;
   // Summary from the streamer's `open` message — used to recompute shoutout server-side.
@@ -94,6 +102,9 @@ export default class StreamServer implements Party.Server {
   private latestClockSec = 0;
   // pollId → (connId → choiceIndex) — per-voter record for live tally computation
   private votesByPoll = new Map<string, Map<string, number>>();
+  // 6.6: pollId → options.length for polls opened by the streamer and not yet closed —
+  // bounds vote.choiceIndex and rejects votes for unknown/closed polls.
+  private pollOptionCounts = new Map<string, number>();
   // connId → ms epoch of last quickChat (per-connection rate limit, 04 §12.7)
   private lastQuickChatMs = new Map<string, number>();
   // 4.5c-2: connection id → verified Supabase user.id (populated in onConnect via JWT)
@@ -181,6 +192,7 @@ export default class StreamServer implements Party.Server {
           this.lastGrade = msg.grade;
           // Clear poll state so stale votes from the ended run can't affect the next run.
           this.votesByPoll.clear();
+          this.pollOptionCounts.clear();
           const out: StreamServerMessage = { type: "ended", grade: msg.grade };
           this.party.broadcast(JSON.stringify(out), [sender.id]);
           break;
@@ -188,6 +200,8 @@ export default class StreamServer implements Party.Server {
 
         case "pollOpen": {
           if (!isStreamer) break;
+          // 6.6: record option count so `vote` can bound choiceIndex against this poll.
+          this.pollOptionCounts.set(msg.poll.pollId, msg.poll.options.length);
           const out: StreamServerMessage = { type: "poll", poll: msg.poll };
           this.party.broadcast(JSON.stringify(out), [sender.id]);
           break;
@@ -204,6 +218,7 @@ export default class StreamServer implements Party.Server {
             tally,
           } satisfies StreamServerMessage));
           this.votesByPoll.delete(msg.pollId);
+          this.pollOptionCounts.delete(msg.pollId);
           break;
         }
 
@@ -251,6 +266,8 @@ export default class StreamServer implements Party.Server {
 
         case "quickChat": {
           if (isStreamer) break;
+          // 6.6: drop forged presets — only the known QUICK_CHAT_TEXT ids may be relayed.
+          if (!VALID_QUICK_CHAT_PRESETS.includes(msg.preset)) break;
           const now = Date.now();
           const lastChat = this.lastQuickChatMs.get(sender.id) ?? 0;
           if (now - lastChat < HARDEN.minQuickChatIntervalMs) break;
@@ -270,6 +287,8 @@ export default class StreamServer implements Party.Server {
 
         case "sendGift": {
           if (isStreamer) break;
+          // 6.6: drop forged tiers — an invented tier produces NaN coins client-side.
+          if (!VALID_GIFT_TIERS.includes(msg.tier)) break;
           const streamer = this.streamerConnId
             ? this.party.getConnection(this.streamerConnId)
             : null;
@@ -286,6 +305,12 @@ export default class StreamServer implements Party.Server {
 
         case "vote": {
           if (isStreamer) break;
+          // 6.6: only accept votes for polls opened by the streamer and not yet closed,
+          // and bound choiceIndex against that poll's option count (prevents a
+          // ~billion-slot sparse array in computeTally from a forged choiceIndex).
+          const optionCount = this.pollOptionCounts.get(msg.pollId);
+          if (optionCount === undefined) break;
+          if (!Number.isInteger(msg.choiceIndex) || msg.choiceIndex < 0 || msg.choiceIndex >= optionCount) break;
           if (!this.votesByPoll.has(msg.pollId)) {
             this.votesByPoll.set(msg.pollId, new Map());
           }
