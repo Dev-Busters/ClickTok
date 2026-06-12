@@ -14,6 +14,7 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom'],
           'vendor-framer-motion': ['framer-motion'],
           'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-posthog': ['posthog-js'],
         },
       },
     },

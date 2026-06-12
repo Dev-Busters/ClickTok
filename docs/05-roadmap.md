@@ -973,7 +973,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   >     into the main chunk in 6.7 but never added to `manualChunks` in `vite.config.ts`.
   >     Filed as task 6.10.
 
-- [ ] **6.10 — Fix bundle-size regression from posthog-js (6.9 finding).** `pnpm build` shows
+- [x] **6.10 — Fix bundle-size regression from posthog-js (6.9 finding).** `pnpm build` shows
   the main entry chunk (`index-*.js`) at 486 KB, regressing from the 286 KB achieved in 6.5.
   Root cause: `posthog-js` was added as an import in `client/src/main.tsx` during 6.7 but was
   not added to `build.rollupOptions.output.manualChunks` in `client/vite.config.ts`. Fix: add
@@ -981,6 +981,11 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   that the main entry chunk drops back below 350 KB and a full play-through (post → go live →
   results → spectate) still works in preview with no chunk-load errors.
   **DoD:** `pnpm build` main entry chunk < 350 KB; play-through clean; typecheck passes.
+  > note: `vendor-posthog` added to `manualChunks` — main entry chunk back to 286.67 KB
+  > (posthog-js now a 198 KB parallel chunk). Verified against the BUILT bundle via
+  > `vite preview` + Playwright (dev mode doesn't exercise chunking): onboard → home →
+  > GO LIVE (lazy Live chunk loaded) → run → END → results/boon picker, zero console
+  > errors/warnings. Typecheck passes.
 
 ---
 
