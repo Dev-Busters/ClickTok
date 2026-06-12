@@ -111,8 +111,10 @@ export type StreamServerMessage =
   | { type: "voteTally"; pollId: string; tally: number[] };
 
 // ——— Phase 7 — The Feed (03 §6.5) ———
-export type FeedBoostId =
-  | "coin_surge" | "fan_magnet" | "like_storm" | "lucky_taps" | "hype_seed";
+// 7.5 REWORK: videos modify clicker MECHANICS, not stats (01 §8.3, table 04 §13.5).
+export type FeedModId =
+  | "ring_slow" | "extra_ring" | "wide_window"   // beat_sync mods
+  | "duet_flow" | "core_surge" | "wave_rush";    // duet/core/scheduler mods
 
 export type VideoCard = {
   videoId: string;           // client-generated uuid (like streamId)
@@ -120,7 +122,7 @@ export type VideoCard = {
   creatorLevel: number;
   topic: string;             // trend topic at post time
   captionId: string;         // preset caption template id — NEVER free text
-  boost: FeedBoostId;        // rolled at publish time
+  mod: FeedModId;            // rolled at publish time (was `boost: FeedBoostId` pre-7.5)
   postedAt: number;          // ms epoch — SERVER-stamped on postVideo
   tapCount: number;          // global engagement counter — SERVER-owned
   npc?: boolean;             // server-generated filler (no royalties)

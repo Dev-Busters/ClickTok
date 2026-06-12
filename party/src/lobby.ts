@@ -51,9 +51,11 @@ type LobbyServerMessage =
 // (ephemeral, dropped on disconnect like pre-4.5b behavior).
 type ChannelEntry = ChannelSummary & { userId?: string };
 
-// Phase 7 — The Feed (03 §6.5); unused server-side until 7.3
-type FeedBoostId =
-  | "coin_surge" | "fan_magnet" | "like_storm" | "lucky_taps" | "hype_seed";
+// Phase 7 — The Feed (03 §6.5); unused server-side until 7.5b
+// 7.5 REWORK: videos modify clicker MECHANICS, not stats (01 §8.3, table 04 §13.5).
+type FeedModId =
+  | "ring_slow" | "extra_ring" | "wide_window"
+  | "duet_flow" | "core_surge" | "wave_rush";
 
 type VideoCard = {
   videoId: string;
@@ -61,7 +63,7 @@ type VideoCard = {
   creatorLevel: number;
   topic: string;
   captionId: string;
-  boost: FeedBoostId;
+  mod: FeedModId;
   postedAt: number;
   tapCount: number;
   npc?: boolean;

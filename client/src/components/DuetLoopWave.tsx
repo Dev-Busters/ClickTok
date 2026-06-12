@@ -4,6 +4,7 @@ import { useGameStore } from "../store";
 import { armProgress, isFlowed } from "../features/elements/duetLoop";
 import { BALANCE } from "../features/economy/balance";
 import type { ElementWave } from "../features/elements/types";
+import type { FeedModId } from "../party/types";
 
 const POD_SIZE = 50;
 
@@ -11,13 +12,15 @@ type DuetLoopWaveT = Extract<ElementWave, { element: "duet_loop" }>;
 
 export function DuetLoopWave({ wave, onFlow }: { wave: DuetLoopWaveT; onFlow: () => void }) {
   const tapDuetPod = useGameStore(s => s.tapDuetPod);
+  // 04 §13.5: the active video's mod (if any) widens duet_loop's flow/arm windows.
+  const activeMod = useGameStore(s => s.deck[s.deckIndex]?.mod ?? null);
   // Shared wave clock (01 §8.2 / 06 §3, same precedent as BeatSyncWave): re-render
   // every frame so the armed-pod glow gutter derives from the same clock as the
   // slice's armTimeoutSec check.
   const [, forceTick] = useState(0);
   useAnimationFrame(() => forceTick(t => (t + 1) % 1_000_000));
 
-  const flowed = wave.completed >= BALANCE.elements.duetLoop.pods && isFlowed(wave.firstArmedAt, wave.completed);
+  const flowed = wave.completed >= BALANCE.elements.duetLoop.pods && isFlowed(wave.firstArmedAt, wave.completed, activeMod);
   const firedRef = useRef(false);
   useEffect(() => {
     if (flowed && !firedRef.current) {
@@ -40,6 +43,7 @@ export function DuetLoopWave({ wave, onFlow }: { wave: DuetLoopWaveT; onFlow: ()
           armedAt={wave.armedIndex === i ? wave.armedAt : null}
           done={i < wave.completed}
           flowed={flowed}
+          activeMod={activeMod}
           onTap={() => tapDuetPod()}
         />
       ))}
@@ -47,16 +51,17 @@ export function DuetLoopWave({ wave, onFlow }: { wave: DuetLoopWaveT; onFlow: ()
   );
 }
 
-function DuetPod({ armed, armedAt, done, flowed, onTap }: {
+function DuetPod({ armed, armedAt, done, flowed, activeMod, onTap }: {
   armed: boolean;
   armedAt: number | null;
   done: boolean;
   flowed: boolean;
+  activeMod: FeedModId | null;
   onTap: () => void;
 }) {
   // 04 §13.2: armed pod untapped for armTimeoutSec gutters back to dormant —
   // glow fades out as the timeout approaches (no harsh fail signal).
-  const progress = armed && armedAt ? armProgress(armedAt) : 0;
+  const progress = armed && armedAt ? armProgress(armedAt, activeMod) : 0;
   const glow = armed ? Math.max(0.15, 1 - progress) : 0;
 
   return (

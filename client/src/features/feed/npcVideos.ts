@@ -1,5 +1,5 @@
-import type { VideoCard, FeedBoostId } from "../../party/types";
-import { BOOST_IDS } from "./boosts";
+import type { VideoCard, FeedModId } from "../../party/types";
+import { MOD_IDS } from "./mods";
 
 // Caption template pool: stable ids → template strings.
 // {topic} is substituted at render time. Server whitelists these ids exactly.
@@ -60,7 +60,7 @@ export function generateNpcCard(index: number): VideoCard {
   const rand = mkRng(index);
   const topic  = pick(NPC_TOPICS, rand());
   const handle = pick(NPC_HANDLES, rand());
-  const boost  = pick(BOOST_IDS, rand()) as FeedBoostId;
+  const mod    = pick(MOD_IDS, rand()) as FeedModId;
   const captionId = pick(CAPTION_IDS, rand());
   const creatorLevel = 1 + Math.floor(rand() * 4);
 
@@ -70,7 +70,7 @@ export function generateNpcCard(index: number): VideoCard {
     creatorLevel,
     topic,
     captionId,
-    boost,
+    mod,
     postedAt:  Date.now() - Math.floor(rand() * 3_600_000),
     tapCount:  Math.floor(rand() * 250),
     npc:       true,

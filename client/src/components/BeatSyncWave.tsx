@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useAnimationFrame } from "framer-motion";
 import { useGameStore } from "../store";
 import { ringScale, GRADE_COLOR } from "../features/elements/beatSync";
 import type { BeatGrade, ElementWave } from "../features/elements/types";
+import type { FeedModId } from "../party/types";
 
 const POD_SIZE = 50;
 const SHARD_ANGLES = [-50, 0, 50].map(d => (d * Math.PI) / 180);
@@ -11,6 +12,8 @@ type BeatSyncWaveT = Extract<ElementWave, { element: "beat_sync" }>;
 
 export function BeatSyncWave({ wave, onAllPerfect }: { wave: BeatSyncWaveT; onAllPerfect: () => void }) {
   const tapRing = useGameStore(s => s.tapRing);
+  // 04 §13.5: the active video's mod (if any) modifies beat_sync's shrink/grade windows.
+  const activeMod = useGameStore(s => s.deck[s.deckIndex]?.mod ?? null);
   // Shared wave clock (01 §8.2 / 06 §3): re-render every frame so each ring's
   // scale — driving BOTH the visual and (via tapRing) the grade — stays in sync.
   const [, forceTick] = useState(0);
@@ -37,6 +40,7 @@ export function BeatSyncWave({ wave, onAllPerfect }: { wave: BeatSyncWaveT; onAl
           key={ring.id}
           startedAt={wave.startedAt}
           ring={ring}
+          activeMod={activeMod}
           onTap={() => tapRing(ring.id)}
         />
       ))}
@@ -44,12 +48,13 @@ export function BeatSyncWave({ wave, onAllPerfect }: { wave: BeatSyncWaveT; onAl
   );
 }
 
-function BeatPod({ startedAt, ring, onTap }: {
+function BeatPod({ startedAt, ring, activeMod, onTap }: {
   startedAt: number;
   ring: { id: number; grade?: BeatGrade };
+  activeMod: FeedModId | null;
   onTap: () => void;
 }) {
-  const scale = ringScale(startedAt, ring.id);
+  const scale = ringScale(startedAt, ring.id, activeMod);
   const resolved = !!ring.grade;
   const ringVisible = !resolved && scale > 0 && scale <= 2.2;
 

@@ -5,6 +5,7 @@ import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { BALANCE } from "../../features/economy/balance";
 import { ringScale, gradeForScale, GRADE_MULT } from "../../features/elements/beatSync";
 import { armProgress, isFlowed } from "../../features/elements/duetLoop";
+import { effectiveBeatSyncConfig, effectiveWaveIdleGapSec } from "../../features/feed/mods";
 
 export type ElementsSlice = {
   ownedElements: Partial<Record<ElementId, boolean>>; // ⚠ PERSISTED — SAVE_VERSION bump +
@@ -43,7 +44,11 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
 
   spawnWave: (id) => {
     if (id === "beat_sync") {
-      const rings = Array.from({ length: BALANCE.elements.beatSync.rings }, (_, i) => ({ id: i }));
+      const { deck, deckIndex } = get();
+      const activeMod = deck[deckIndex]?.mod ?? null;
+      // 04 §13.5: `extra_ring` adds a ring to every Beat Sync wave spawned while on screen.
+      const cfg = effectiveBeatSyncConfig(activeMod);
+      const rings = Array.from({ length: cfg.rings }, (_, i) => ({ id: i }));
       set({ activeWave: { element: "beat_sync", startedAt: Date.now(), rings }, lastSpawnedElement: id });
     }
     if (id === "duet_loop") {
@@ -58,12 +63,13 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
   },
 
   tapRing: (ringId) => {
-    const { activeWave, tapPower, multiplier, followerConversion, combo, wallet } = get();
+    const { activeWave, tapPower, multiplier, followerConversion, combo, wallet, deck, deckIndex } = get();
     if (!activeWave || activeWave.element !== "beat_sync") return;
     const ring = activeWave.rings.find(r => r.id === ringId);
     if (!ring || ring.grade) return;
 
-    const grade = gradeForScale(ringScale(activeWave.startedAt, ringId));
+    const activeMod = deck[deckIndex]?.mod ?? null;
+    const grade = gradeForScale(ringScale(activeWave.startedAt, ringId, activeMod), activeMod);
     const gradeMult = GRADE_MULT[grade];
 
     if (gradeMult > 0) {
@@ -89,18 +95,19 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
   },
 
   tapDuetPod: () => {
-    const { activeWave, tapPower, multiplier, followerConversion, combo, wallet } = get();
+    const { activeWave, tapPower, multiplier, followerConversion, combo, wallet, deck, deckIndex } = get();
     if (!activeWave || activeWave.element !== "duet_loop") return;
     if (activeWave.armedIndex === null) return;
 
     const cfg = BALANCE.elements.duetLoop;
+    const activeMod = deck[deckIndex]?.mod ?? null;
     const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
     const completed = activeWave.completed + 1;
 
     // 04 §13.2: pod tap pays podPayout; the final pod ALSO pays flowBonus if the
     // chain completed within flowSec of the wave's first core tap.
     let k = cfg.podPayout * comboMult;
-    if (isFlowed(activeWave.firstArmedAt, completed)) {
+    if (isFlowed(activeWave.firstArmedAt, completed, activeMod)) {
       k += cfg.flowBonus * comboMult;
     }
 
@@ -121,16 +128,20 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
   },
 
   expireOrResolveWave: () => {
-    const { activeWave, openSheet, phase, spectating, ownedElements, nextWaveAt } = get();
+    const { activeWave, openSheet, phase, spectating, ownedElements, nextWaveAt, deck, deckIndex } = get();
     // 01 §8.2 / 04 §13.2: scheduler pauses while a sheet is open or a run/spectate is active.
     if (openSheet !== null || phase !== "idle" || spectating !== null) return;
 
+    const activeMod = deck[deckIndex]?.mod ?? null;
+    // 04 §13.5: `wave_rush` halves the idle gap between waves while its card is on screen.
+    const idleGapMs = effectiveWaveIdleGapSec(activeMod) * 1000;
+
     if (activeWave?.element === "beat_sync") {
-      const cfg = BALANCE.elements.beatSync;
+      const cfg = effectiveBeatSyncConfig(activeMod);
       let changed = false;
       const rings = activeWave.rings.map(r => {
         if (r.grade) return r;
-        const scale = ringScale(activeWave.startedAt, r.id);
+        const scale = ringScale(activeWave.startedAt, r.id, activeMod);
         // Ring expired (shrunk past the OK window) untapped ⇒ MISS.
         if (1 - scale > cfg.windowOk) {
           changed = true;
@@ -155,7 +166,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
             },
           });
         }
-        set({ activeWave: null, nextWaveAt: Date.now() + BALANCE.elements.waveIdleGapSec * 1000 });
+        set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
       }
       return;
     }
@@ -163,12 +174,12 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
     if (activeWave?.element === "duet_loop") {
       const cfg = BALANCE.elements.duetLoop;
       if (activeWave.completed >= cfg.pods) {
-        set({ activeWave: null, nextWaveAt: Date.now() + BALANCE.elements.waveIdleGapSec * 1000 });
+        set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
         return;
       }
       // 04 §13.2: armed pod untapped for armTimeoutSec gutters back to dormant
       // — no penalty, the chain just stalls (completed/firstArmedAt untouched).
-      if (activeWave.armedIndex !== null && activeWave.armedAt !== null && armProgress(activeWave.armedAt) >= 1) {
+      if (activeWave.armedIndex !== null && activeWave.armedAt !== null && armProgress(activeWave.armedAt, activeMod) >= 1) {
         set({ activeWave: { ...activeWave, armedIndex: null, armedAt: null } });
       }
       return;
