@@ -1101,7 +1101,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > exact `4×/2×/1×` of the base unit, an untapped expired ring resolves to MISS (pays 0), and
   > an all-PERFECT wave adds the `perfectWaveBonus` (5×) on top.
 
-- [ ] **7.4 — DUET LOOP (the second element — proves the framework).** Implement per `04` §13.2 +
+- [x] **7.4 — DUET LOOP (the second element — proves the framework).** Implement per `04` §13.2 +
   `06` §3: dormant pods, `engageTap()` arms the next pod (energy beam), armed-pod tap pays
   `podPayout × gainPerPost × comboMult`, `armTimeoutSec` gutters a neglected pod, full chain
   inside `flowSec` pays the FLOW bonus with the triangle flourish. **Pluggability test: this
@@ -1110,6 +1110,26 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   **Refs:** `01` §8.2, `03` §6.5, `04` §13.2, `06` §3. **DoD:** with both elements unlocked the
   scheduler alternates them; the chain pays formula-exact (pods + FLOW verified); timeout stalls
   without penalty; framework diff outside `features/elements/` is ≈zero; typecheck.
+  > note: Added a `duet_loop` catalog entry, one component (`DuetLoopWave.tsx`), and the
+  > `spawnWave`/`tapDuetPod`/`expireOrResolveWave` cases in `elementsSlice` — no framework
+  > surgery; the pre-existing round-robin scheduler picked up the second element with zero
+  > changes, confirming the 7.3 prediction. Two deviations from `03`§6.5's `ElementWave`
+  > duet_loop shape, both additive ephemeral fields: `armedAt` (the armed pod's own
+  > `armTimeoutSec` clock) and `firstArmedAt` (the wave's FIRST core tap, since `flowSec` is
+  > measured from there, not from `startedAt`). The one spec-mandated cross-slice touch is
+  > `feedSlice.engageTap`, which arms the next dormant pod on a TAP CORE tap (per `01`§8.2 —
+  > "`engageTap()` arms the next pod" lives outside `features/elements/` by definition).
+  > Formula-verified via a throwaway `tsx` script built from the real `createElementsSlice`/
+  > `createFeedSlice` (deleted after use): pod tap pays `podPayout × gainPerPost × comboMult`
+  > exactly (e.g. a late, non-flowed pod paid `18.27`, matching `3 × comboMult × gainPerPostCoin`
+  > to float tolerance); a full chain inside `flowSec` adds `flowBonus × gainPerPost × comboMult`
+  > on the final pod; an armed pod left past `armTimeoutSec` gutters to dormant
+  > (`armedIndex/armedAt: null`) with `completed`/`firstArmedAt` untouched — chain stalls, no
+  > penalty. Browser preview (driving `window.gameStore` directly, per the existing dev-only
+  > exposure in `store/index.ts`): unlocked both elements, drove a full duet chain — pods 0→1→2
+  > each flip dormant→"TAP!"→"✓", a fast chain shows the gold **FLOW** banner + triangle
+  > flourish, a stalled armed pod gutters back to dormant pulsing with `completed` preserved, and
+  > `expireOrResolveWave` correctly round-robins to `beat_sync` next. No console errors.
 
 - [ ] **7.5a — Mods catalog + video pager (client-only).** First half of the player-video layer
   per `01` §8.3 — NO server work in this task. Rework `features/feed/boosts.ts` → `mods.ts`
