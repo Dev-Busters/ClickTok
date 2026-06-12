@@ -90,7 +90,6 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     set({
       deckIndex: nextIndex,
       combo: 0,
-      lastTapAt: 0,
       tapsThisCard: 0,
       nextWaveAt: Date.now() + effectiveWaveIdleGapSec(nextMod) * 1000,
     });

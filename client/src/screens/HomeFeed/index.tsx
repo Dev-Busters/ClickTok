@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useGameStore } from "../../store";
 import { BALANCE } from "../../features/economy/balance";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
@@ -7,7 +7,9 @@ import { avatarGradient } from "../../lib/avatar";
 import { formatCount } from "../../lib/format";
 import { VideoCanvas } from "../../components/VideoCanvas";
 import { ElementStage } from "../../components/ElementStage";
-import { generateNpcCard } from "../../features/feed/npcVideos";
+import { generateNpcDeck, formatCaption } from "../../features/feed/npcVideos";
+import { MOD_CATALOG } from "../../features/feed/mods";
+import type { VideoCard } from "../../party/types";
 
 // ── Combo-tier visual progression ───────────────────────────────────────────
 const TIER_COLORS = ["var(--dim)", "var(--cyan)", "var(--red)", "var(--gold)"] as const;
@@ -26,9 +28,8 @@ const PARTICLE_ANGLES = [0, 60, 120, 180, 240, 300].map(d => d * Math.PI / 180);
 type TapFx = { id: number; gainCoins: number; gainFollowers: number };
 let nextFxId = 0;
 
-// ── NPC backdrop pool size ───────────────────────────────────────────────────
-const NPC_POOL = 20;
-const BACKDROP_ROTATE_MS = 15_000;
+// ── Pager (06 §3 task 7.5) ───────────────────────────────────────────────────
+const SWIPE_THRESHOLD_PX = 80;
 
 export function HomeFeed() {
   // Store reads
@@ -45,20 +46,26 @@ export function HomeFeed() {
   const lastTapAt     = useGameStore(s => s.lastTapAt);
   const engageTap     = useGameStore(s => s.engageTap);
   const setSheet      = useGameStore(s => s.setSheet);
+  const deck          = useGameStore(s => s.deck);
+  const deckIndex     = useGameStore(s => s.deckIndex);
+  const setDeck       = useGameStore(s => s.setDeck);
+  const advance       = useGameStore(s => s.advance);
 
   // Local state
   const [tapFxs, setTapFxs]   = useState<TapFx[]>([]);
-  const [npcIdx, setNpcIdx]   = useState(0);
   const fxTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
-  // Rotate NPC backdrop slowly
+  // 7.5a: pad with a local NPC deck (offline-playable; server feed arrives in 7.5b)
   useEffect(() => {
-    const t = setInterval(() => setNpcIdx(i => (i + 1) % NPC_POOL), BACKDROP_ROTATE_MS);
-    return () => clearInterval(t);
-  }, []);
+    if (deck.length === 0) setDeck(generateNpcDeck(BALANCE.feed.feedMinDeck));
+  }, [deck.length, setDeck]);
 
-  // NPC card for backdrop (stable per index)
-  const npcCard = useMemo(() => generateNpcCard(npcIdx), [npcIdx]);
+  const activeCard = deck[deckIndex];
+
+  const handlePagerDragEnd = (_e: unknown, info: PanInfo) => {
+    if (info.offset.y <= -SWIPE_THRESHOLD_PX) advance(1);
+    else if (info.offset.y >= SWIPE_THRESHOLD_PX) advance(-1);
+  };
 
   // Combo-derived display values
   const clampedCombo  = Math.min(combo, BALANCE.feed.comboCap);
@@ -116,19 +123,45 @@ export function HomeFeed() {
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}>
 
-      {/* ── VideoCanvas ambient backdrop ─────────────────────────────────── */}
-      <VideoCanvas
-        seed={npcCard.handle}
-        topic={npcCard.topic}
-        intensity={canvasIntensity}
-      />
+      {/* ── Pager (06 §3 task 7.5): swipe changes backdrop + mod banner ──── */}
+      <motion.div
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.15}
+        onDragEnd={handlePagerDragEnd}
+        style={{ position: 'absolute', inset: 0 }}
+      >
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.div
+            key={activeCard?.videoId ?? "loading"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            style={{ position: 'absolute', inset: 0 }}
+          >
+            {/* VideoCanvas ambient backdrop */}
+            <VideoCanvas
+              seed={activeCard?.handle ?? "fyp"}
+              topic={activeCard?.topic ?? "trending"}
+              intensity={canvasIntensity}
+            />
 
-      {/* ── Dark scrim ───────────────────────────────────────────────────── */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'rgba(0,0,0,0.48)',
-        pointerEvents: 'none',
-      }} />
+            {/* Dark scrim */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(0,0,0,0.48)',
+              pointerEvents: 'none',
+            }} />
+
+            {/* Mod banner pill (06 §3: mod icon + name + effect) */}
+            {activeCard && <ModBanner mod={activeCard.mod} />}
+
+            {/* Poster info: @handle, caption, #topic, tap counter, sound marquee */}
+            <VideoInfoOverlay card={activeCard} />
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
 
       {/* ── Top stat strip ───────────────────────────────────────────────── */}
       <div style={{
@@ -361,10 +394,9 @@ export function HomeFeed() {
         } />
       </div>
 
-      {/* ── Bottom: GO LIVE pill + caption/marquee ───────────────────────── */}
+      {/* ── Bottom: GO LIVE pill (persists across swipes) ────────────────── */}
       <div style={{
-        position: 'absolute', left: 12, right: 76, bottom: 14,
-        display: 'flex', flexDirection: 'column', gap: 7,
+        position: 'absolute', left: 12, bottom: 14,
         pointerEvents: 'none',
         zIndex: 2,
       }}>
@@ -375,14 +407,12 @@ export function HomeFeed() {
           transition={{ type: "spring", stiffness: 520, damping: 24 }}
           style={{
             pointerEvents: 'auto',
-            alignSelf: 'flex-start',
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '7px 14px',
             borderRadius: 999,
             background: 'rgba(255,31,75,0.16)',
             border: '1px solid var(--red)',
             cursor: 'pointer',
-            marginBottom: 2,
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', boxShadow: '0 0 8px var(--red)', animation: 'dot-pulse 1.6s ease-in-out infinite' }} />
@@ -393,25 +423,72 @@ export function HomeFeed() {
             ~{formatCount(projectedViewers)} viewers
           </span>
         </motion.button>
+      </div>
+    </div>
+  );
+}
 
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
-          @{handle}
-        </span>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'rgba(255,255,255,0.92)', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
-          grinding <span style={{ color: 'var(--gold)' }}>#{activeTrend ?? 'fyp'}</span> for the algorithm 🔥
-        </span>
+// ── Pager sub-components (06 §3 task 7.5) ───────────────────────────────────
 
-        {/* Sound marquee */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
-            <path d="M9 18.5A3.5 3.5 0 1 1 5.5 15c.54 0 1.05.12 1.5.34V4h11v3h-8.5v11.5h-.03c.02.16.03.33.03.5Z" />
-          </svg>
-          <div style={{ width: 170, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-            <div style={{ display: 'inline-block', animation: 'marquee 7s linear infinite' }}>
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: '#fff' }}>
-                original sound — {handle} &nbsp;·&nbsp; original sound — {handle} &nbsp;·&nbsp;
-              </span>
-            </div>
+function ModBanner({ mod }: { mod: VideoCard["mod"] }) {
+  const def = MOD_CATALOG[mod];
+  return (
+    <div style={{
+      position: 'absolute', top: 60, left: 12,
+      display: 'flex', alignItems: 'center', gap: 6,
+      maxWidth: 240,
+      padding: '5px 10px',
+      borderRadius: 999,
+      background: 'rgba(0,0,0,0.5)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      pointerEvents: 'none',
+    }}>
+      <span style={{ fontSize: 13, lineHeight: 1 }}>{def.icon}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--cyan)', whiteSpace: 'nowrap' }}>
+        {def.name}
+      </span>
+      <span style={{
+        fontFamily: 'var(--font-ui)', fontSize: 10, color: 'rgba(255,255,255,0.75)',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {def.effectLine}
+      </span>
+    </div>
+  );
+}
+
+function VideoInfoOverlay({ card }: { card: VideoCard | undefined }) {
+  if (!card) return null;
+  return (
+    <div style={{
+      position: 'absolute', left: 12, right: 76, bottom: 56,
+      display: 'flex', flexDirection: 'column', gap: 6,
+      pointerEvents: 'none',
+    }}>
+      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+        @{card.handle}
+      </span>
+      <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'rgba(255,255,255,0.92)', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+        {formatCaption(card.captionId, card.topic)} <span style={{ color: 'var(--gold)' }}>#{card.topic}</span>
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+        </svg>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+          {formatCount(card.tapCount)}
+        </span>
+      </div>
+      {/* Sound marquee */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
+          <path d="M9 18.5A3.5 3.5 0 1 1 5.5 15c.54 0 1.05.12 1.5.34V4h11v3h-8.5v11.5h-.03c.02.16.03.33.03.5Z" />
+        </svg>
+        <div style={{ width: 170, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <div style={{ display: 'inline-block', animation: 'marquee 7s linear infinite' }}>
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: '#fff' }}>
+              original sound — {card.handle} &nbsp;·&nbsp; original sound — {card.handle} &nbsp;·&nbsp;
+            </span>
           </div>
         </div>
       </div>
