@@ -1131,7 +1131,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > flourish, a stalled armed pod gutters back to dormant pulsing with `completed` preserved, and
   > `expireOrResolveWave` correctly round-robins to `beat_sync` next. No console errors.
 
-- [ ] **7.5a — Mods catalog + video pager (client-only).** First half of the player-video layer
+- [x] **7.5a — Mods catalog + video pager (client-only).** First half of the player-video layer
   per `01` §8.3 — NO server work in this task. Rework `features/feed/boosts.ts` → `mods.ts`
   (`FeedModId` catalog per `04` §13.5 table; `VideoCard.boost` → `mod` — mirror BOTH type files
   now, the server consumes them in 7.5b; nothing persisted changes). Vertical snap pager per
@@ -1143,6 +1143,20 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   `wide_window` widens the grade windows and `wave_rush` halves the wave gap, asserted against
   the §13.5 constants; one preview pass: swiping changes video+banner and resets combo, deck
   full and playable offline; typecheck.
+  > note: `mods.ts` exports `MOD_CATALOG`/`MOD_IDS` + 4 effective-config helpers
+  > (`effectiveBeatSyncConfig`, `effectiveDuetLoopConfig`, `effectiveWaveIdleGapSec`,
+  > `coreCoinMult`) read live from `deck[deckIndex]?.mod` by `beatSync.ts`/`duetLoop.ts`/
+  > `elementsSlice`/`feedSlice`/the wave components — single source of truth, mods apply
+  > ONLY while their card is on screen. tsx check (real `mods.ts`): `wide_window` →
+  > windowPerfect 0.08→0.12, windowGood 0.2→0.30, windowOk 0.4→0.60 (all ×1.5); `wave_rush` →
+  > waveIdleGapSec 6→3 (×0.5). HomeFeed: deck auto-fills to `feedMinDeck` (10) NPC cards on
+  > mount; vertical drag pager (Framer `drag="y"`, 80px threshold) crossfades the backdrop +
+  > mod banner pill + poster `@handle`/caption/`#topic`/tap-count/sound-marquee overlay.
+  > Verified via store calls in preview (`advance(1)`): deckIndex 0→1, combo 3→0, mod
+  > duet_flow→ring_slow, nextWaveAt rescheduled +6s (base waveIdleGapSec, ring_slow doesn't
+  > touch the scheduler). Deviation: GO LIVE pill moved to its own static bottom-left slot
+  > (was sharing a flex column with the now-per-card caption/marquee) so it persists across
+  > swipes without colliding with the poster overlay.
 
 - [ ] **7.5b — Server video pool + publish flow.** Second half: server (`party/src/lobby.ts`):
   pool (cap `feedPoolCap`), `postVideo` (stamp `postedAt`, zero `tapCount`, whitelist
