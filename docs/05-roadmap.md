@@ -771,7 +771,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > modifiers/hype/feed → END → results overlay with grade/rewards/boon pick → BACK TO CHANNEL,
   > rewards applied to wallet) both worked with zero console errors.
 
-- [ ] **6.4 — README.** Root `README.md`: what the game is (one paragraph + the prod URL),
+- [x] **6.4 — README.** Root `README.md`: what the game is (one paragraph + the prod URL),
   quickstart (`pnpm install`, `pnpm dev`, copy `client/.env.example` + `party/.env.example` and
   fill from your own Supabase project), architecture map (Vercel client + PartyKit realtime +
   Supabase persistence, with the prod hosts), the docs/ read order + roadmap workflow for
