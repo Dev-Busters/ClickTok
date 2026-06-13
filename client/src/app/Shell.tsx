@@ -25,6 +25,7 @@ export function Shell() {
   const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
   const spectating = useGameStore(s => s.spectating);
   const pendingDrop = useGameStore(s => s.pendingDrop);
+  const royaltyToast = useGameStore(s => s.royaltyToast);
 
   const [idleReport, setIdleReport] = useState<IdleReport | null>(null);
 
@@ -81,6 +82,19 @@ export function Shell() {
 
       {idleReport && (
         <WelcomeBackSheet report={idleReport} onDismiss={() => setIdleReport(null)} />
+      )}
+
+      {/* 7.6: royalty toast — appears on any tab when someone engages your video */}
+      {royaltyToast && (
+        <div style={{
+          position: 'absolute', bottom: 72, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.82)', border: '1px solid var(--dim)',
+          borderRadius: 20, padding: '8px 16px', whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--text)',
+          pointerEvents: 'none', zIndex: 200,
+        }}>
+          {royaltyToast}
+        </div>
       )}
     </div>
   );

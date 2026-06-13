@@ -509,6 +509,36 @@ export default class LobbyServer implements Party.Server {
             cards: this.buildFeed(),
           } satisfies LobbyServerMessage));
           break;
+
+        case "engage": {
+          // 7.6: validate, clamp, bump tapCount, relay royalty to poster.
+          if (!Number.isFinite(msg.taps) || typeof msg.taps !== "number") break;
+          const taps = Math.min(FEED.engageMaxTapsPerMsg, Math.max(0, Math.round(msg.taps)));
+          if (taps === 0) break;
+
+          // Bump tapCount on the card in the pool.
+          const cardIdx = this.feedPool.findIndex(c => c.videoId === msg.videoId);
+          if (cardIdx >= 0) this.feedPool[cardIdx] = {
+            ...this.feedPool[cardIdx],
+            tapCount: (this.feedPool[cardIdx].tapCount ?? 0) + taps,
+          };
+
+          // Relay royalty to poster if their connection is alive.
+          const posterConnId = this.videoPosters.get(msg.videoId);
+          if (posterConnId && posterConnId !== sender.id) {
+            const posterConn = this.party.getConnection(posterConnId);
+            if (posterConn) {
+              const fromCh = this.channels.get(this.connKeys.get(sender.id) ?? sender.id);
+              posterConn.send(JSON.stringify({
+                type: "royalty",
+                videoId: msg.videoId,
+                fromHandle: fromCh?.handle ?? "someone",
+                taps,
+              } satisfies LobbyServerMessage));
+            }
+          }
+          break;
+        }
       }
     } catch {
       // Malformed message — silently drop.

@@ -1178,7 +1178,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > pass: probe B WS (local) received `videoPosted` from A's POST within ~200ms, `tapCount=0`,
   > captionId valid; A's deck top-prepended the new card (deck size 10→11). Zero console errors.
 
-- [ ] **7.6 — Engagement royalties.** Client: batch `tapsThisCard`, send `engage` on swipe-away/
+- [x] **7.6 — Engagement royalties.** Client: batch `tapsThisCard`, send `engage` on swipe-away/
   unmount/tab-change. Server: `Number.isFinite` + clamp to `engageMaxTapsPerMsg`, bump the card's
   `tapCount`, relay `royalty` to the poster's connection when present (key by verified
   userId/handle binding from 4.5c-2). Poster client: `applyRoyalty` grants
@@ -1188,6 +1188,16 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   swipes → A's likes rise by the formula amount with a toast, the card's public counter rises for
   both; probe: `engage` with `taps: 9999` clamps, `taps: "x"` drops; typecheck;
   `npx partykit deploy`.
+  > note: `engage` handler: `!Number.isFinite || typeof !== "number"` drops the message;
+  > `Math.min(FEED.engageMaxTapsPerMsg, Math.max(0, Math.round(taps)))` clamps; taps=0 after
+  > clamp also skips. `videoPosters.get(videoId)` → `party.getConnection()` pattern relays
+  > `royalty` to the poster if still connected; NPC cards never enter `videoPosters` → silent.
+  > Client: `engageTap()` increments `tapsThisCard`; `advance()` flushes via `lobbySendRef` +
+  > optimistic `tapCount` bump on the departing card; `flushEngage()` flushes on HomeFeed
+  > unmount (tab-switch). `applyRoyalty(taps, fromHandle, videoId)` grants
+  > `round(taps × 0.5)` likes, bumps the matching deck card's `tapCount`, shows a 3s toast.
+  > Probe `probe-7.6.mjs` 12/12. Browser two-window pass: viewer B's raw WS sent engage(20);
+  > poster A's `likes` rose by 10 (20 × 0.5 ✓), deck card `tapCount` updated to 20 ✓.
 
 - [ ] **7.7 — Live stage backdrop (kill the last blank center).** Render `VideoCanvas` behind
   BOTH `StreamerLive` and `SpectatorLive` (seed = `streamId` + handle, topic = run topic) with

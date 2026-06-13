@@ -50,6 +50,7 @@ export function HomeFeed() {
   const deckIndex     = useGameStore(s => s.deckIndex);
   const setDeck       = useGameStore(s => s.setDeck);
   const advance       = useGameStore(s => s.advance);
+  const flushEngage   = useGameStore(s => s.flushEngage);
 
   // Local state
   const [tapFxs, setTapFxs]   = useState<TapFx[]>([]);
@@ -112,9 +113,14 @@ export function HomeFeed() {
     fxTimers.current.set(id, timer);
   };
 
-  // Cleanup on unmount
+  // Cleanup on unmount (tab-switch / navigate away): flush engage batch.
   useEffect(() => {
-    return () => { fxTimers.current.forEach(clearTimeout); };
+    return () => {
+      fxTimers.current.forEach(clearTimeout);
+      flushEngage();
+    };
+  // flushEngage is stable (Zustand action ref), empty dep array is correct.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // SVG ring dashoffset (ring fills clockwise from top)
