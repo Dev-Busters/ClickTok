@@ -37,7 +37,7 @@ export type FeedSlice = {
   advance: (dir: 1 | -1) => void;    // swipe: flushes engage batch, resets combo
   flushEngage: () => void;           // (7.6) send engage for current card + reset; called on unmount
   publishVideo: () => VideoCard | null;
-  applyRoyalty: (taps: number, fromHandle: string, videoId?: string) => void;  // (7.6) poster receives likes
+  applyRoyalty: (taps: number, fromHandle: string, videoId?: string, reactions?: Partial<Record<ReactionKind, boolean>>) => void;  // (7.6/8.6) poster receives likes/followers
   reactToCard: (kind: ReactionKind) => boolean; // (8.5) false if already reacted on this video;
                                // pays 04 §13.7 × comboMult (× viral), bumps the local card
                                // counter optimistically, fires SUPERFAN sweep when all 4 done
@@ -137,16 +137,20 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   // scheduler reschedules against the new card's mod (TAP CORE/element stage
   // — including any in-flight activeWave — persist across the swipe).
   advance: (dir) => {
-    const { deck, deckIndex, tapsThisCard } = get();
+    const { deck, deckIndex, tapsThisCard, reactedByVideo } = get();
     if (deck.length === 0) return;
     const nextIndex = Math.min(deck.length - 1, Math.max(0, deckIndex + dir));
     if (nextIndex === deckIndex) return;
 
-    // 7.6: flush engage batch before leaving the card.
-    if (tapsThisCard > 0) {
-      const card = deck[deckIndex];
-      if (card) {
-        lobbySendRef.current?.({ type: "engage", videoId: card.videoId, taps: tapsThisCard } satisfies LobbyClientMessage);
+    // 7.6/8.6: flush engage batch (taps + this card's reactions) before leaving the card.
+    const card = deck[deckIndex];
+    const reactions = card ? reactedByVideo[card.videoId] : undefined;
+    if (card && (tapsThisCard > 0 || reactions)) {
+      lobbySendRef.current?.({
+        type: "engage", videoId: card.videoId, taps: tapsThisCard,
+        ...(reactions ? { reactions } : {}),
+      } satisfies LobbyClientMessage);
+      if (tapsThisCard > 0) {
         // Optimistic tapCount bump so the counter updates locally.
         set({ deck: deck.map((c, i) => i === deckIndex ? { ...c, tapCount: c.tapCount + tapsThisCard } : c) });
       }
@@ -161,13 +165,17 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     });
   },
 
-  // Called on HomeFeed unmount (tab-switch) to flush any pending taps.
+  // Called on HomeFeed unmount (tab-switch) to flush any pending taps + reactions.
   flushEngage: () => {
-    const { deck, deckIndex, tapsThisCard } = get();
-    if (tapsThisCard === 0) return;
+    const { deck, deckIndex, tapsThisCard, reactedByVideo } = get();
     const card = deck[deckIndex];
+    const reactions = card ? reactedByVideo[card.videoId] : undefined;
+    if (tapsThisCard === 0 && !reactions) return;
     if (card) {
-      lobbySendRef.current?.({ type: "engage", videoId: card.videoId, taps: tapsThisCard } satisfies LobbyClientMessage);
+      lobbySendRef.current?.({
+        type: "engage", videoId: card.videoId, taps: tapsThisCard,
+        ...(reactions ? { reactions } : {}),
+      } satisfies LobbyClientMessage);
     }
     set({ tapsThisCard: 0 });
   },
@@ -210,18 +218,34 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     return card;
   },
 
-  // 7.6: poster receives likes from a viewer's engage batch.
-  // Formula: taps × royaltyLikesPerTap (04 §13.4). Also bumps tapCount on the
-  // matching deck card so the poster sees the counter rise immediately.
-  applyRoyalty: (taps, fromHandle, videoId?) => {
+  // 7.6/8.6: poster receives likes (+ followers from reactions) from a viewer's engage batch.
+  // Tap likes: taps × royaltyLikesPerTap (04 §13.4). Reaction royalties (04 §13.7):
+  // royaltyLikesPerReaction likes per like/comment/share, royaltyFollowersPerFollow followers
+  // per follow. Also bumps tapCount on the matching deck card so the poster sees it rise.
+  applyRoyalty: (taps, fromHandle, videoId?, reactions?) => {
     const { wallet, deck } = get();
-    const likesGain = Math.round(taps * BALANCE.feed.royaltyLikesPerTap);
-    const toastMsg = `@${fromHandle} binged your video +${likesGain} ❤️`;
+    const tapLikes = Math.round(taps * BALANCE.feed.royaltyLikesPerTap);
+    const reactionLikes = reactions
+      ? REACTION_KINDS.filter(k => k !== "follow" && reactions[k]).length * BALANCE.feed.royaltyLikesPerReaction
+      : 0;
+    const likesGain = tapLikes + reactionLikes;
+    const followersGain = reactions?.follow ? BALANCE.feed.royaltyFollowersPerFollow : 0;
+
+    const parts: string[] = [];
+    if (likesGain > 0) parts.push(`+${likesGain} ❤️`);
+    if (followersGain > 0) parts.push(`+${followersGain} 👥`);
+    const toastMsg = `@${fromHandle} engaged your video ${parts.join(" ")}`;
+
     const newDeck = videoId
       ? deck.map(c => c.videoId === videoId ? { ...c, tapCount: c.tapCount + taps } : c)
       : deck;
     set({
-      wallet: { ...wallet, likes: wallet.likes + likesGain },
+      wallet: {
+        ...wallet,
+        likes: wallet.likes + likesGain,
+        followers: wallet.followers + followersGain,
+        totalFollowers: wallet.totalFollowers + followersGain,
+      },
       royaltyToast: toastMsg,
       deck: newDeck,
     });

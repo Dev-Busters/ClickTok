@@ -40,7 +40,8 @@ type LobbyClientMessage =
   | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number }
   | { type: "postVideo"; card: VideoCard }
   | { type: "getFeed" }
-  | { type: "engage"; videoId: string; taps: number };
+  | { type: "engage"; videoId: string; taps: number;
+      reactions?: Partial<Record<ReactionKind, boolean>> };
 
 type LobbyServerMessage =
   | { type: "directory"; streams: LiveStreamSummary[] }
@@ -50,7 +51,8 @@ type LobbyServerMessage =
   | { type: "algorithm"; state: AlgorithmState }
   | { type: "feed"; cards: VideoCard[] }
   | { type: "videoPosted"; card: VideoCard }
-  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number;
+      reactions?: Partial<Record<ReactionKind, boolean>> };
 
 // 4.5b: a channel entry, keyed by the Supabase `userId` when known (durable
 // across reconnects/restarts) or the PartyKit connection id for guests
@@ -62,6 +64,10 @@ type ChannelEntry = ChannelSummary & { userId?: string };
 type FeedModId =
   | "ring_slow" | "extra_ring" | "wide_window"
   | "duet_flow" | "core_surge" | "wave_rush";
+
+// (Phase 8.5–8.6) rail reactions — once per player per video; counters SERVER-owned
+type ReactionKind = "like" | "comment" | "share" | "follow";
+const REACTION_KINDS: ReactionKind[] = ["like", "comment", "share", "follow"];
 
 type VideoCard = {
   videoId: string;
@@ -248,6 +254,8 @@ export default class LobbyServer implements Party.Server {
   private npcFeedCards: VideoCard[] = [];
   // (7.6) videoId → poster's connection id, for relaying royalties.
   private videoPosters = new Map<string, string>();
+  // (8.6) connection id → FIFO set of videoIds already reacted-to, cap ~200 (04 §13.7 dedupe).
+  private reactedVideos = new Map<string, Set<string>>();
   // (7.5b) connection id → ms epoch of last postVideo (serverPublishCooldownSec).
   private lastPublishMs = new Map<string, number>();
 
@@ -525,14 +533,45 @@ export default class LobbyServer implements Party.Server {
           // 7.6: validate, clamp, bump tapCount, relay royalty to poster.
           if (!Number.isFinite(msg.taps) || typeof msg.taps !== "number") break;
           const taps = Math.min(FEED.engageMaxTapsPerMsg, Math.max(0, Math.round(msg.taps)));
-          if (taps === 0) break;
 
-          // Bump tapCount on the card in the pool.
+          // 8.6: boolean-clamp reactions; dedupe per connection per videoId (FIFO, cap 200).
+          let reactions: Partial<Record<ReactionKind, boolean>> | undefined;
+          if (msg.reactions && typeof msg.reactions === "object") {
+            const seen = this.reactedVideos.get(sender.id) ?? new Set<string>();
+            if (!seen.has(msg.videoId)) {
+              const clamped: Partial<Record<ReactionKind, boolean>> = {};
+              for (const kind of REACTION_KINDS) {
+                if (msg.reactions[kind] === true) clamped[kind] = true;
+              }
+              if (Object.keys(clamped).length > 0) {
+                reactions = clamped;
+                seen.add(msg.videoId);
+                if (seen.size > 200) {
+                  const oldest = seen.values().next().value;
+                  if (oldest !== undefined) seen.delete(oldest);
+                }
+                this.reactedVideos.set(sender.id, seen);
+              }
+            }
+          }
+
+          if (taps === 0 && !reactions) break;
+
+          // Bump tapCount + reactions counters on the card in the pool.
           const cardIdx = this.feedPool.findIndex(c => c.videoId === msg.videoId);
-          if (cardIdx >= 0) this.feedPool[cardIdx] = {
-            ...this.feedPool[cardIdx],
-            tapCount: (this.feedPool[cardIdx].tapCount ?? 0) + taps,
-          };
+          if (cardIdx >= 0) {
+            const card = this.feedPool[cardIdx];
+            const r = card.reactions ?? { likes: 0, comments: 0, shares: 0 };
+            this.feedPool[cardIdx] = {
+              ...card,
+              tapCount: (card.tapCount ?? 0) + taps,
+              reactions: reactions ? {
+                likes: r.likes + (reactions.like ? 1 : 0),
+                comments: r.comments + (reactions.comment ? 1 : 0),
+                shares: r.shares + (reactions.share ? 1 : 0),
+              } : r,
+            };
+          }
 
           // Relay royalty to poster if their connection is alive.
           const posterConnId = this.videoPosters.get(msg.videoId);
@@ -545,6 +584,7 @@ export default class LobbyServer implements Party.Server {
                 videoId: msg.videoId,
                 fromHandle: fromCh?.handle ?? "someone",
                 taps,
+                ...(reactions ? { reactions } : {}),
               } satisfies LobbyServerMessage));
             }
           }
@@ -560,6 +600,7 @@ export default class LobbyServer implements Party.Server {
     this.connUserIds.delete(conn.id); // 4.5c-2: clean up verified identity
     this.feedAlgoLastMs.delete(conn.id);
     this.lastPublishMs.delete(conn.id);
+    this.reactedVideos.delete(conn.id); // (8.6)
 
     const streamId = this.streamerConns.get(conn.id);
     if (streamId) {

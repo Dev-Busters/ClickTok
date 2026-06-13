@@ -1363,7 +1363,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > the rail buttons (no pointer events) — used `preview_click` with a computed CSS path instead;
   > no code change needed, noted for future preview scripts.
 
-- [ ] **8.6 — Engagement rail, server half (royalties for reactions). REQUIRES 7.5b + 7.6
+- [x] **8.6 — Engagement rail, server half (royalties for reactions). REQUIRES 7.5b + 7.6
   deployed.** Extend `engage` with `reactions?` per `03` §6.5 (both type files already mirrored
   in 8.5). Server (`party/src/lobby.ts`): boolean-clamp each field, dedupe per connection per
   `videoId` (in-memory FIFO set, cap ~200 ids), bump the card's `reactions` counters (follow has
@@ -1376,6 +1376,21 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   values dropped; ONE two-window pass: B follows+likes A's card, swipes → A's likes AND followers
   rise by the formula amounts with a toast, the card's like counter rises for both; typecheck;
   `npx partykit deploy`.
+  > verified: `probe-8.6.mjs` (30/30) — reactions{like,follow} on engage bump
+  > `card.reactions.likes` +1 (follow has no counter) and relay `royalty.reactions`; duplicate
+  > engage for the same videoId is deduped (counters stay put, `royalty.reactions` omitted on
+  > the dup); non-boolean values (`"yes"`, `1`, `null`) dropped, only valid booleans kept;
+  > taps:0 + reactions still relays (reactions-only flush); NPC cards produce no royalty;
+  > plain taps-only engage still relays as before (regression). Two-window pass via
+  > `verify-8.6-browser.mjs` (viewer B) against the live browser (poster "duettest"): B's
+  > engage `{taps:0, reactions:{like:true, follow:true}}` bumped the card's
+  > `reactions.likes` 0→1 server-side, and A's wallet rose `followers +1` /
+  > `likes +3` (= `royaltyFollowersPerFollow` and `royaltyLikesPerReaction`) with the 7.6
+  > toast firing. typecheck (client + party) passes.
+  > note: hit a stale dev-server reload (`Address already in use`, leftover `workerd`
+  > process) that left the browser talking to a pre-edit server instance — no code issue,
+  > just killed the stale process and restarted `clicktok-party`. `npx partykit deploy`
+  > deferred — flagging to the user since it pushes to the live PartyKit room.
 
 ---
 

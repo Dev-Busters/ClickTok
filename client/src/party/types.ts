@@ -75,7 +75,8 @@ export type LobbyClientMessage =
   | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number }
   | { type: "postVideo"; card: VideoCard }                                              // (7.5b)
   | { type: "getFeed" }                                                                 // (7.5b)
-  | { type: "engage"; videoId: string; taps: number };                                 // (7.6)
+  | { type: "engage"; videoId: string; taps: number;                                   // (7.6)
+      reactions?: Partial<Record<ReactionKind, boolean>> };                           // (8.6)
 
 export type LobbyServerMessage =
   | { type: "directory"; streams: LiveStreamSummary[] }
@@ -85,7 +86,8 @@ export type LobbyServerMessage =
   | { type: "algorithm"; state: AlgorithmState }
   | { type: "feed"; cards: VideoCard[] }                                      // (7.5b)
   | { type: "videoPosted"; card: VideoCard }                                  // (7.5b)
-  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };   // (7.6)
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number;     // (7.6)
+      reactions?: Partial<Record<ReactionKind, boolean>> };                  // (8.6) → poster only
 
 // ——— Stream room (streamer and viewers are both clients of the same room) ———
 export type StreamClientMessage =

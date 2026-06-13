@@ -136,8 +136,8 @@ export function useLobby() {
           break;
         }
         case "royalty": {
-          // 7.6: poster receives likes from a viewer's engage batch.
-          useGameStore.getState().applyRoyalty(msg.taps, msg.fromHandle, msg.videoId);
+          // 7.6/8.6: poster receives likes (+ followers from reactions) from a viewer's engage batch.
+          useGameStore.getState().applyRoyalty(msg.taps, msg.fromHandle, msg.videoId, msg.reactions);
           break;
         }
       }
