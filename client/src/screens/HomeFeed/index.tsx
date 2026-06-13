@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState, useRef, useCallback } from "react";
-import { AnimatePresence, motion, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, useAnimationControls, type PanInfo } from "framer-motion";
 import { useGameStore } from "../../store";
 import { BALANCE } from "../../features/economy/balance";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
@@ -8,10 +8,19 @@ import { formatCount } from "../../lib/format";
 import { VideoCanvas } from "../../components/VideoCanvas";
 import { ElementStage } from "../../components/ElementStage";
 import { generateNpcDeck, formatCaption } from "../../features/feed/npcVideos";
-import { MOD_CATALOG } from "../../features/feed/mods";
+import { MOD_CATALOG, viralMult } from "../../features/feed/mods";
 import { TapCore } from "./TapCore";
-import { FloatingTextLayer } from "../../components/fx/FloatingTextLayer";
-import type { VideoCard } from "../../party/types";
+import { FloatingTextLayer, pushFloatText } from "../../components/fx/FloatingTextLayer";
+import type { VideoCard, ReactionKind } from "../../party/types";
+
+// 06 §3 Phase 8: canned comment one-liner pool — cosmetic only, moderation-safe.
+const COMMENT_LINES = [
+  "this is fire", "POV: quality content", "no thoughts just vibes",
+  "underrated‼️", "the algorithm blessed us", "need this on repeat",
+  "okay but why is this so good", "not me watching this 3 times",
+];
+
+const REACTION_ORDER: ReactionKind[] = ["follow", "like", "comment", "share"];
 
 // ── Pager (06 §3 task 7.5 / 8.3 true scroll feel) ────────────────────────────
 const SWIPE_THRESHOLD_PX = 80;
@@ -26,9 +35,7 @@ const cardVariants = {
 
 export function HomeFeed() {
   // Store reads
-  const handle        = useGameStore(s => s.handle);
   const wallet        = useGameStore(s => s.wallet);
-  const comments      = useGameStore(s => s.comments);
   const multiplier    = useGameStore(s => s.multiplier);
   const passiveFollowersPerSec = useGameStore(s => s.passiveFollowersPerSec);
   const activeTrend   = useGameStore(s => s.activeTrend);
@@ -41,6 +48,9 @@ export function HomeFeed() {
   const setDeck       = useGameStore(s => s.setDeck);
   const advance       = useGameStore(s => s.advance);
   const flushEngage   = useGameStore(s => s.flushEngage);
+  const tapPower      = useGameStore(s => s.tapPower);
+  const reactedByVideo = useGameStore(s => s.reactedByVideo);
+  const reactToCard   = useGameStore(s => s.reactToCard);
 
   // 7.5a: pad with a local NPC deck (offline-playable; server feed arrives in 7.5b)
   useEffect(() => {
@@ -78,6 +88,44 @@ export function HomeFeed() {
   const fillFraction    = Math.min(combo, BALANCE.feed.comboCap) / BALANCE.feed.comboCap;
   // 8.4: VIRAL pins canvas intensity to max.
   const canvasIntensity = viralUntil > Date.now() ? 1 : 0.15 + fillFraction * 0.85;
+
+  // 8.5: engagement rail — SUPERFAN sweep flash trigger + canned comment one-liner.
+  const [sweepTrigger, setSweepTrigger] = useState(0);
+  const [commentLine, setCommentLine] = useState<{ text: string; id: number } | null>(null);
+  useEffect(() => {
+    if (!commentLine) return;
+    const t = setTimeout(() => setCommentLine(null), 2500);
+    return () => clearTimeout(t);
+  }, [commentLine]);
+
+  // 04 §13.7: press a rail reaction — computes the float-text gain BEFORE
+  // mutating the store (reactedByVideo/reactions only update on success).
+  const pressReaction = useCallback((kind: ReactionKind): boolean => {
+    if (!activeCard) return false;
+    if (reactedByVideo[activeCard.videoId]?.[kind]) return false;
+
+    const cap = BALANCE.feed.comboCap;
+    const comboMult = 1 + Math.min(combo, cap) * BALANCE.feed.comboPerTap;
+    const vMult = viralMult(viralUntil, Date.now());
+    const reactedAfter = { ...reactedByVideo[activeCard.videoId], [kind]: true };
+    const isSweep = REACTION_ORDER.every(k => reactedAfter[k]);
+
+    const k = (BALANCE.feed.railReactionMult[kind] + (isSweep ? BALANCE.feed.railSweepBonus : 0)) * comboMult * vMult;
+    const gainCoins = tapPower * BALANCE.postCoinConversion * multiplier * k;
+
+    if (!reactToCard(kind)) return false;
+
+    pushFloatText({ text: `+${formatCount(gainCoins)}`, kind: "coin", magnitude: k });
+    if (kind === "comment") {
+      const text = COMMENT_LINES[Math.floor(Math.random() * COMMENT_LINES.length)];
+      setCommentLine({ text, id: Date.now() });
+    }
+    if (isSweep) {
+      pushFloatText({ text: "SUPERFAN!", kind: "callout", magnitude: 0 });
+      setSweepTrigger(t => t + 1);
+    }
+    return true;
+  }, [activeCard, reactedByVideo, combo, viralUntil, tapPower, multiplier, reactToCard]);
 
   // Projected viewers for GO LIVE pill
   const projectedViewers = useMemo(() => {
@@ -197,7 +245,7 @@ export function HomeFeed() {
       {/* ── Arcade FX layer (task 8.2) — payout floats route here ─────────── */}
       <FloatingTextLayer />
 
-      {/* ── Right action rail ────────────────────────────────────────────── */}
+      {/* ── Engagement rail (task 8.5): part of the CARD layer, slides with it ── */}
       <div
         onPointerDown={e => e.stopPropagation()}
         style={{
@@ -206,56 +254,79 @@ export function HomeFeed() {
           zIndex: 2,
         }}
       >
-        <motion.div
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.92 }}
-          transition={{ type: "spring", stiffness: 520, damping: 22 }}
-          style={{ position: 'relative', width: 44, height: 44, cursor: 'pointer' }}
-        >
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%',
-            background: avatarGradient(handle),
-            border: '1.5px solid #fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '17px', color: '#fff' }}>
-              {(handle || "?").slice(0, 2).toUpperCase()}
-            </span>
-          </div>
-          <div style={{
-            position: 'absolute', left: '50%', bottom: '-7px', transform: 'translateX(-50%)',
-            width: 16, height: 16, borderRadius: '50%',
-            background: 'var(--red)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1,
-          }}>
-            +
-          </div>
-        </motion.div>
-
-        <RailStat count={wallet.likes} label="likes" icon={
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="#fff">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-          </svg>
-        } />
-        <RailStat count={comments} label="comments" icon={
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff">
-            <path d="M12 2C6.5 2 2 6 2 11c0 2.6 1.2 4.9 3.2 6.6-.2 1.2-.8 2.6-2 3.6 0 0 2.8.2 5-1.4 1.2.4 2.5.6 3.8.6 5.5 0 10-4 10-9S17.5 2 12 2Z" />
-          </svg>
-        } />
-        <RailStat count={wallet.coins} label="coins" gold icon={
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2">
-            <circle cx="12" cy="12" r="9" fill="rgba(245,166,35,0.2)" />
-            <path d="M12 7v10M9.5 9.2c.6-.8 1.5-1.2 2.5-1.2 1.7 0 3 .9 3 2s-1.3 2-3 2-3 .9-3 2 1.3 2 3 2c1 0 1.9-.4 2.5-1.2" strokeLinecap="round" />
-          </svg>
-        } />
-        <RailStat count={wallet.diamonds} label="diamonds" cyan icon={
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="rgba(37,244,238,0.25)" stroke="var(--cyan)" strokeWidth="1.6" strokeLinejoin="round">
-            <path d="M6 4h12l4 5-10 12L2 9l4-5Z" />
-            <path d="M2 9h20M9 4l3 5 3-5M7 9l5 11 5-11" fill="none" />
-          </svg>
-        } />
+        <FollowBadge
+          card={activeCard}
+          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.follow)}
+          onPress={() => pressReaction("follow")}
+          sweepTrigger={sweepTrigger}
+          sweepDelay={0}
+        />
+        <RailButton
+          count={activeCard?.reactions.likes ?? 0}
+          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.like)}
+          activeColor="var(--red)"
+          onPress={() => pressReaction("like")}
+          sweepTrigger={sweepTrigger}
+          sweepDelay={0.08}
+          icon={
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+          }
+        />
+        <RailButton
+          count={activeCard?.reactions.comments ?? 0}
+          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.comment)}
+          activeColor="var(--cyan)"
+          onPress={() => pressReaction("comment")}
+          sweepTrigger={sweepTrigger}
+          sweepDelay={0.16}
+          icon={
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.5 2 2 6 2 11c0 2.6 1.2 4.9 3.2 6.6-.2 1.2-.8 2.6-2 3.6 0 0 2.8.2 5-1.4 1.2.4 2.5.6 3.8.6 5.5 0 10-4 10-9S17.5 2 12 2Z" />
+            </svg>
+          }
+        />
+        <RailButton
+          count={activeCard?.reactions.shares ?? 0}
+          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.share)}
+          activeColor="var(--gold)"
+          onPress={() => pressReaction("share")}
+          sweepTrigger={sweepTrigger}
+          sweepDelay={0.24}
+          icon={
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17 17 7M9 7h8v8" />
+            </svg>
+          }
+        />
       </div>
+
+      {/* ── Canned comment one-liner (task 8.5): cosmetic, bottom-left ──────── */}
+      <AnimatePresence>
+        {commentLine && (
+          <motion.div
+            key={commentLine.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.25 }}
+            style={{
+              position: 'absolute', left: 12, bottom: 145,
+              maxWidth: 240,
+              padding: '5px 10px',
+              borderRadius: 999,
+              background: 'rgba(0,0,0,0.5)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              pointerEvents: 'none', zIndex: 2,
+            }}
+          >
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: '#fff' }}>
+              💬 {commentLine.text}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Bottom: GO LIVE pill (persists across swipes) ────────────────── */}
       <div style={{
@@ -367,9 +438,8 @@ function VideoInfoOverlay({ card }: { card: VideoCard | undefined }) {
         {formatCaption(card.captionId, card.topic)} <span style={{ color: 'var(--gold)' }}>#{card.topic}</span>
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-        </svg>
+        {/* 06 §3 Phase 8: ❤→👆 — the rail heart is the only heart on screen */}
+        <span style={{ fontSize: 12, lineHeight: 1 }}>👆</span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
           {formatCount(card.tapCount)}
         </span>
@@ -409,28 +479,129 @@ function CurrencyPill({ value, icon, color }: { value: number; icon: string; col
   );
 }
 
-function RailStat({ count, label, icon, gold, cyan }: {
-  count: number; label: string; icon: React.ReactNode; gold?: boolean; cyan?: boolean;
+// 06 §3 Phase 8 (task 8.5): a rail action — icon fills/locks to `activeColor` on
+// a successful (once-per-video) reaction; a spent press shakes ~2px and pays
+// nothing. SUPERFAN sweep: all 4 rail icons flash gold in sequence, staggered
+// by `sweepDelay`.
+function RailButton({ icon, count, active, activeColor, onPress, sweepTrigger, sweepDelay }: {
+  icon: React.ReactNode;
+  count: number;
+  active: boolean;
+  activeColor: string;
+  onPress: () => boolean;
+  sweepTrigger: number;
+  sweepDelay: number;
 }) {
+  const controls = useAnimationControls();
+  const sweepRef = useRef(sweepTrigger);
+
+  useEffect(() => {
+    if (sweepTrigger === sweepRef.current) return;
+    sweepRef.current = sweepTrigger;
+    controls.start({
+      color: ['var(--gold)', activeColor],
+      scale: [1.3, 1],
+      transition: { delay: sweepDelay, duration: 0.4 },
+    });
+  }, [sweepTrigger, controls, activeColor, sweepDelay]);
+
+  const handlePress = () => {
+    if (onPress()) {
+      controls.start({ scale: [1, 1.35, 1], color: activeColor, transition: { duration: 0.3 } });
+    } else {
+      controls.start({ x: [0, -2, 2, -2, 2, 0], transition: { duration: 0.25 } });
+    }
+  };
+
   return (
     <motion.button
-      whileHover={{ scale: 1.18, y: -2 }}
-      whileTap={{ scale: 0.8 }}
-      transition={{ type: "spring", stiffness: 520, damping: 22 }}
-      title={label}
+      onPointerDown={e => { e.stopPropagation(); handlePress(); }}
+      whileHover={{ scale: 1.1 }}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
         background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
       }}
     >
-      <div style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }}>{icon}</div>
+      <motion.div
+        animate={controls}
+        initial={false}
+        style={{ color: active ? activeColor : '#fff', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }}
+      >
+        {icon}
+      </motion.div>
       <span style={{
         fontFamily: 'var(--font-ui)', fontSize: '12px', fontWeight: 600,
-        color: gold ? 'var(--gold)' : cyan ? 'var(--cyan)' : '#fff',
+        color: active ? activeColor : '#fff',
         textShadow: '0 1px 3px rgba(0,0,0,0.6)',
       }}>
         {formatCount(count)}
       </span>
     </motion.button>
+  );
+}
+
+// 06 §3 Phase 8 (task 8.5): poster avatar + follow badge ("+" → "✓" once followed).
+function FollowBadge({ card, active, onPress, sweepTrigger, sweepDelay }: {
+  card: VideoCard | undefined;
+  active: boolean;
+  onPress: () => boolean;
+  sweepTrigger: number;
+  sweepDelay: number;
+}) {
+  const controls = useAnimationControls();
+  const sweepRef = useRef(sweepTrigger);
+  const restColor = active ? 'var(--cyan)' : 'var(--red)';
+
+  useEffect(() => {
+    if (sweepTrigger === sweepRef.current) return;
+    sweepRef.current = sweepTrigger;
+    controls.start({
+      backgroundColor: ['var(--gold)', restColor],
+      scale: [1.3, 1],
+      transition: { delay: sweepDelay, duration: 0.4 },
+    });
+  }, [sweepTrigger, controls, restColor, sweepDelay]);
+
+  const handlePress = () => {
+    if (onPress()) {
+      controls.start({ scale: [1, 1.35, 1], backgroundColor: 'var(--cyan)', transition: { duration: 0.3 } });
+    } else {
+      controls.start({ x: [0, -2, 2, -2, 2, 0], transition: { duration: 0.25 } });
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', width: 44, height: 44 }}>
+      <motion.div
+        whileHover={{ scale: 1.1 }}
+        style={{
+          width: 44, height: 44, borderRadius: '50%',
+          background: avatarGradient(card?.handle ?? "fyp"),
+          border: '1.5px solid #fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: '17px', color: '#fff' }}>
+          {(card?.handle || "?").slice(0, 2).toUpperCase()}
+        </span>
+      </motion.div>
+      <motion.button
+        onPointerDown={e => { e.stopPropagation(); handlePress(); }}
+        animate={controls}
+        initial={false}
+        whileTap={{ scale: 0.85 }}
+        style={{
+          position: 'absolute', left: '50%', bottom: '-7px', transform: 'translateX(-50%)',
+          width: 18, height: 18, borderRadius: '50%',
+          background: restColor,
+          border: 'none', padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1,
+          cursor: 'pointer',
+        }}
+      >
+        {active ? '✓' : '+'}
+      </motion.button>
+    </div>
   );
 }

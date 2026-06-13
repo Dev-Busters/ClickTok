@@ -124,6 +124,15 @@ export const BALANCE = {
     viralSec: 8,                   // VIRAL duration: combo frozen at cap, decay paused
     viralGainMult: 2,              // ALL payouts ×2 while viral (core taps, elements, rail)
     viralExitCombo: 25,            // combo settles here when VIRAL ends (the climb restarts)
+
+    // §13.7 the engagement rail (Phase 8.5–8.6)
+    railReactionMult: { like: 2, comment: 3, share: 4, follow: 5 }, // × gainPerPost × comboMult,
+                                   //   ONCE per video per session (keyed by videoId)
+    railSweepBonus: 6,             // all 4 reactions on one card → +6 × gainPerPost × comboMult
+    royaltyLikesPerReaction: 3,    // SERVER-relayed (8.6): poster gains likes per like/comment/share
+    royaltyFollowersPerFollow: 1,  // SERVER-relayed (8.6): poster gains followers per follow
+    npcSeedLikesMin: 100,          // NPC card seeded counters: likes log-uniform in
+    npcSeedLikesMax: 100000,       //   [min, max]; comments/shares derived (§13.7)
   },
 
   // Phase 7.3 — the element framework (04 §13.2)

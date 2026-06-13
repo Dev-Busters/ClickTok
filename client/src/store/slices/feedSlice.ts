@@ -1,10 +1,15 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
-import type { VideoCard, LobbyClientMessage } from "../../party/types";
+import type { VideoCard, ReactionKind, LobbyClientMessage } from "../../party/types";
 import { BALANCE } from "../../features/economy/balance";
 import { coreCoinMult, effectiveWaveIdleGapSec, viralMult, MOD_IDS } from "../../features/feed/mods";
 import { CAPTION_IDS } from "../../features/feed/npcVideos";
 import { lobbySendRef } from "../../party/socketRefs";
+
+const REACTION_KINDS: ReactionKind[] = ["like", "comment", "share", "follow"];
+const REACTION_COUNTER_KEY: Partial<Record<ReactionKind, keyof VideoCard["reactions"]>> = {
+  like: "likes", comment: "comments", share: "shares",
+};
 
 // Duplicated from useLobby.ts/useStreamRoom.ts (small pure fn, codebase convention).
 function computeCreatorLevel(totalFollowers: number): number {
@@ -23,6 +28,8 @@ export type FeedSlice = {
   tapsThisCard: number;
   publishReadyAt: number;
   royaltyToast: string | null;  // (7.6) ephemeral; auto-cleared after 3s
+  reactedByVideo: Record<string, Partial<Record<ReactionKind, true>>>; // (8.5) session-ephemeral
+                               //   once-per-VIDEO gate, keyed by videoId
 
   engageTap: () => void;       // THE clicker: gainPerPost × comboMult (04 §13.1)
   decayCombo: (dt: number) => void;  // called by channelSlice.tick each frame
@@ -31,6 +38,9 @@ export type FeedSlice = {
   flushEngage: () => void;           // (7.6) send engage for current card + reset; called on unmount
   publishVideo: () => VideoCard | null;
   applyRoyalty: (taps: number, fromHandle: string, videoId?: string) => void;  // (7.6) poster receives likes
+  reactToCard: (kind: ReactionKind) => boolean; // (8.5) false if already reacted on this video;
+                               // pays 04 §13.7 × comboMult (× viral), bumps the local card
+                               // counter optimistically, fires SUPERFAN sweep when all 4 done
 };
 
 export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set, get) => ({
@@ -42,6 +52,7 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   tapsThisCard: 0,
   publishReadyAt: 0,
   royaltyToast: null,
+  reactedByVideo: {},
 
   engageTap: () => {
     const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, activeWave, deck, deckIndex, tapsThisCard } = get();
@@ -117,7 +128,10 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     set({ combo: Math.max(0, combo - BALANCE.feed.comboDecayPerSec * dt) });
   },
 
-  setDeck: (cards) => set({ deck: cards }),
+  // (8.5) defensively default `reactions` on cards from a pre-8.6 server.
+  setDeck: (cards) => set({
+    deck: cards.map(c => ({ ...c, reactions: c.reactions ?? { likes: 0, comments: 0, shares: 0 } })),
+  }),
 
   // 06 §3 pager: swipe changes the active card; combo resets and the wave
   // scheduler reschedules against the new card's mod (TAP CORE/element stage
@@ -178,6 +192,7 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
       mod: MOD_IDS[Math.floor(Math.random() * MOD_IDS.length)],
       postedAt: Date.now(),
       tapCount: 0,
+      reactions: { likes: 0, comments: 0, shares: 0 },
     };
 
     set({
@@ -213,5 +228,49 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     setTimeout(() => {
       if (get().royaltyToast === toastMsg) set({ royaltyToast: null });
     }, 3000);
+  },
+
+  // 04 §13.7: rail reaction — once per video per session, pays
+  // railReactionMult[kind] × gainPerPost × comboMult × viralMult; the 4th
+  // reaction on a card adds railSweepBonus × gainPerPost × comboMult × viralMult.
+  // Rail presses do NOT build combo and video mods do NOT apply.
+  reactToCard: (kind) => {
+    const { deck, deckIndex, reactedByVideo, combo, viralUntil, tapPower, multiplier, followerConversion, wallet } = get();
+    const card = deck[deckIndex];
+    if (!card) return false;
+    if (reactedByVideo[card.videoId]?.[kind]) return false;
+
+    const cap = BALANCE.feed.comboCap;
+    const comboMult = 1 + Math.min(combo, cap) * BALANCE.feed.comboPerTap;
+    const vMult = viralMult(viralUntil, Date.now());
+
+    const reacted = { ...reactedByVideo[card.videoId], [kind]: true as const };
+    const isSweep = REACTION_KINDS.every(k => reacted[k]);
+
+    const k = (BALANCE.feed.railReactionMult[kind] + (isSweep ? BALANCE.feed.railSweepBonus : 0)) * comboMult * vMult;
+    const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * k;
+    const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k;
+    const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * k;
+
+    const counterKey = REACTION_COUNTER_KEY[kind];
+    const newDeck = counterKey
+      ? deck.map((c, i) => i === deckIndex
+          ? { ...c, reactions: { ...c.reactions, [counterKey]: c.reactions[counterKey] + 1 } }
+          : c)
+      : deck;
+
+    set({
+      wallet: {
+        ...wallet,
+        coins: wallet.coins + coinsGain,
+        followers: wallet.followers + followersGain,
+        totalFollowers: wallet.totalFollowers + followersGain,
+        likes: wallet.likes + likesGain,
+      },
+      deck: newDeck,
+      reactedByVideo: { ...reactedByVideo, [card.videoId]: reacted },
+    });
+
+    return true;
   },
 });

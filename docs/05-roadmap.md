@@ -1325,7 +1325,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > AnimatePresence, ring eased (1.4s) down to the viralExitCombo position and resumed normal
   > decay/tier coloring — no snap. typecheck passes (client + party).
 
-- [ ] **8.5 — Engagement rail, client half (the rail finally does something).** Add
+- [x] **8.5 — Engagement rail, client half (the rail finally does something).** Add
   `reactions` to `VideoCard` + `ReactionKind` per `03` §6.5 (⚠ mirror BOTH type files now —
   server consumes them in 8.6; client defensively defaults zeros on server cards missing the
   field). `npcVideos` seeds counters from the card PRNG per `04` §13.7. `feedSlice`:
@@ -1338,6 +1338,30 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   formula-exact (worked example §13.7), the 4th adds the sweep bonus, a repeat `reactToCard`
   returns false and pays zero, and swiping away + back keeps the rail spent — paste numbers.
   ONE preview pass: counters change per card, heart fills, sweep flourish fires; typecheck.
+  > verified (vite-node on real `createFeedSlice`, combo=50 → comboMult=1.25, default
+  > `tapPower=1` → `gainPerPost.coins = tapPower × postCoinConversion × multiplier = 6`):
+  > like → ok=true, coins+15, followers+1.5, likes+1 (= 2×6×1.25 exact).
+  > comment → ok=true, coins+22.5, followers+2.25, likes+1.5 (= 3×6×1.25 exact).
+  > share → ok=true, coins+30, followers+3, likes+2 (= 4×6×1.25 exact).
+  > follow (4th, SUPERFAN sweep) → ok=true, coins+82.5, followers+8.25, likes+5.5
+  >   = base(5×6×1.25=37.5) + sweep(6×6×1.25=45) = 82.5 exact. Card counters →
+  >   {likes:1, comments:1, shares:1}. Wallet totals after sweep: coins+150, followers+15,
+  >   likes+10 — matches §13.7 worked example scaled by 6/10.
+  > repeat `reactToCard("like")` on the same card → ok=false, coins delta=0.
+  > `advance(1)` then `advance(-1)` (swipe away + back to card-a) → deckIndex returns to 0,
+  > `reactedByVideo["card-a"]` still `{like:true, comment:true, share:true, follow:true}`, and
+  > a follow-up `reactToCard("like")` still returns false / pays 0 — rail stays spent.
+  > preview pass (390×844, NPC deck): clicked like/comment/share/follow on one card — counters
+  > went 162→163, 8→9, 4→5, follow badge "+"→"✓"; heart filled red, comment bubble filled cyan,
+  > share arrow filled gold; wallet jumped 38943→39063 coins, 10144→10156 followers,
+  > 106→114 likes (deltas match the formula above for combo=0, k=2/3/4/(5+6)). On the 4th
+  > (follow) reaction the SUPERFAN sweep fired: "SUPERFAN! +66!" gold callout over TAP CORE.
+  > Re-pressing the spent like button paid nothing (wallet unchanged). Swiped to next card and
+  > back — rail still shows all 4 as spent/filled with the same totals. No console errors.
+  > typecheck passes (client + party).
+  > deviation: `(.click())` via raw DOM dispatch did not trigger framer-motion's tap handler on
+  > the rail buttons (no pointer events) — used `preview_click` with a computed CSS path instead;
+  > no code change needed, noted for future preview scripts.
 
 - [ ] **8.6 — Engagement rail, server half (royalties for reactions). REQUIRES 7.5b + 7.6
   deployed.** Extend `engage` with `reactions?` per `03` §6.5 (both type files already mirrored

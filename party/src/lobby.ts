@@ -72,6 +72,7 @@ type VideoCard = {
   mod: FeedModId;
   postedAt: number;
   tapCount: number;
+  reactions: { likes: number; comments: number; shares: number }; // (8.5) rail counters
   npc?: boolean;
 };
 
@@ -184,6 +185,14 @@ const CAPTION_IDS = [
 
 // (7.5b) NPC filler cards padding `feed` replies up to FEED.feedMinDeck —
 // reuses the featured-stream handle/topic pools (06.1 precedent).
+// 04 §13.7 NPC seeding: likes log-uniform in [100, 100000]; comments/shares derived.
+function seedNpcReactions(): VideoCard["reactions"] {
+  const likes = Math.round(10 ** (2 + Math.random() * 3));
+  const comments = Math.round(likes * (0.02 + Math.random() * 0.06));
+  const shares = Math.round(likes * (0.01 + Math.random() * 0.02));
+  return { likes, comments, shares };
+}
+
 function generateNpcVideoCards(count: number): VideoCard[] {
   const handles = shuffle(FEATURED_HANDLES);
   const topics = shuffle(TREND_POOL);
@@ -196,6 +205,7 @@ function generateNpcVideoCards(count: number): VideoCard[] {
     mod: FEED_MOD_IDS[Math.floor(Math.random() * FEED_MOD_IDS.length)],
     postedAt: Date.now() - Math.floor(Math.random() * 3_600_000),
     tapCount: Math.floor(Math.random() * 250),
+    reactions: seedNpcReactions(),
     npc: true,
   }));
 }
@@ -485,6 +495,7 @@ export default class LobbyServer implements Party.Server {
             mod: FEED_MOD_IDS[Math.floor(Math.random() * FEED_MOD_IDS.length)],
             postedAt: now,
             tapCount: 0,
+            reactions: { likes: 0, comments: 0, shares: 0 },
           };
 
           this.feedPool.unshift(card);

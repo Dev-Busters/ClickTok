@@ -1,5 +1,6 @@
 import type { VideoCard, FeedModId } from "../../party/types";
 import { MOD_IDS } from "./mods";
+import { BALANCE } from "../economy/balance";
 
 // Caption template pool: stable ids → template strings.
 // {topic} is substituted at render time. Server whitelists these ids exactly.
@@ -63,6 +64,17 @@ export function generateNpcCard(index: number): VideoCard {
   const mod    = pick(MOD_IDS, rand()) as FeedModId;
   const captionId = pick(CAPTION_IDS, rand());
   const creatorLevel = 1 + Math.floor(rand() * 4);
+  const postedAt = Date.now() - Math.floor(rand() * 3_600_000);
+  const tapCount = Math.floor(rand() * 250);
+
+  // 04 §13.7 NPC seeding: likes log-uniform in [npcSeedLikesMin, npcSeedLikesMax];
+  // comments/shares derived as a fraction of likes.
+  const { npcSeedLikesMin, npcSeedLikesMax } = BALANCE.feed;
+  const logMin = Math.log10(npcSeedLikesMin);
+  const logMax = Math.log10(npcSeedLikesMax);
+  const likes = Math.round(10 ** (logMin + rand() * (logMax - logMin)));
+  const comments = Math.round(likes * (0.02 + rand() * 0.06));
+  const shares = Math.round(likes * (0.01 + rand() * 0.02));
 
   return {
     videoId:      `npc-${index}`,
@@ -71,8 +83,9 @@ export function generateNpcCard(index: number): VideoCard {
     topic,
     captionId,
     mod,
-    postedAt:  Date.now() - Math.floor(rand() * 3_600_000),
-    tapCount:  Math.floor(rand() * 250),
+    postedAt,
+    tapCount,
+    reactions: { likes, comments, shares },
     npc:       true,
   };
 }

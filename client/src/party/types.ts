@@ -122,6 +122,9 @@ export type FeedModId =
   | "ring_slow" | "extra_ring" | "wide_window"   // beat_sync mods
   | "duet_flow" | "core_surge" | "wave_rush";    // duet/core/scheduler mods
 
+// (Phase 8.5–8.6) rail reactions — once per player per video; counters SERVER-owned
+export type ReactionKind = "like" | "comment" | "share" | "follow";
+
 export type VideoCard = {
   videoId: string;           // client-generated uuid (like streamId)
   handle: string;            // poster handle (or NPC name)
@@ -131,5 +134,9 @@ export type VideoCard = {
   mod: FeedModId;            // rolled at publish time (was `boost: FeedBoostId` pre-7.5)
   postedAt: number;          // ms epoch — SERVER-stamped on postVideo
   tapCount: number;          // global engagement counter — SERVER-owned
+  reactions: { likes: number; comments: number; shares: number }; // (8.5) rail counters —
+                             //   NPC cards seeded per `04` §13.7; player cards accrue via
+                             //   `engage`; SERVER defaults zeros on legacy pool cards (8.6);
+                             //   client defaults zeros on cards from a pre-8.6 server
   npc?: boolean;             // server-generated filler (no royalties)
 };
