@@ -1233,7 +1233,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
 > state — no SAVE_VERSION work anywhere.** Economy changes are confined to §13.7–13.8; every
 > existing payout formula is untouched.
 
-- [ ] **8.1 — TAP CORE v2 (the juice pass — zero economy change).** Extract the core button +
+- [x] **8.1 — TAP CORE v2 (the juice pass — zero economy change).** Extract the core button +
   its FX out of `screens/HomeFeed/index.tsx` into `screens/HomeFeed/TapCore.tsx`, then implement
   `06` §3 (Phase 8): tier SKINS (glass/neon/plasma/gold-rush as stacked layers, opacity
   crossfade + tier-up flash — not border recolors), center ♪ glyph, squash-and-stretch press
@@ -1245,6 +1245,13 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   squashes and springs back; no dropped frames with a wave + particles live (use the perf
   overlay/console timing, not screenshots); no payout value changed (no economy file touched);
   typecheck.
+  > implemented: `TapCore.tsx` self-contained (reads store directly, no props). GlassSkin /
+  > NeonSkin (rotating cyan sweep) / PlasmaSkin (dual counter-rotate red blobs) / GoldSkin
+  > (rotating sunburst + shimmer pulse) crossfaded via opacity. ♪ glyph center; TAP label on
+  > idle attract (6s interval) + pre-first-tap. whileTap squash scaleX:1.06/scaleY:0.90 +
+  > spring stiffness:600 damping:20 overshoot release. 2 staggered shockwaves + flash disc,
+  > 8–12 gravity-arc particles (♪/✦ glyphs at tier≥2). fxTimers cap -5 concurrent FX.
+  > No economy files touched. typecheck passes.
 
 - [ ] **8.2 — Arcade floating numbers (the shared FX layer).** New
   `components/fx/FloatingTextLayer.tsx` + module-level `pushFloatText({ text, kind, magnitude })`

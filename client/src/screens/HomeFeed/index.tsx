@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useEffect } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useGameStore } from "../../store";
 import { BALANCE } from "../../features/economy/balance";
@@ -9,24 +9,8 @@ import { VideoCanvas } from "../../components/VideoCanvas";
 import { ElementStage } from "../../components/ElementStage";
 import { generateNpcDeck, formatCaption } from "../../features/feed/npcVideos";
 import { MOD_CATALOG } from "../../features/feed/mods";
+import { TapCore } from "./TapCore";
 import type { VideoCard } from "../../party/types";
-
-// ── Combo-tier visual progression ───────────────────────────────────────────
-const TIER_COLORS = ["var(--dim)", "var(--cyan)", "var(--red)", "var(--gold)"] as const;
-function tierColor(combo: number): string {
-  const idx = BALANCE.feed.comboMilestones.filter(m => combo >= m).length;
-  return TIER_COLORS[Math.min(idx, TIER_COLORS.length - 1)];
-}
-
-// ── SVG ring constants ───────────────────────────────────────────────────────
-const RING_R = 80;
-const RING_SVG = 170;  // viewBox size
-const RING_CIRC = 2 * Math.PI * RING_R;
-const PARTICLE_ANGLES = [0, 60, 120, 180, 240, 300].map(d => d * Math.PI / 180);
-
-// ── Tap effect type ──────────────────────────────────────────────────────────
-type TapFx = { id: number; gainCoins: number; gainFollowers: number };
-let nextFxId = 0;
 
 // ── Pager (06 §3 task 7.5) ───────────────────────────────────────────────────
 const SWIPE_THRESHOLD_PX = 80;
@@ -36,25 +20,17 @@ export function HomeFeed() {
   const handle        = useGameStore(s => s.handle);
   const wallet        = useGameStore(s => s.wallet);
   const comments      = useGameStore(s => s.comments);
-  const tapPower      = useGameStore(s => s.tapPower);
   const multiplier    = useGameStore(s => s.multiplier);
-  const followerConversion = useGameStore(s => s.followerConversion);
   const passiveFollowersPerSec = useGameStore(s => s.passiveFollowersPerSec);
   const activeTrend   = useGameStore(s => s.activeTrend);
   const trendsAvailable = useGameStore(s => s.trendsAvailable);
   const combo         = useGameStore(s => s.combo);
-  const lastTapAt     = useGameStore(s => s.lastTapAt);
-  const engageTap     = useGameStore(s => s.engageTap);
   const setSheet      = useGameStore(s => s.setSheet);
   const deck          = useGameStore(s => s.deck);
   const deckIndex     = useGameStore(s => s.deckIndex);
   const setDeck       = useGameStore(s => s.setDeck);
   const advance       = useGameStore(s => s.advance);
   const flushEngage   = useGameStore(s => s.flushEngage);
-
-  // Local state
-  const [tapFxs, setTapFxs]   = useState<TapFx[]>([]);
-  const fxTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   // 7.5a: pad with a local NPC deck (offline-playable; server feed arrives in 7.5b)
   useEffect(() => {
@@ -68,13 +44,9 @@ export function HomeFeed() {
     else if (info.offset.y >= SWIPE_THRESHOLD_PX) advance(-1);
   };
 
-  // Combo-derived display values
-  const clampedCombo  = Math.min(combo, BALANCE.feed.comboCap);
-  const fillFraction  = clampedCombo / BALANCE.feed.comboCap;
-  const comboMult     = 1 + clampedCombo * BALANCE.feed.comboPerTap;
-  const ringColor     = tierColor(combo);
+  // combo only needed here for canvasIntensity (TapCore reads it from store directly)
+  const fillFraction    = Math.min(combo, BALANCE.feed.comboCap) / BALANCE.feed.comboCap;
   const canvasIntensity = 0.15 + fillFraction * 0.85;
-  const showTapLabel  = lastTapAt === 0;  // "TAP" hint until first session tap
 
   // Projected viewers for GO LIVE pill
   const projectedViewers = useMemo(() => {
@@ -93,38 +65,12 @@ export function HomeFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTrend, trendsAvailable, wallet.followers]);
 
-  // Tap handler
-  const handleCoreTap = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    // Compute gains at current combo (before engageTap increments)
-    const cmult = 1 + clampedCombo * BALANCE.feed.comboPerTap;
-    const gainCoins     = tapPower * BALANCE.postCoinConversion * multiplier * cmult;
-    const gainFollowers = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * cmult;
-
-    const id = nextFxId++;
-    setTapFxs(prev => [...prev.slice(-6), { id, gainCoins, gainFollowers }]);
-    engageTap();
-
-    // Clean up fx after longest animation (1s)
-    const timer = setTimeout(() => {
-      setTapFxs(prev => prev.filter(f => f.id !== id));
-      fxTimers.current.delete(id);
-    }, 1000);
-    fxTimers.current.set(id, timer);
-  };
-
   // Cleanup on unmount (tab-switch / navigate away): flush engage batch.
   useEffect(() => {
-    return () => {
-      fxTimers.current.forEach(clearTimeout);
-      flushEngage();
-    };
+    return () => { flushEngage(); };
   // flushEngage is stable (Zustand action ref), empty dep array is correct.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // SVG ring dashoffset (ring fills clockwise from top)
-  const ringOffset = RING_CIRC * (1 - fillFraction);
 
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}>
@@ -202,143 +148,8 @@ export function HomeFeed() {
       {/* ── Element stage (upper ~35%, waves spawn here) ────────────────── */}
       <ElementStage />
 
-      {/* ── TAP CORE — dead center ───────────────────────────────────────── */}
-      <div style={{
-        position: 'absolute',
-        left: '50%', top: '50%',
-        transform: 'translate(-50%, -50%)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 10,
-        zIndex: 3,
-      }}>
-        {/* Combo multiplier counter */}
-        <div style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: '13px',
-          letterSpacing: '0.1em',
-          color: combo > 0 ? ringColor : 'var(--dim)',
-          transition: 'color 0.3s',
-          minHeight: 18,
-          textAlign: 'center',
-        }}>
-          ×{comboMult.toFixed(2)}
-        </div>
-
-        {/* Ring + button container (220px lets the shockwave expand) */}
-        <div style={{ position: 'relative', width: 220, height: 220 }}>
-
-          {/* SVG combo ring */}
-          <svg
-            width={RING_SVG}
-            height={RING_SVG}
-            style={{
-              position: 'absolute',
-              top: 25, left: 25,
-              transform: 'rotate(-90deg)',
-              transition: 'filter 0.3s',
-              filter: combo > 0 ? `drop-shadow(0 0 6px ${ringColor})` : 'none',
-            }}
-          >
-            {/* Track */}
-            <circle
-              cx={RING_R + 5} cy={RING_R + 5} r={RING_R}
-              fill="none"
-              stroke="rgba(255,255,255,0.08)"
-              strokeWidth="3"
-            />
-            {/* Fill */}
-            <circle
-              cx={RING_R + 5} cy={RING_R + 5} r={RING_R}
-              fill="none"
-              stroke={ringColor}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={RING_CIRC}
-              strokeDashoffset={ringOffset}
-              style={{ transition: 'stroke-dashoffset 0.08s linear, stroke 0.3s' }}
-            />
-          </svg>
-
-          {/* TAP CORE button */}
-          <motion.button
-            onPointerDown={handleCoreTap}
-            animate={{ scale: combo > 0 ? [1, 1.025, 1] : [1, 1.05, 1] }}
-            transition={{
-              duration: combo > 0 ? 1.2 : 2.5,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-            whileTap={{ scale: 0.91 }}
-            style={{
-              position: 'absolute',
-              top: 40, left: 40,
-              width: 140, height: 140,
-              borderRadius: '50%',
-              border: `2px solid ${ringColor}`,
-              background: `radial-gradient(circle at 38% 38%, rgba(255,255,255,0.08), rgba(0,0,0,0.4))`,
-              boxShadow: combo > 0
-                ? `0 0 24px ${ringColor}44, inset 0 0 16px rgba(0,0,0,0.4)`
-                : `0 0 10px rgba(255,255,255,0.05), inset 0 0 12px rgba(0,0,0,0.4)`,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'column',
-              gap: 4,
-              transition: 'border-color 0.3s, box-shadow 0.3s',
-            }}
-          >
-            {/* Concentric ring accent */}
-            <div style={{
-              width: 110, height: 110, borderRadius: '50%',
-              border: `1px solid ${ringColor}33`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'border-color 0.3s',
-            }}>
-              <div style={{
-                width: 80, height: 80, borderRadius: '50%',
-                border: `1px solid ${ringColor}22`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'border-color 0.3s',
-              }}>
-                {showTapLabel && (
-                  <span style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    letterSpacing: '0.22em',
-                    color: 'rgba(255,255,255,0.5)',
-                  }}>
-                    TAP
-                  </span>
-                )}
-              </div>
-            </div>
-          </motion.button>
-
-          {/* ── Tap FX (shockwave + particles, relative to container center) */}
-          <AnimatePresence>
-            {tapFxs.map(fx => (
-              <TapEffect key={fx.id} ringColor={ringColor} />
-            ))}
-          </AnimatePresence>
-        </div>
-
-        {/* ── Floating +N numbers (above the ring container) */}
-        <div style={{ position: 'relative', height: 0, width: 220 }}>
-          <AnimatePresence>
-            {tapFxs.map(fx => (
-              <FloatingGain
-                key={fx.id}
-                gainCoins={fx.gainCoins}
-                gainFollowers={fx.gainFollowers}
-                ringColor={ringColor}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
-      </div>
+      {/* ── TAP CORE v2 — dead center ─────────────────────────────────────── */}
+      <TapCore />
 
       {/* ── Right action rail ────────────────────────────────────────────── */}
       <div
@@ -502,99 +313,6 @@ function VideoInfoOverlay({ card }: { card: VideoCard | undefined }) {
   );
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────────
-
-function TapEffect({ ringColor }: { ringColor: string }) {
-  return (
-    <>
-      {/* Shockwave */}
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0.85 }}
-        animate={{ scale: 2.1, opacity: 0 }}
-        exit={{}}
-        transition={{ duration: 0.42, ease: "easeOut" }}
-        style={{
-          position: 'absolute',
-          top: '50%', left: '50%',
-          width: RING_SVG, height: RING_SVG,
-          marginTop: -(RING_SVG / 2),
-          marginLeft: -(RING_SVG / 2),
-          borderRadius: '50%',
-          border: `2px solid ${ringColor}`,
-          boxShadow: `0 0 10px ${ringColor}66`,
-          pointerEvents: 'none',
-        }}
-      />
-      {/* Particles */}
-      {PARTICLE_ANGLES.map((angle, i) => (
-        <motion.div
-          key={i}
-          initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-          animate={{
-            x: Math.cos(angle) * 68,
-            y: Math.sin(angle) * 68,
-            opacity: 0,
-            scale: 0.4,
-          }}
-          exit={{}}
-          transition={{ duration: 0.38, ease: "easeOut" }}
-          style={{
-            position: 'absolute',
-            top: '50%', left: '50%',
-            width: 5, height: 5,
-            marginTop: -2.5, marginLeft: -2.5,
-            borderRadius: '50%',
-            backgroundColor: ringColor,
-            pointerEvents: 'none',
-          }}
-        />
-      ))}
-    </>
-  );
-}
-
-function FloatingGain({ gainCoins, gainFollowers, ringColor }: {
-  gainCoins: number;
-  gainFollowers: number;
-  ringColor: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 1, y: 0 }}
-      animate={{ opacity: 0, y: -90 }}
-      exit={{}}
-      transition={{ duration: 0.88, ease: "easeOut" }}
-      style={{
-        position: 'absolute',
-        left: '50%',
-        top: -20,  // starts above the ring container top edge
-        transform: 'translateX(-50%)',
-        pointerEvents: 'none',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-      }}
-    >
-      <span style={{
-        fontFamily: 'var(--font-display)',
-        fontSize: '22px',
-        color: ringColor,
-        textShadow: `0 0 12px ${ringColor}88`,
-        lineHeight: 1,
-      }}>
-        +{formatCount(gainCoins)}
-      </span>
-      {gainFollowers >= 0.05 && (
-        <span style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: '10px',
-          color: 'rgba(255,255,255,0.7)',
-          letterSpacing: '0.08em',
-        }}>
-          +{formatCount(gainFollowers)} followers
-        </span>
-      )}
-    </motion.div>
-  );
-}
 
 function CurrencyPill({ value, icon, color }: { value: number; icon: string; color: string }) {
   return (
