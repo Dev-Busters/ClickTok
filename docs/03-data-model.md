@@ -446,6 +446,9 @@ export type FeedModId =
   | "ring_slow" | "extra_ring" | "wide_window"   // beat_sync mods
   | "duet_flow" | "core_surge" | "wave_rush";    // duet/core/scheduler mods
 
+// (Phase 8.5–8.6) rail reactions — once per player per video; counters SERVER-owned
+export type ReactionKind = "like" | "comment" | "share" | "follow";
+
 export type VideoCard = {
   videoId: string;           // client-generated uuid (like streamId)
   handle: string;            // poster handle (or NPC name)
@@ -454,7 +457,11 @@ export type VideoCard = {
   captionId: string;         // preset caption template id — NEVER free text (moderation)
   mod: FeedModId;            // rolled at publish time (was `boost: FeedBoostId` pre-7.5)
   postedAt: number;          // ms epoch — SERVER-stamped on postVideo
-  tapCount: number;          // global engagement counter — SERVER-owned, client value ignored
+  tapCount: number;          // global BINGE-TAP counter — SERVER-owned, client value ignored
+  reactions: { likes: number; comments: number; shares: number }; // (8.5) rail counters —
+                             //   NPC cards: seeded per `04` §13.7; player cards accrue via
+                             //   `engage`; SERVER defaults zeros on legacy pool cards (8.6);
+                             //   client defaults zeros on cards from a pre-8.6 server
   npc?: boolean;             // server-generated filler (no royalties)
 };
 
@@ -462,12 +469,16 @@ export type VideoCard = {
 export type LobbyClientMessageFeed =                 // merge into LobbyClientMessage
   | { type: "postVideo"; card: VideoCard }           // server stamps postedAt, zeroes tapCount
   | { type: "getFeed" }                              // request/response (like getTrendLeaderboard)
-  | { type: "engage"; videoId: string; taps: number }; // batched on swipe-away (clamped, 04 §13)
+  | { type: "engage"; videoId: string; taps: number;  // batched on swipe-away (clamped, 04 §13)
+      reactions?: Partial<Record<ReactionKind, boolean>> }; // (8.6) boolean-clamped; server
+                                                     //   dedupes per connection per videoId
 
 export type LobbyServerMessageFeed =                 // merge into LobbyServerMessage
   | { type: "feed"; cards: VideoCard[] }             // newest-first, NPC-padded to feedMinDeck
   | { type: "videoPosted"; card: VideoCard }         // broadcast on accepted postVideo
-  | { type: "royalty"; videoId: string; fromHandle: string; taps: number }; // → poster only
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number;
+      reactions?: Partial<Record<ReactionKind, boolean>> }; // → poster only (likes/followers
+                                                     //   per `04` §13.7 royalty lines)
 ```
 
 ```ts
@@ -481,8 +492,17 @@ export type FeedSlice = {
   deckIndex: number;           // (7.5)
   tapsThisCard: number;        // (7.6) batched → `engage` on swipe-away/unmount
   publishReadyAt: number;      // (7.5) ms epoch — POST cooldown gate
-  engageTap: () => void;       // THE clicker: gainPerPost × comboMult (× mods after 7.5);
-                               // also arms duet_loop's next pod when its wave is active
+  reactedByVideo: Record<string, Partial<Record<ReactionKind, true>>>; // (8.5) session-ephemeral
+                               //   once-per-VIDEO gate (keyed by videoId so re-swiping a card
+                               //   can't farm it); current card's entry flushes into `engage`
+  viralUntil: number;          // (8.4) ms epoch; > now ⇒ VIRAL: ALL payouts × viralGainMult,
+                               //   combo frozen at cap, decay paused (04 §13.8); 0 = idle
+  engageTap: () => void;       // THE clicker: gainPerPost × comboMult (× mods after 7.5,
+                               // × viralGainMult while viral); arms duet_loop's next pod when
+                               // its wave is active; triggers VIRAL when combo hits comboCap
+  reactToCard: (kind: ReactionKind) => boolean; // (8.5) false if already reacted on this video;
+                               // pays 04 §13.7 × comboMult (× viral), bumps the local card
+                               // counter optimistically, fires SUPERFAN sweep when all 4 done
   setDeck: (cards: VideoCard[]) => void;   // (7.5)
   advance: (dir: 1 | -1) => void;          // (7.5) swipe: flush engage batch, reset combo
   publishVideo: () => VideoCard | null;    // (7.5) null if on cooldown; burst (04 §13.3)

@@ -446,6 +446,21 @@ feed: {
   feedMinDeck: 10,               // pad with NPC cards up to this (server; client offline too)
   engageMaxTapsPerMsg: 120,      // SERVER clamp (≈ tapMaxPerSec × a 15–30s stay, with slack)
   serverPublishCooldownSec: 60,  // SERVER per-connection postVideo rate limit (client gate is 120)
+
+  // §13.7 the engagement rail (Phase 8.5–8.6)
+  railReactionMult: { like: 2, comment: 3, share: 4, follow: 5 }, // × gainPerPost × comboMult,
+                                 //   ONCE per video per session (keyed by videoId)
+  railSweepBonus: 6,             // all 4 reactions on one card → +6 × gainPerPost × comboMult
+  royaltyLikesPerReaction: 3,    // SERVER-relayed: poster gains likes per like/comment/share
+  royaltyFollowersPerFollow: 1,  // SERVER-relayed: poster gains followers per follow
+  npcSeedLikesMin: 100,          // NPC card seeded counters: likes log-uniform in
+  npcSeedLikesMax: 100000,       //   [min, max]; comments/shares derived (§13.7)
+
+  // §13.8 VIRAL overdrive (Phase 8.4)
+  viralBurstMult: 25,            // ring hits comboCap → instant 25 × gainPerPost × comboMult
+  viralSec: 8,                   // VIRAL duration: combo frozen at cap, decay paused
+  viralGainMult: 2,              // ALL payouts ×2 while viral (core taps, elements, rail)
+  viralExitCombo: 25,            // combo settles here when VIRAL ends (the climb restarts)
 },
 
 elements: {
@@ -526,7 +541,52 @@ Rolled uniformly at publish (poster can't pick). Active while that video is on s
 Locked elements ignore their mods (a `ring_slow` card does nothing for a player without
 Beat Sync — visible on the card, which doubles as an advertisement for the unlock).
 
-### 13.6 Tuning guidance
+### 13.7 The engagement rail (Phase 8.5–8.6 — the rail finally does something, `01` §8.6)
+
+Rail counters display the WATCHED card's engagement totals (`card.reactions`), never the
+player's wallet. Each rail action pays once per video per session:
+
+```
+railGain(kind) = railReactionMult[kind] × gainPerPost × comboMult × viralMult
+sweep (all 4 on one card) = railSweepBonus × gainPerPost × comboMult × viralMult, on the 4th
+```
+Rail presses do NOT build combo (same ruling as element taps — only TAP CORE builds it) and
+video mods do NOT apply to rail payouts (`core_surge` is core-tap coins only). The once-per-video
+gate is keyed by `videoId` in `feedSlice.reactedByVideo` (session-ephemeral) — swiping back and
+forth re-shows a card with its rail already spent, so the rail can't be scroll-farmed. A spent
+button gives a small shake and pays nothing.
+
+Worked example (`gainPerPost.coins = 10`, combo 50 ⇒ ×1.25): like 25c, comment 37.5c, share 50c,
+follow 62.5c, sweep +75c ⇒ a full sweep ≈ 250c per fresh card — about one all-PERFECT Beat Sync
+wave, by design.
+
+**Royalties (8.6, extends the 7.6 pipe):** the current card's `reactedByVideo` entry flushes
+with the `engage` batch. Server: clamp each reaction to boolean, dedupe per connection per
+`videoId` (in-memory FIFO set, cap ~200 ids per connection), bump the card's
+`reactions.likes/comments/shares` (follow has no card counter), relay in the `royalty` message.
+Poster client grants `royaltyLikesPerReaction` likes per like/comment/share and
+`royaltyFollowersPerFollow` followers per follow. NPC cards: counters bump, royalties never.
+
+**NPC seeding (8.5):** from the card's existing PRNG —
+`likes = round(10^(2 + r₁ × 3))` (log-uniform 100…100k, the `npcSeedLikes*` bounds),
+`comments = round(likes × (0.02 + r₂ × 0.06))`, `shares = round(likes × (0.01 + r₃ × 0.02))`.
+Player cards start at zeros and accrue real reactions.
+
+### 13.8 VIRAL overdrive (Phase 8.4 — the combo-cap payoff, `01` §8.6)
+
+```
+trigger: combo reaches comboCap while not viral (engageTap)
+burst   = viralBurstMult × gainPerPost × comboMult(cap)     // instant, e.g. 25 × 10 × 1.5 = 375c
+state   : viralUntil = now + viralSec × 1000
+          while viral: ALL payouts × viralGainMult (core taps, element waves, rail, sweep);
+          combo FROZEN at comboCap (no decay, taps don't overfill)
+exit    : combo = viralExitCombo (ring drains smoothly to the floor); decay resumes
+```
+Multiplier stacking is multiplicative and order-free:
+`payout = base × gainPerPost × comboMult × modMult × viralMult`. A full cycle is ≈75 core taps
+(climb 25→100) → burst + 8s of doubled payouts — pump-and-pop beats quiet saturation.
+
+### 13.9 Tuning guidance (was 13.6 — renumbered when §13.7–13.8 landed)
 - Elements should make active feed time worth ~1.5–2× bare tapping, and runs must STILL dominate
   per-minute income (§11 rules everything).
 - The unlock prices are the first real coin sinks outside gear — if players hit 1k followers with
@@ -535,3 +595,10 @@ Beat Sync — visible on the card, which doubles as an advertisement for the unl
 - PERFECT should be hittable by a focused human ~half the time at base speed; tune `windowPerfect`
   (not payouts) first if PostHog shows all-MISS waves.
 - Watch all-PERFECT rate + FLOW rate in PostHog — those are the dopamine spikes; instrument both.
+- (§13.7) A full rail sweep should pay ≈ one all-PERFECT Beat Sync wave per FRESH card. If
+  PostHog shows players scroll-sweeping without tapping (sweeps high, taps/card low), lower
+  `railReactionMult` first, never the sweep flourish. Combo resets on swipe — the rail payouts
+  are deliberately what makes swiping worth that loss.
+- (§13.8) VIRAL is the session heartbeat: target 1–3 triggers per active minute mid-game. If it's
+  rarer, raise `viralExitCombo` (shorter climb); if it's constant, lower it. Instrument viral
+  triggers/session and sweep rate alongside the §13.2 spikes.

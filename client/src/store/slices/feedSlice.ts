@@ -1,8 +1,15 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
-import type { VideoCard } from "../../party/types";
+import type { VideoCard, LobbyClientMessage } from "../../party/types";
 import { BALANCE } from "../../features/economy/balance";
-import { coreCoinMult, effectiveWaveIdleGapSec } from "../../features/feed/mods";
+import { coreCoinMult, effectiveWaveIdleGapSec, MOD_IDS } from "../../features/feed/mods";
+import { CAPTION_IDS } from "../../features/feed/npcVideos";
+import { lobbySendRef } from "../../party/socketRefs";
+
+// Duplicated from useLobby.ts/useStreamRoom.ts (small pure fn, codebase convention).
+function computeCreatorLevel(totalFollowers: number): number {
+  return 1 + Math.floor(Math.log10(Math.max(1, totalFollowers)));
+}
 
 // Phase 7 — EPHEMERAL, never persisted.
 // 7.2 builds the combo/engageTap half; deck/pager/publish/royalty fields activate at 7.5–7.6.
@@ -95,6 +102,42 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     });
   },
 
-  publishVideo: () => null,
+  // 04 §13.3: POST grants an instant burst of publishBurstTaps × gainPerPost
+  // (no combo/mod multiplier), then gates the POST button for publishCooldownSec.
+  publishVideo: () => {
+    const { publishReadyAt, tapPower, multiplier, followerConversion, wallet, handle, activeTrend } = get();
+    if (Date.now() < publishReadyAt) return null;
+
+    const burst = BALANCE.feed.publishBurstTaps;
+    const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * burst;
+    const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * burst;
+    const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * burst;
+
+    const card: VideoCard = {
+      videoId: crypto.randomUUID(),
+      handle,
+      creatorLevel: computeCreatorLevel(wallet.totalFollowers),
+      topic: activeTrend ?? "trending",
+      captionId: CAPTION_IDS[Math.floor(Math.random() * CAPTION_IDS.length)],
+      mod: MOD_IDS[Math.floor(Math.random() * MOD_IDS.length)],
+      postedAt: Date.now(),
+      tapCount: 0,
+    };
+
+    set({
+      wallet: {
+        ...wallet,
+        coins: wallet.coins + coinsGain,
+        followers: wallet.followers + followersGain,
+        totalFollowers: wallet.totalFollowers + followersGain,
+        likes: wallet.likes + likesGain,
+      },
+      publishReadyAt: Date.now() + BALANCE.feed.publishCooldownSec * 1000,
+    });
+
+    lobbySendRef.current?.({ type: "postVideo", card } satisfies LobbyClientMessage);
+    return card;
+  },
+
   applyRoyalty: () => {},
 });

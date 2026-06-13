@@ -72,14 +72,20 @@ export type LobbyClientMessage =
   | { type: "endLive"; streamId: string }
   | { type: "score"; followers: number; likes: number; userId?: string; trend?: string }  // (4.5b) userId/trend persist + scope the leaderboard
   | { type: "getTrendLeaderboard"; trend: string }                                        // (4.5b)
-  | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number };
+  | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number }
+  | { type: "postVideo"; card: VideoCard }                                              // (7.5b)
+  | { type: "getFeed" }                                                                 // (7.5b)
+  | { type: "engage"; videoId: string; taps: number };                                 // (7.6)
 
 export type LobbyServerMessage =
   | { type: "directory"; streams: LiveStreamSummary[] }
   | { type: "trends"; trends: { topic: string; heat: number }[]; rotatesAt: number }
   | { type: "leaderboard"; channels: ChannelSummary[] }                       // global, top followers
   | { type: "trendLeaderboard"; trend: string; channels: ChannelSummary[] }   // (4.5b) per-trend
-  | { type: "algorithm"; state: AlgorithmState };
+  | { type: "algorithm"; state: AlgorithmState }
+  | { type: "feed"; cards: VideoCard[] }                                      // (7.5b)
+  | { type: "videoPosted"; card: VideoCard }                                  // (7.5b)
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };   // (7.6)
 
 // ——— Stream room (streamer and viewers are both clients of the same room) ———
 export type StreamClientMessage =
@@ -127,14 +133,3 @@ export type VideoCard = {
   tapCount: number;          // global engagement counter — SERVER-owned
   npc?: boolean;             // server-generated filler (no royalties)
 };
-
-// Lobby room — Phase 7 message additions (merge into LobbyClientMessage in 7.3):
-export type LobbyClientMessageFeed =
-  | { type: "postVideo"; card: VideoCard }
-  | { type: "getFeed" }
-  | { type: "engage"; videoId: string; taps: number };
-
-export type LobbyServerMessageFeed =
-  | { type: "feed"; cards: VideoCard[] }
-  | { type: "videoPosted"; card: VideoCard }
-  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };

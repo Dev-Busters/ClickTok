@@ -37,14 +37,20 @@ type LobbyClientMessage =
   | { type: "endLive"; streamId: string }
   | { type: "score"; followers: number; likes: number; userId?: string; trend?: string }
   | { type: "getTrendLeaderboard"; trend: string }
-  | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number };
+  | { type: "feedAlgorithm"; kind: "streamStarted" | "watchSec" | "giftCoins"; amount: number }
+  | { type: "postVideo"; card: VideoCard }
+  | { type: "getFeed" }
+  | { type: "engage"; videoId: string; taps: number };
 
 type LobbyServerMessage =
   | { type: "directory"; streams: LiveStreamSummary[] }
   | { type: "trends"; trends: TrendInfo[]; rotatesAt: number }
   | { type: "leaderboard"; channels: ChannelSummary[] }
   | { type: "trendLeaderboard"; trend: string; channels: ChannelSummary[] }
-  | { type: "algorithm"; state: AlgorithmState };
+  | { type: "algorithm"; state: AlgorithmState }
+  | { type: "feed"; cards: VideoCard[] }
+  | { type: "videoPosted"; card: VideoCard }
+  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };
 
 // 4.5b: a channel entry, keyed by the Supabase `userId` when known (durable
 // across reconnects/restarts) or the PartyKit connection id for guests
@@ -68,17 +74,6 @@ type VideoCard = {
   tapCount: number;
   npc?: boolean;
 };
-
-// (7.3) merge into LobbyClientMessage / LobbyServerMessage when wired
-type _LobbyClientMessageFeed =
-  | { type: "postVideo"; card: VideoCard }
-  | { type: "getFeed" }
-  | { type: "engage"; videoId: string; taps: number };
-
-type _LobbyServerMessageFeed =
-  | { type: "feed"; cards: VideoCard[] }
-  | { type: "videoPosted"; card: VideoCard }
-  | { type: "royalty"; videoId: string; fromHandle: string; taps: number };
 
 // Mirrored from client/src/features/social/trends.ts (04 §6: heat 0..1).
 const TREND_POOL = [
@@ -166,6 +161,45 @@ function generateTrends(): TrendInfo[] {
   return shuffle(TREND_POOL).slice(0, TRENDS_SHOWN).map(topic => ({ topic, heat: Math.random() }));
 }
 
+// 04 §13.5 — Phase 7 feed (SERVER-marked values mirrored from client BALANCE.feed)
+const FEED = {
+  feedPoolCap: 50,
+  feedMinDeck: 10,
+  serverPublishCooldownSec: 60,
+  engageMaxTapsPerMsg: 120, // (7.6)
+};
+
+const FEED_MOD_IDS: FeedModId[] = [
+  "ring_slow", "extra_ring", "wide_window", "duet_flow", "core_surge", "wave_rush",
+];
+
+// Mirrored from client/src/features/feed/npcVideos.ts (caption ids only — server
+// never needs the template text, just the whitelist).
+const CAPTION_IDS = [
+  "algo_chose", "pov_algo", "no_sleep", "real_talk", "not_ready", "main_character",
+  "trend_check", "ratio_check", "lowkey_obsessed", "its_giving", "no_thoughts",
+  "out_here", "this_is_it", "unhinged", "literally_me", "your_sign", "day_one",
+  "caught_in_4k", "not_me", "vibes_check",
+];
+
+// (7.5b) NPC filler cards padding `feed` replies up to FEED.feedMinDeck —
+// reuses the featured-stream handle/topic pools (06.1 precedent).
+function generateNpcVideoCards(count: number): VideoCard[] {
+  const handles = shuffle(FEATURED_HANDLES);
+  const topics = shuffle(TREND_POOL);
+  return Array.from({ length: count }, (_, i) => ({
+    videoId: `npc-${i}-${Math.random().toString(36).slice(2, 8)}`,
+    handle: handles[i % handles.length],
+    creatorLevel: 1 + Math.floor(Math.random() * 4),
+    topic: topics[i % topics.length],
+    captionId: CAPTION_IDS[Math.floor(Math.random() * CAPTION_IDS.length)],
+    mod: FEED_MOD_IDS[Math.floor(Math.random() * FEED_MOD_IDS.length)],
+    postedAt: Date.now() - Math.floor(Math.random() * 3_600_000),
+    tapCount: Math.floor(Math.random() * 250),
+    npc: true,
+  }));
+}
+
 export default class LobbyServer implements Party.Server {
   // streamId → summary for all currently-live streams
   private streams = new Map<string, LiveStreamSummary>();
@@ -198,6 +232,15 @@ export default class LobbyServer implements Party.Server {
   private alarmCount = 0;
   private ph: PostHog | null = null;
 
+  // (7.5b) live-posted videos, newest first, capped at FEED.feedPoolCap.
+  private feedPool: VideoCard[] = [];
+  // (7.5b) NPC filler cards used to pad `feed` replies up to FEED.feedMinDeck.
+  private npcFeedCards: VideoCard[] = [];
+  // (7.6) videoId → poster's connection id, for relaying royalties.
+  private videoPosters = new Map<string, string>();
+  // (7.5b) connection id → ms epoch of last postVideo (serverPublishCooldownSec).
+  private lastPublishMs = new Map<string, number>();
+
   constructor(readonly party: Party.Room) {
     const env = party.env as Record<string, string | undefined>;
     const apiKey = env.POSTHOG_API_KEY;
@@ -211,6 +254,7 @@ export default class LobbyServer implements Party.Server {
 
   async onStart() {
     this.featuredCards = this.generateFeaturedCards(FEATURED_MIN_DIRECTORY);
+    this.npcFeedCards = generateNpcVideoCards(FEED.feedMinDeck);
     await this.party.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
     await this.loadLeaderboard();
   }
@@ -421,6 +465,50 @@ export default class LobbyServer implements Party.Server {
           if (amount > 0) this.feedAlgorithm(now, msg.kind, amount);
           break;
         }
+
+        case "postVideo": {
+          // Per-connection publish cooldown (04 §13.3).
+          const lastPublish = this.lastPublishMs.get(sender.id) ?? 0;
+          if (now - lastPublish < FEED.serverPublishCooldownSec * 1000) break;
+          this.lastPublishMs.set(sender.id, now);
+
+          const key = this.connKeys.get(sender.id) ?? sender.id;
+          const ch = this.channels.get(key);
+          const card: VideoCard = {
+            videoId: msg.card.videoId || crypto.randomUUID(),
+            handle: ch?.handle ?? msg.card.handle,
+            creatorLevel: Math.min(10, Math.max(1, Math.round(msg.card.creatorLevel) || 1)),
+            topic: msg.card.topic,
+            // Whitelist captionId server-side (04 §13.3, same pattern as quick-chat presets).
+            captionId: CAPTION_IDS.includes(msg.card.captionId) ? msg.card.captionId : CAPTION_IDS[0],
+            // 04 §13.5: poster doesn't pick their own mod — server rolls it.
+            mod: FEED_MOD_IDS[Math.floor(Math.random() * FEED_MOD_IDS.length)],
+            postedAt: now,
+            tapCount: 0,
+          };
+
+          this.feedPool.unshift(card);
+          if (this.feedPool.length > FEED.feedPoolCap) {
+            const evicted = this.feedPool.splice(FEED.feedPoolCap);
+            for (const e of evicted) this.videoPosters.delete(e.videoId);
+          }
+          this.videoPosters.set(card.videoId, sender.id);
+
+          this.party.broadcast(JSON.stringify({ type: "videoPosted", card } satisfies LobbyServerMessage));
+          this.ph?.capture({
+            distinctId: this.connUserIds.get(sender.id) ?? sender.id,
+            event: "video posted",
+            properties: { video_id: card.videoId, topic: card.topic, mod: card.mod },
+          });
+          break;
+        }
+
+        case "getFeed":
+          sender.send(JSON.stringify({
+            type: "feed",
+            cards: this.buildFeed(),
+          } satisfies LobbyServerMessage));
+          break;
       }
     } catch {
       // Malformed message — silently drop.
@@ -430,6 +518,7 @@ export default class LobbyServer implements Party.Server {
   async onClose(conn: Party.Connection) {
     this.connUserIds.delete(conn.id); // 4.5c-2: clean up verified identity
     this.feedAlgoLastMs.delete(conn.id);
+    this.lastPublishMs.delete(conn.id);
 
     const streamId = this.streamerConns.get(conn.id);
     if (streamId) {
@@ -479,6 +568,13 @@ export default class LobbyServer implements Party.Server {
         featured: true,
       };
     });
+  }
+
+  // (7.5b) Live feedPool, padded with NPC filler up to feedMinDeck.
+  private buildFeed(): VideoCard[] {
+    if (this.feedPool.length >= FEED.feedMinDeck) return this.feedPool;
+    const needed = FEED.feedMinDeck - this.feedPool.length;
+    return [...this.feedPool, ...this.npcFeedCards.slice(0, needed)];
   }
 
   // (6.1) Slightly drift viewers/hype each alarm tick so the rail feels alive.

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../../store";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
@@ -13,6 +14,8 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
   const trendsAvailable = useGameStore(s => s.trendsAvailable);
   const startRun = useGameStore(s => s.startRun);
   const setTab = useGameStore(s => s.setTab);
+  const publishVideo = useGameStore(s => s.publishVideo);
+  const publishReadyAt = useGameStore(s => s.publishReadyAt);
 
   const topic = activeTrend ?? "trending";
   const trendHeat = getTrendHeat(trendsAvailable, topic);
@@ -22,7 +25,18 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
     trendHeat,
   );
 
+  // 04 §13.3: POST button shows a countdown while publishCooldownSec is active.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (now >= publishReadyAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [now, publishReadyAt]);
+  const cooldownSec = Math.max(0, Math.ceil((publishReadyAt - now) / 1000));
+
   const handlePost = () => {
+    const card = publishVideo();
+    if (!card) return;
     setTab('home');
     onClose();
   };
@@ -67,21 +81,22 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
         </div>
 
         <motion.button
-          whileTap={{ scale: 0.97 }}
+          whileTap={cooldownSec === 0 ? { scale: 0.97 } : undefined}
           onClick={handlePost}
+          disabled={cooldownSec > 0}
           style={{
             width: '100%',
             padding: '14px',
             fontFamily: 'var(--font-display)',
             fontSize: '18px',
             letterSpacing: '0.12em',
-            color: 'var(--text)',
+            color: cooldownSec > 0 ? 'var(--dim)' : 'var(--text)',
             background: 'rgba(255,255,255,0.06)',
             border: '1px solid var(--dim)',
-            cursor: 'pointer',
+            cursor: cooldownSec > 0 ? 'default' : 'pointer',
           }}
         >
-          POST
+          {cooldownSec > 0 ? `POST (${cooldownSec}s)` : 'POST'}
         </motion.button>
 
         <div style={{

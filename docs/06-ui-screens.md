@@ -76,7 +76,8 @@ wave events — every tap makes the whole screen breathe.
   one shared rAF clock for wave timing, pods/rings are fixed-size elements scaled via
   `transform`, target 60fps on a phone with the canvas + a wave + particles all live.
 - **Kept from the current build:** right action rail, GO LIVE pill (with ~viewers projection),
-  bottom nav. Rail like/comment act on the current backdrop "video" (cosmetic counts ok v1).
+  bottom nav. ⚠ The rail is REWORKED in the Phase 8 block below — it becomes the watched card's
+  engagement and actually pays (the "cosmetic counts ok v1" ruling is superseded).
 - **First-run coach marks (task 7.8):** 3-step dimmed overlay anchored to real elements —
   (1) TAP CORE "Tap to earn", (2) element stage "Unlock new ways to play", (3) GO LIVE pill
   "Streams pay 10×". Advances per tap, never shows again (`uiSlice.coachMarksSeen`, persisted).
@@ -85,6 +86,68 @@ wave events — every tap makes the whole screen breathe.
   name + effect, e.g. "🎯 WIDE WINDOW — easier PERFECTs on this video"); poster `@handle`,
   caption, `#topic`, and tap-counter overlay bottom-left, TikTok style. TAP CORE, combo, and the
   element stage persist across swipes (combo resets, waves reschedule).
+
+**Phase 8 — second-playtest juice pass (design LOCKED 2026-06-12; `01` §8.6, `04` §13.7–13.8):**
+
+- **Top-zone layout contract (task 8.3).** Fixed bands at the 390×844 reference; nothing renders
+  outside its band, so feed features stop colliding:
+
+  | band | y (≈) | contents |
+  |---|---|---|
+  | stat strip | 0–56 | followers hero + currency pills |
+  | mod banner | 56–88 | the active card's mod pill, centered in its OWN full-width band — nothing else docks here |
+  | element stage | 88–340 | waves + the locked-pod dock (pods live INSIDE the band, below the banner) |
+  | core zone | vertical center | TAP CORE + combo ring + tap FX + floating-text lanes |
+  | left column | bottom-up | GO LIVE pill (persistent, bottom) → poster `@handle`/caption/sound block above it; width clears the rail |
+  | right rail | right edge, lower third | the engagement rail — part of the CARD layer from 8.5 (slides with the card) |
+
+  **Pager feel:** the card layer (backdrop, mod banner, poster block, and — from 8.5 — the rail)
+  follows the finger (translate-Y) during the drag and slides off/in with a spring on release;
+  the HUD (stat strip, element stage, TAP CORE, GO LIVE) stays fixed. The 7.5a crossfade is
+  retired. After ~10s idle on a card (first session only), a small animated swipe-up chevron
+  hints at the scroll.
+- **TAP CORE v2 (task 8.1, zero economy change).** The core is the production centerpiece:
+  - **Tier skins**, not border recolors — same `comboMilestones`: tier 0 "glass" (dim disc,
+    faint inner rings), tier 1 "neon" (slow-rotating cyan conic-gradient sweep), tier 2 "plasma"
+    (two counter-rotating red radial layers), tier 3 "gold rush" (gold sunburst rays + shimmer).
+    Skins are stacked absolutely-positioned layers crossfaded by opacity on tier change, with a
+    tier-up flash ring. A center glyph (♪) replaces the empty middle; "TAP" micro-label only
+    pre-first-tap and during idle attract.
+  - **Press feel:** pointer-down = squash-and-stretch (scaleX 1.06 / scaleY 0.90, ~60ms, glyph
+    stamps down); release = spring overshoot to ~1.05 then settle (stiffness ~600). Shockwave =
+    TWO staggered expanding rings + a brief flash disc whose intensity scales with comboMult.
+    Particles: 8–12 per tap, mixed 3–7px, gravity arcs (up and out, then fall); tier ≥2 mixes in
+    glyph particles (♪ ✦).
+  - **Idle attract:** 6s without a tap → breathing amplitude doubles and the "TAP" label fades
+    back in.
+- **Arcade floating numbers (task 8.2).** One shared `FloatingTextLayer` (mounted once on Home)
+  with an imperative `pushFloatText({ text, kind, magnitude })`; ALL payout text routes through
+  it — core `+N`, element grades, rail payouts, sweep, VIRAL burst:
+  - **Lanes:** 4 spawn lanes (x ≈ −70 / −25 / +25 / +70 from core center) cycled round-robin,
+    ±10px jitter, random −8°…+8° tilt, slight horizontal drift along the rise — consecutive
+    numbers can never overlap.
+  - **Magnitude tiers** vs the current base tap gain: <3× = 16px in tier color; ≥3× = 22px gold
+    with a thin dark outline; ≥10× = 30px, scale-pop entrance (overshoot ~1.3), bold outline,
+    trailing "!".
+  - **Flavor callouts** (center lane, larger): combo tier-ups print NICE! / ON FIRE! /
+    UNSTOPPABLE! / VIRAL!!; the rail sweep prints SUPERFAN!; element grade words keep their `04`
+    colors (PERFECT `--gold`, GOOD `--cyan`, OK `--dim`, MISS `--red`).
+  - Cap ~12 live items (cull oldest); transforms + opacity only.
+- **Engagement rail (task 8.5).** The rail belongs to the CARD and slides with it. Top→bottom:
+  poster avatar + follow `+` (flips to ✓ once followed), ❤ likes, 💬 comments, ↗ shares —
+  counters are THE CARD'S totals (`card.reactions`; NPC cards seeded per `04` §13.7, player
+  cards accrue real ones), never the player's wallet. Each action pays once per video
+  (`04` §13.7): the icon fills/locks (heart fills red, TikTok-style pop), the counter bumps
+  optimistically, the payout floats via the FX layer. A spent button shakes ~2px and pays
+  nothing. All four on one card → SUPERFAN sweep: rail icons flash gold in sequence + callout +
+  bonus. The comment action also floats a canned one-liner from a preset pool ("this is fire",
+  "POV: quality content", …) bottom-left — cosmetic only, moderation-safe. The bottom-left
+  tap-counter icon changes ❤→👆 (binge taps) so the rail heart is the only heart on screen.
+- **VIRAL (task 8.4).** Ring hits full → eruption: full-screen white flash, burst payout as a
+  tier-3 float, the combo ring blazes (animated gradient stroke + heavy glow), the core goes
+  white-hot, `VideoCanvas` intensity pins to 1, and a slim "🔥 VIRAL ×2" banner with a draining
+  time bar sits above the core for `viralSec`. On exit the ring drains smoothly to
+  `viralExitCombo` (never snaps) and the banner pops away.
 
 ## 4. Discover (`screens/Discover/`)
 

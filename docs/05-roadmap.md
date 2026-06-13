@@ -1158,7 +1158,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > (was sharing a flex column with the now-per-card caption/marquee) so it persists across
   > swipes without colliding with the poster overlay.
 
-- [ ] **7.5b — Server video pool + publish flow.** Second half: server (`party/src/lobby.ts`):
+- [x] **7.5b — Server video pool + publish flow.** Second half: server (`party/src/lobby.ts`):
   pool (cap `feedPoolCap`), `postVideo` (stamp `postedAt`, zero `tapCount`, whitelist
   `captionId`, rate-limit `serverPublishCooldownSec`), `getFeed` → `feed` reply (NPC-padded to
   `feedMinDeck`), `videoPosted` broadcast — types were already mirrored in 7.5a. Client:
@@ -1167,6 +1167,16 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   **Refs:** `01` §8.3, `03` §6.5, `04` §13.3, `02` §6. **DoD:** probe: forged `captionId` and
   cooldown-violating `postVideo` dropped, valid post lands in the `feed` reply; ONE two-window
   pass: A POSTs → card in B's deck ≈2s with A's handle/mod; typecheck; `npx partykit deploy`.
+  > note: `postVideo` handler: server-rolls the `mod` (poster never picks their own), zeroes
+  > `tapCount`, stamps `postedAt`, whitelists `captionId` (replaced with `CAPTION_IDS[0]` if
+  > unknown — card still accepted). Per-connection cooldown map (`lastPublishMs`) enforces
+  > `serverPublishCooldownSec`; violating posts are dropped entirely. `buildFeed()` returns
+  > `feedPool` padded with `npcFeedCards` to `feedMinDeck`. Client `publishVideo()` sends a burst
+  > payout (`publishBurstTaps × gainPerPost`, no combo/mod mult per §13.3) and gates the POST
+  > button for `publishCooldownSec`; `useLobby` sends `getFeed` on connect and handles `feed`/
+  > `videoPosted` to keep the deck live. Probe `probe-7.5b.mjs` 15/15. Two-window browser
+  > pass: probe B WS (local) received `videoPosted` from A's POST within ~200ms, `tapCount=0`,
+  > captionId valid; A's deck top-prepended the new card (deck size 10→11). Zero console errors.
 
 - [ ] **7.6 — Engagement royalties.** Client: batch `tapsThisCard`, send `engage` on swipe-away/
   unmount/tab-change. Server: `Number.isFinite` + clamp to `engageMaxTapsPerMsg`, bump the card's
@@ -1197,6 +1207,97 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   the overlay exactly once (reload → never again; old save migrates clean — verify the migration
   via tsx, not the browser); an audit of all 5 tabs + Live (text `preview_snapshot`s, NOT image
   screenshots) shows no unlabeled interactive elements; typecheck.
+
+---
+
+## PHASE 8 — Juice + the engagement rail (second-playtest redesign; design LOCKED 2026-06-12, `01` §8.6)
+
+> From the second playtest (2026-06-12): the TAP CORE press + floating numbers read as
+> placeholder (numbers overlap, all identical); the right rail looks tappable but does nothing
+> and shows the player's own wallet; filling the combo ring has no payoff; the mod banner
+> overlaps the locked pods. Design `01` §8.6 · types `03` §6.5 · numbers `04` §13.7–13.8 ·
+> visuals `06` §3 (Phase 8 block). **The Phase 7 TOKEN DISCIPLINE block applies verbatim.**
+> Ordering: 8.1–8.5 are CLIENT-ONLY and need no Phase 7 leftovers; **8.6 requires 7.5b + 7.6
+> deployed** (it extends the `engage` pipe). 7.7 can land any time; run 7.8's affordance audit
+> AFTER 8.5 so it audits the real rail, not the cosmetic one. **This phase adds ZERO persisted
+> state — no SAVE_VERSION work anywhere.** Economy changes are confined to §13.7–13.8; every
+> existing payout formula is untouched.
+
+- [ ] **8.1 — TAP CORE v2 (the juice pass — zero economy change).** Extract the core button +
+  its FX out of `screens/HomeFeed/index.tsx` into `screens/HomeFeed/TapCore.tsx`, then implement
+  `06` §3 (Phase 8): tier SKINS (glass/neon/plasma/gold-rush as stacked layers, opacity
+  crossfade + tier-up flash — not border recolors), center ♪ glyph, squash-and-stretch press
+  with spring-overshoot release, two staggered shockwave rings + flash disc scaling with
+  comboMult, 8–12 gravity-arc particles (glyph particles at tier ≥2), idle attract after 6s.
+  Transforms + opacity ONLY; the §3 performance rules bind.
+  **Refs:** `01` §8.6, `06` §3 (Phase 8 + performance rules). **DoD:** preview at 390px: driving
+  `combo` through the store shows 4 clearly distinct skins + a tier-up flash; press visibly
+  squashes and springs back; no dropped frames with a wave + particles live (use the perf
+  overlay/console timing, not screenshots); no payout value changed (no economy file touched);
+  typecheck.
+
+- [ ] **8.2 — Arcade floating numbers (the shared FX layer).** New
+  `components/fx/FloatingTextLayer.tsx` + module-level `pushFloatText({ text, kind, magnitude })`
+  (tiny event-bus pattern, no store churn per tap). Route ALL payout text through it: core `+N`s
+  (replace `FloatingGain`), Beat Sync grade words, Duet pod payouts + FLOW, and leave it ready
+  for rail/viral (8.4–8.5 call the same API). Lanes/jitter/tilt/drift, magnitude tiers, flavor
+  callouts on combo tier-ups, ≤12 live items — all per `06` §3 (Phase 8).
+  **Refs:** `06` §3 (Phase 8), `04` §13.1–13.2 (what each text represents). **DoD:** preview:
+  10 rapid core taps → numbers visibly scatter across lanes, zero overlapping pairs; a PERFECT
+  ring pays through the same layer in `--gold`; a ≥10× payout (force via store) renders the
+  tier-3 pop; combo tier-up prints its callout; typecheck.
+
+- [ ] **8.3 — Top-zone layout contract + true scroll feel.** Implement the `06` §3 band table:
+  `ModBanner` moves into its OWN centered full-width band (y 56–88); `ElementStage`'s pod dock
+  shifts below it — banner and pods may never overlap. Pager upgrade: the card layer (backdrop +
+  banner + poster block) translate-Y follows the finger during drag and slides off/in with a
+  spring on release (retire the crossfade); HUD stays fixed; idle swipe-up chevron hint per `06`
+  §3. This is the groundwork the scrolling loop (7.5b/7.6 feed) renders into.
+  **Refs:** `01` §8.6, `06` §3 (Phase 8 band table). **DoD:** `preview_snapshot` at 390×844 with
+  a duet_flow card active: banner and locked-pod bounding boxes are disjoint; mid-drag the card
+  visibly tracks the finger, release past threshold slides to the next card, under threshold
+  springs back; combo still resets + waves still reschedule on swipe; typecheck.
+
+- [ ] **8.4 — VIRAL overdrive (the combo-cap payoff).** `feedSlice`: `viralUntil` (ephemeral);
+  `engageTap` triggers VIRAL at `comboCap` per `04` §13.8 (burst payout, freeze combo, pause
+  decay), exit to `viralExitCombo`. Add ONE shared `viralMult()` helper (in `features/feed/mods.ts`
+  beside the mod helpers) and wire it into every payout path — core taps, Beat Sync resolutions,
+  Duet pods/FLOW — so future payout code can't forget it (rail consumes it in 8.5). Visuals per
+  `06` §3: eruption flash, blazing ring, white-hot core, canvas intensity pinned, "🔥 VIRAL ×2"
+  banner with time bar, smooth drain on exit.
+  **Refs:** `01` §8.6, `03` §6.5 (feedSlice), `04` §13.8, `06` §3 (Phase 8). **DoD:** tsx script
+  on the REAL slices: burst pays `viralBurstMult × gainPerPost × comboMult(cap)` exactly; during
+  viral a core tap and a PERFECT ring both pay exactly ×2 their non-viral value; decay during
+  viral = 0; exit sets combo to 25 and decay resumes — paste the numbers in the note. ONE preview
+  pass: eruption → banner countdown → smooth drain visible; typecheck.
+
+- [ ] **8.5 — Engagement rail, client half (the rail finally does something).** Add
+  `reactions` to `VideoCard` + `ReactionKind` per `03` §6.5 (⚠ mirror BOTH type files now —
+  server consumes them in 8.6; client defensively defaults zeros on server cards missing the
+  field). `npcVideos` seeds counters from the card PRNG per `04` §13.7. `feedSlice`:
+  `reactedByVideo` + `reactToCard(kind)` (once per videoId, pays §13.7 × comboMult × viralMult,
+  optimistic counter bump, SUPERFAN sweep on the 4th). Rail rework per `06` §3: rail joins the
+  CARD layer (slides with it); counters = the card's totals; follow `+`→✓, heart fills, spent
+  buttons shake and pay nothing; canned comment one-liner; bottom-left counter icon ❤→👆. Fully
+  playable offline against the NPC deck. Rail presses do NOT build combo; mods do NOT apply.
+  **Refs:** `01` §8.6, `03` §6.5, `04` §13.7, `06` §3 (Phase 8). **DoD:** tsx: each reaction pays
+  formula-exact (worked example §13.7), the 4th adds the sweep bonus, a repeat `reactToCard`
+  returns false and pays zero, and swiping away + back keeps the rail spent — paste numbers.
+  ONE preview pass: counters change per card, heart fills, sweep flourish fires; typecheck.
+
+- [ ] **8.6 — Engagement rail, server half (royalties for reactions). REQUIRES 7.5b + 7.6
+  deployed.** Extend `engage` with `reactions?` per `03` §6.5 (both type files already mirrored
+  in 8.5). Server (`party/src/lobby.ts`): boolean-clamp each field, dedupe per connection per
+  `videoId` (in-memory FIFO set, cap ~200 ids), bump the card's `reactions` counters (follow has
+  no counter), default zeros on legacy pool cards, relay `reactions` in `royalty`. Client flush:
+  the current card's `reactedByVideo` entry rides the existing swipe-away `engage` batch. Poster
+  client: `royaltyLikesPerReaction` likes per like/comment/share + `royaltyFollowersPerFollow`
+  followers per follow, folded into the 7.6 toast. NPC cards: counters only, never royalties.
+  **Refs:** `01` §8.6, `03` §6.5, `04` §13.7, `02` §6. **DoD:** probe (pattern `probe-6.6.mjs`):
+  duplicate engage-with-reactions for the same videoId bumps counters ONCE; non-boolean reaction
+  values dropped; ONE two-window pass: B follows+likes A's card, swipes → A's likes AND followers
+  rise by the formula amounts with a toast, the card's like counter rises for both; typecheck;
+  `npx partykit deploy`.
 
 ---
 

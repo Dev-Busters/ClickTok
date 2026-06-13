@@ -87,6 +87,8 @@ export function useLobby() {
       if (trend) {
         socket.send(JSON.stringify({ type: "getTrendLeaderboard", trend } satisfies LobbyClientMessage));
       }
+      // 7.5b: replace the local NPC fallback deck with the server's feed pool.
+      socket.send(JSON.stringify({ type: "getFeed" } satisfies LobbyClientMessage));
     });
 
     socket.addEventListener("close", startFallback);
@@ -112,6 +114,27 @@ export function useLobby() {
         case "algorithm":
           setAlgorithm(msg.state);
           break;
+        case "feed": {
+          // 7.5b: server feed replaces the 7.5a local NPC fallback deck.
+          if (msg.cards.length === 0) break;
+          const { setDeck, deckIndex } = useGameStore.getState();
+          setDeck(msg.cards);
+          if (deckIndex >= msg.cards.length) {
+            useGameStore.setState({ deckIndex: 0 });
+          }
+          break;
+        }
+        case "videoPosted": {
+          // 7.5b: prepend newly posted videos so the deck stays freshest-first;
+          // bump deckIndex to keep the currently-viewed card in place.
+          const { deck, deckIndex } = useGameStore.getState();
+          if (deck.some(c => c.videoId === msg.card.videoId)) break;
+          useGameStore.setState({
+            deck: [msg.card, ...deck],
+            deckIndex: deckIndex + 1,
+          });
+          break;
+        }
       }
     });
 

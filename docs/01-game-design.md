@@ -283,6 +283,37 @@ A one-time 3-step coach-mark overlay on first Home visit (TAP THE CORE → the e
 affordance rule: **every interactive element shows a visible label** — if it's a button, it must
 look like one.
 
+### 8.6 Second playtest (2026-06-12) — juice, the engagement rail, VIRAL (design LOCKED)
+**Findings:** the TAP CORE works but feels flat — the press animation and the floating numbers
+read as placeholder (every `+N` spawns in the same spot, same size, and they overlap); the right
+rail LOOKS tappable (it's TikTok's visual grammar) but does nothing — the worst affordance lie
+on the screen, and it shows the player's own wallet, which confuses "my stats" with "this
+video"; filling the combo ring has no payoff moment; the mod banner overlaps the locked element
+pods. Four locked responses:
+
+1. **Juice pass (zero economy change).** The core becomes the production centerpiece it should
+   be: per-tier visual skins (not just border recolors), squash-and-stretch press feel, layered
+   shockwaves, gravity-arc particles, a center glyph, an idle attract state. Floating numbers
+   become arcade pop text: spawn lanes so they never overlap, size scaled by payout magnitude,
+   flavor callouts on milestones. One shared FX layer serves every payout source (core, elements,
+   rail, viral) so the language stays consistent. Visual spec `06` §3 (Phase 8 block).
+2. **The rail is the video's engagement — and pressing it pays.** Rail counters stop mirroring
+   the player's wallet and show the WATCHED card's real totals (likes/comments/shares — NPC cards
+   seeded with plausible counts, player cards accrue real ones). Each rail action (follow, like,
+   comment, share) is a **once-per-video micro-payout** (× comboMult); doing all four on one card
+   pays a SUPERFAN sweep bonus; on player cards the reactions flow back to the poster as royalty
+   likes/followers. This makes the rail honest (it does something), teaches scrolling (a fresh
+   card = a fresh rail), and deepens multiplayer (your engagement literally pays the creator).
+   Numbers `04` §13.7.
+3. **VIRAL — the combo-cap payoff.** Filling the ring now ERUPTS: an instant burst payout plus a
+   short VIRAL state where every payout is doubled while the ring blazes; then the combo settles
+   back to a floor and the climb restarts. The combo becomes a pump-and-pop jackpot cycle instead
+   of a meter that quietly saturates. Numbers `04` §13.8.
+4. **Top-zone layout contract + true scroll feel.** Fixed vertical bands (stat strip / mod banner
+   / element stage) so nothing overlaps as feed features stack up, and the pager card follows the
+   finger and slides like TikTok (crossfade retired) — the groundwork for the full video-scrolling
+   loop. Spec `06` §3.
+
 ## 9. Out of scope (for now — note so models don't build them)
 
 - Real video/audio, real TikTok API integration, real accounts of real creators.
