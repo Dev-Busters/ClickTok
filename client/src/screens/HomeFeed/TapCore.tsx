@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../../store";
 import { BALANCE } from "../../features/economy/balance";
 import { formatCount } from "../../lib/format";
+import { coreCoinMult } from "../../features/feed/mods";
+import { pushFloatText } from "../../components/fx/FloatingTextLayer";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const RING_R = 80;
@@ -10,6 +12,7 @@ const RING_SVG = 170;
 const RING_CIRC = 2 * Math.PI * RING_R;
 const IDLE_SEC = 6;
 const TIER_COLORS = ["var(--dim)", "var(--cyan)", "var(--red)", "var(--gold)"] as const;
+const TIER_CALLOUTS = ["", "NICE!", "ON FIRE!", "UNSTOPPABLE!"] as const;
 
 function getTier(combo: number): number {
   return Math.min(BALANCE.feed.comboMilestones.filter(m => combo >= m).length, 3);
@@ -19,8 +22,6 @@ function getTier(combo: number): number {
 type Particle = { angle: number; dist: number; size: number; isGlyph: boolean };
 type TapFx = {
   id: number;
-  gainCoins: number;
-  gainFollowers: number;
   ringColor: string;
   comboMult: number;
   particles: Particle[];
@@ -226,43 +227,6 @@ function GravParticle({ p, ringColor }: { p: Particle; ringColor: string }) {
   );
 }
 
-// ── Floating gain number ───────────────────────────────────────────────────────
-function FloatingGain({ gainCoins, gainFollowers, ringColor }: {
-  gainCoins: number;
-  gainFollowers: number;
-  ringColor: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 1, y: 0 }}
-      animate={{ opacity: 0, y: -90 }}
-      exit={{}}
-      transition={{ duration: 0.88, ease: 'easeOut' }}
-      style={{
-        position: 'absolute', left: '50%', top: -20,
-        transform: 'translateX(-50%)',
-        pointerEvents: 'none',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-      }}
-    >
-      <span style={{
-        fontFamily: 'var(--font-display)', fontSize: '22px',
-        color: ringColor, textShadow: `0 0 12px ${ringColor}88`, lineHeight: 1,
-      }}>
-        +{formatCount(gainCoins)}
-      </span>
-      {gainFollowers >= 0.05 && (
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: '10px',
-          color: 'rgba(255,255,255,0.7)', letterSpacing: '0.08em',
-        }}>
-          +{formatCount(gainFollowers)} followers
-        </span>
-      )}
-    </motion.div>
-  );
-}
-
 // ── Main component (self-contained — reads store directly) ────────────────────
 export function TapCore() {
   const combo = useGameStore(s => s.combo);
@@ -270,7 +234,7 @@ export function TapCore() {
   const engageTap = useGameStore(s => s.engageTap);
   const tapPower = useGameStore(s => s.tapPower);
   const multiplier = useGameStore(s => s.multiplier);
-  const followerConversion = useGameStore(s => s.followerConversion);
+  const activeMod = useGameStore(s => s.deck[s.deckIndex]?.mod ?? null);
 
   const [tapFxs, setTapFxs] = useState<TapFx[]>([]);
   const [tierFlash, setTierFlash] = useState(false);
@@ -285,10 +249,12 @@ export function TapCore() {
   const ringColor = TIER_COLORS[tier];
   const ringOffset = RING_CIRC * (1 - fillFraction);
 
-  // Tier-up flash
+  // Tier-up flash + callout
   useEffect(() => {
     if (tier > prevTier.current) {
       setTierFlash(true);
+      const callout = TIER_CALLOUTS[tier];
+      if (callout) pushFloatText({ text: callout, kind: "callout", magnitude: 0 });
       const t = setTimeout(() => setTierFlash(false), 600);
       prevTier.current = tier;
       return () => clearTimeout(t);
@@ -311,10 +277,14 @@ export function TapCore() {
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
-    // Compute gains at current combo BEFORE engageTap increments it
+    // Compute gain at current combo BEFORE engageTap increments it
     const cMult = comboMult; // already computed from clampedCombo above
-    const gainCoins = tapPower * BALANCE.postCoinConversion * multiplier * cMult;
-    const gainFollowers = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * cMult;
+    const modMult = coreCoinMult(activeMod);
+    const magnitude = cMult * modMult;
+    const gainCoins = tapPower * BALANCE.postCoinConversion * multiplier * magnitude;
+
+    // Push via shared FX layer (replaces old FloatingGain)
+    pushFloatText({ text: `+${formatCount(gainCoins)}`, kind: "coin", magnitude, color: ringColor });
 
     engageTap();
     setIsIdle(false);
@@ -322,8 +292,7 @@ export function TapCore() {
     const pCount = 8 + Math.floor(Math.random() * 5); // 8–12
     const id = _nextId++;
     setTapFxs(prev => [...prev.slice(-5), {
-      id, gainCoins, gainFollowers, ringColor,
-      comboMult: cMult,
+      id, ringColor, comboMult: cMult,
       particles: mkParticles(tier, pCount),
     }]);
     const t = setTimeout(() => {
@@ -468,14 +437,6 @@ export function TapCore() {
         </AnimatePresence>
       </div>
 
-      {/* Floating +N numbers (above the ring container) */}
-      <div style={{ position: 'relative', height: 0, width: 220 }}>
-        <AnimatePresence>
-          {tapFxs.map(fx => (
-            <FloatingGain key={fx.id} gainCoins={fx.gainCoins} gainFollowers={fx.gainFollowers} ringColor={fx.ringColor} />
-          ))}
-        </AnimatePresence>
-      </div>
     </div>
   );
 }

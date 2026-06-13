@@ -1253,7 +1253,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > 8–12 gravity-arc particles (♪/✦ glyphs at tier≥2). fxTimers cap -5 concurrent FX.
   > No economy files touched. typecheck passes.
 
-- [ ] **8.2 — Arcade floating numbers (the shared FX layer).** New
+- [x] **8.2 — Arcade floating numbers (the shared FX layer).** New
   `components/fx/FloatingTextLayer.tsx` + module-level `pushFloatText({ text, kind, magnitude })`
   (tiny event-bus pattern, no store churn per tap). Route ALL payout text through it: core `+N`s
   (replace `FloatingGain`), Beat Sync grade words, Duet pod payouts + FLOW, and leave it ready
@@ -1263,8 +1263,16 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   10 rapid core taps → numbers visibly scatter across lanes, zero overlapping pairs; a PERFECT
   ring pays through the same layer in `--gold`; a ≥10× payout (force via store) renders the
   tier-3 pop; combo tier-up prints its callout; typecheck.
+  > implemented: `pushFloatText({text,kind,magnitude,color?})` round-robins 4 lanes (±70/±25px)
+  > with ±10px jitter, −8°…+8° tilt, horizontal drift; cap 12 items (oldest culled). magnitude
+  > tiers: <3×=16px (tier color via `color` override), ≥3×=22px gold + thin dark outline,
+  > ≥10×=30px scale-pop (1.3 spring) + bold outline + trailing "!". Grade words keep `04` colors
+  > (perfect=gold, good=cyan, ok=dim, miss=red) via `kind`. Core taps, Duet pod payouts, FLOW,
+  > ALL PERFECT, and combo tier-up callouts (NICE!/ON FIRE!/UNSTOPPABLE!) all route through it;
+  > old `FloatingGain` removed. 10-tap + forced-combo preview verified lanes/colors/sizes;
+  > typecheck passes.
 
-- [ ] **8.3 — Top-zone layout contract + true scroll feel.** Implement the `06` §3 band table:
+- [x] **8.3 — Top-zone layout contract + true scroll feel.** Implement the `06` §3 band table:
   `ModBanner` moves into its OWN centered full-width band (y 56–88); `ElementStage`'s pod dock
   shifts below it — banner and pods may never overlap. Pager upgrade: the card layer (backdrop +
   banner + poster block) translate-Y follows the finger during drag and slides off/in with a
@@ -1274,6 +1282,20 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   a duet_flow card active: banner and locked-pod bounding boxes are disjoint; mid-drag the card
   visibly tracks the finger, release past threshold slides to the next card, under threshold
   springs back; combo still resets + waves still reschedule on swipe; typecheck.
+  > implemented: `ModBanner` now a full-width `position:absolute top:56 height:32` flex-centered
+  > band; `ElementStage` moved to `top:88` (pod dock at its own `top:4` ⇒ abs y92, disjoint from
+  > the banner). Pager card layer (backdrop+scrim+banner+poster) is one `motion.div` per
+  > `activeCard.videoId` with `drag="y" dragConstraints={{top:0,bottom:0}} dragElastic={1}` —
+  > follows the finger 1:1, snaps back to 0 on release under threshold. Past threshold,
+  > `advance(dir)` swaps the key; `cardVariants` slide the old card off (`y:∓900`) and the new
+  > one in (`y:±900→0`) via a `{type:"spring",stiffness:300,damping:32}` transition; opacity
+  > crossfade retired. HUD (stat strip/ElementStage/TapCore/rail/GO LIVE) sits outside this
+  > layer and stays fixed. Added `SwipeUpHint` (bouncing chevron + "SWIPE") shown once after 10s
+  > idle, reset via `onPointerDownCapture` on the root. `advance()` already resets combo +
+  > reschedules waves — unchanged. preview_snapshot at 390×844 with a `duet_flow` card confirms
+  > banner/pod-dock bounding boxes disjoint; `advance(1)` exercised the slide transition
+  > end-to-end (old card + banner slide off, new card slides in and settles, combo → ×1.00).
+  > typecheck passes.
 
 - [ ] **8.4 — VIRAL overdrive (the combo-cap payoff).** `feedSlice`: `viralUntil` (ephemeral);
   `engageTap` triggers VIRAL at `comboCap` per `04` §13.8 (burst payout, freeze combo, pause

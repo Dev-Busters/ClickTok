@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useAnimationFrame } from "framer-motion";
 import { useGameStore } from "../store";
-import { ringScale, GRADE_COLOR } from "../features/elements/beatSync";
+import { ringScale, GRADE_COLOR, GRADE_MULT } from "../features/elements/beatSync";
 import type { BeatGrade, ElementWave } from "../features/elements/types";
 import type { FeedModId } from "../party/types";
+import { pushFloatText } from "./fx/FloatingTextLayer";
 
 const POD_SIZE = 50;
 const SHARD_ANGLES = [-50, 0, 50].map(d => (d * Math.PI) / 180);
@@ -25,6 +26,7 @@ export function BeatSyncWave({ wave, onAllPerfect }: { wave: BeatSyncWaveT; onAl
   useEffect(() => {
     if (allPerfect && !firedRef.current) {
       firedRef.current = true;
+      pushFloatText({ text: "ALL PERFECT!", kind: "callout", magnitude: 0 });
       onAllPerfect();
     }
     if (!allGraded) firedRef.current = false;
@@ -56,6 +58,16 @@ function BeatPod({ startedAt, ring, activeMod, onTap }: {
 }) {
   const scale = ringScale(startedAt, ring.id, activeMod);
   const resolved = !!ring.grade;
+
+  // Push grade word through the shared FX layer when a grade first appears
+  const prevGradeRef = useRef<BeatGrade | undefined>(undefined);
+  useEffect(() => {
+    if (ring.grade && !prevGradeRef.current) {
+      const kind = ring.grade; // 'perfect' | 'good' | 'ok' | 'miss'
+      pushFloatText({ text: ring.grade.toUpperCase(), kind, magnitude: GRADE_MULT[ring.grade] });
+    }
+    prevGradeRef.current = ring.grade;
+  }, [ring.grade]);
   const ringVisible = !resolved && scale > 0 && scale <= 2.2;
 
   return (

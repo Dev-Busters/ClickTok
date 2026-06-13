@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useGameStore } from "../../store";
 import { BALANCE } from "../../features/economy/balance";
@@ -10,10 +10,19 @@ import { ElementStage } from "../../components/ElementStage";
 import { generateNpcDeck, formatCaption } from "../../features/feed/npcVideos";
 import { MOD_CATALOG } from "../../features/feed/mods";
 import { TapCore } from "./TapCore";
+import { FloatingTextLayer } from "../../components/fx/FloatingTextLayer";
 import type { VideoCard } from "../../party/types";
 
-// ── Pager (06 §3 task 7.5) ───────────────────────────────────────────────────
+// ── Pager (06 §3 task 7.5 / 8.3 true scroll feel) ────────────────────────────
 const SWIPE_THRESHOLD_PX = 80;
+const PAGE_SLIDE_PX = 900; // off-screen distance for card slide-in/out
+const IDLE_HINT_MS = 10_000;
+
+const cardVariants = {
+  initial: (dir: 1 | -1) => ({ y: dir === 1 ? PAGE_SLIDE_PX : -PAGE_SLIDE_PX }),
+  animate: { y: 0 },
+  exit: (dir: 1 | -1) => ({ y: dir === 1 ? -PAGE_SLIDE_PX : PAGE_SLIDE_PX }),
+};
 
 export function HomeFeed() {
   // Store reads
@@ -39,10 +48,30 @@ export function HomeFeed() {
 
   const activeCard = deck[deckIndex];
 
+  // 8.3: track swipe direction so the exiting/entering card slides off/in the right way
+  const [swipeDir, setSwipeDir] = useState<1 | -1>(1);
   const handlePagerDragEnd = (_e: unknown, info: PanInfo) => {
-    if (info.offset.y <= -SWIPE_THRESHOLD_PX) advance(1);
-    else if (info.offset.y >= SWIPE_THRESHOLD_PX) advance(-1);
+    if (info.offset.y <= -SWIPE_THRESHOLD_PX) { setSwipeDir(1); advance(1); }
+    else if (info.offset.y >= SWIPE_THRESHOLD_PX) { setSwipeDir(-1); advance(-1); }
   };
+
+  // 8.3: idle swipe-up chevron hint — shows once after 10s without a tap/swipe
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const hintShownRef = useRef(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const resetIdleTimer = useCallback(() => {
+    setShowSwipeHint(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (hintShownRef.current) return;
+    idleTimerRef.current = setTimeout(() => {
+      setShowSwipeHint(true);
+      hintShownRef.current = true;
+    }, IDLE_HINT_MS);
+  }, []);
+  useEffect(() => {
+    resetIdleTimer();
+    return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
+  }, [resetIdleTimer]);
 
   // combo only needed here for canvasIntensity (TapCore reads it from store directly)
   const fillFraction    = Math.min(combo, BALANCE.feed.comboCap) / BALANCE.feed.comboCap;
@@ -73,23 +102,30 @@ export function HomeFeed() {
   }, []);
 
   return (
-    <div style={{ position: 'relative', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}>
+    <div
+      onPointerDownCapture={resetIdleTimer}
+      style={{ position: 'relative', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}
+    >
 
-      {/* ── Pager (06 §3 task 7.5): swipe changes backdrop + mod banner ──── */}
-      <motion.div
-        drag="y"
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.15}
-        onDragEnd={handlePagerDragEnd}
-        style={{ position: 'absolute', inset: 0 }}
-      >
-        <AnimatePresence initial={false} mode="popLayout">
+      {/* ── Pager card layer (06 §3 / 8.3): backdrop + mod banner + poster
+           block follow the finger during drag and slide off/in with a
+           spring on release. The HUD (stat strip, stage, core, GO LIVE)
+           lives outside this layer and stays fixed. ─────────────────── */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+        <AnimatePresence initial={false} custom={swipeDir}>
           <motion.div
             key={activeCard?.videoId ?? "loading"}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22 }}
+            custom={swipeDir}
+            variants={cardVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ y: { type: "spring", stiffness: 300, damping: 32 } }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={1}
+            dragMomentum={false}
+            onDragEnd={handlePagerDragEnd}
             style={{ position: 'absolute', inset: 0 }}
           >
             {/* VideoCanvas ambient backdrop */}
@@ -106,14 +142,19 @@ export function HomeFeed() {
               pointerEvents: 'none',
             }} />
 
-            {/* Mod banner pill (06 §3: mod icon + name + effect) */}
+            {/* Mod banner (06 §3 Phase 8: own centered full-width band, y 56-88) */}
             {activeCard && <ModBanner mod={activeCard.mod} />}
 
             {/* Poster info: @handle, caption, #topic, tap counter, sound marquee */}
             <VideoInfoOverlay card={activeCard} />
           </motion.div>
         </AnimatePresence>
-      </motion.div>
+      </div>
+
+      {/* ── Idle swipe-up hint (06 §3 Phase 8: first session only) ──────── */}
+      <AnimatePresence>
+        {showSwipeHint && <SwipeUpHint />}
+      </AnimatePresence>
 
       {/* ── Top stat strip ───────────────────────────────────────────────── */}
       <div style={{
@@ -150,6 +191,9 @@ export function HomeFeed() {
 
       {/* ── TAP CORE v2 — dead center ─────────────────────────────────────── */}
       <TapCore />
+
+      {/* ── Arcade FX layer (task 8.2) — payout floats route here ─────────── */}
+      <FloatingTextLayer />
 
       {/* ── Right action rail ────────────────────────────────────────────── */}
       <div
@@ -251,26 +295,58 @@ function ModBanner({ mod }: { mod: VideoCard["mod"] }) {
   const def = MOD_CATALOG[mod];
   return (
     <div style={{
-      position: 'absolute', top: 60, left: 12,
-      display: 'flex', alignItems: 'center', gap: 6,
-      maxWidth: 240,
-      padding: '5px 10px',
-      borderRadius: 999,
-      background: 'rgba(0,0,0,0.5)',
-      border: '1px solid rgba(255,255,255,0.12)',
+      position: 'absolute', top: 56, left: 0, right: 0, height: 32,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
     }}>
-      <span style={{ fontSize: 13, lineHeight: 1 }}>{def.icon}</span>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--cyan)', whiteSpace: 'nowrap' }}>
-        {def.name}
-      </span>
-      <span style={{
-        fontFamily: 'var(--font-ui)', fontSize: 10, color: 'rgba(255,255,255,0.75)',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        maxWidth: 320,
+        padding: '5px 10px',
+        borderRadius: 999,
+        background: 'rgba(0,0,0,0.5)',
+        border: '1px solid rgba(255,255,255,0.12)',
       }}>
-        {def.effectLine}
-      </span>
+        <span style={{ fontSize: 13, lineHeight: 1 }}>{def.icon}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--cyan)', whiteSpace: 'nowrap' }}>
+          {def.name}
+        </span>
+        <span style={{
+          fontFamily: 'var(--font-ui)', fontSize: 10, color: 'rgba(255,255,255,0.75)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {def.effectLine}
+        </span>
+      </div>
     </div>
+  );
+}
+
+function SwipeUpHint() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4 }}
+      style={{
+        position: 'absolute', left: 0, right: 0, bottom: 100,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+        pointerEvents: 'none', zIndex: 2,
+      }}
+    >
+      <motion.div
+        animate={{ y: [0, -6, 0], opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 15l6-6 6 6" />
+        </svg>
+      </motion.div>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.6)' }}>
+        SWIPE
+      </span>
+    </motion.div>
   );
 }
 

@@ -31,7 +31,7 @@ export function ElementStage() {
   };
 
   return (
-    <div style={{ position: 'absolute', top: 56, left: 0, right: 0, height: '35%', pointerEvents: 'none' }}>
+    <div style={{ position: 'absolute', top: 88, left: 0, right: 0, height: '30%', pointerEvents: 'none' }}>
 
       {/* ── Locked element pods (06§3: dock at the stage's top edge) ────── */}
       {locked.length > 0 && (

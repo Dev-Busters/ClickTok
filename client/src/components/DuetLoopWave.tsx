@@ -3,8 +3,10 @@ import { motion, AnimatePresence, useAnimationFrame } from "framer-motion";
 import { useGameStore } from "../store";
 import { armProgress, isFlowed } from "../features/elements/duetLoop";
 import { BALANCE } from "../features/economy/balance";
+import { formatCount } from "../lib/format";
 import type { ElementWave } from "../features/elements/types";
 import type { FeedModId } from "../party/types";
+import { pushFloatText } from "./fx/FloatingTextLayer";
 
 const POD_SIZE = 50;
 
@@ -20,14 +22,36 @@ export function DuetLoopWave({ wave, onFlow }: { wave: DuetLoopWaveT; onFlow: ()
   const [, forceTick] = useState(0);
   useAnimationFrame(() => forceTick(t => (t + 1) % 1_000_000));
 
-  const flowed = wave.completed >= BALANCE.elements.duetLoop.pods && isFlowed(wave.firstArmedAt, wave.completed, activeMod);
+  const cfg = BALANCE.elements.duetLoop;
+  const flowed = wave.completed >= cfg.pods && isFlowed(wave.firstArmedAt, wave.completed, activeMod);
+
+  // Push pod payout number when a pod is completed
+  const prevCompletedRef = useRef(0);
+  useEffect(() => {
+    if (wave.completed > prevCompletedRef.current) {
+      const s = useGameStore.getState();
+      const comboMult = 1 + Math.min(s.combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
+      const isLast = wave.completed >= cfg.pods;
+      const didFlow = isLast && isFlowed(wave.firstArmedAt, wave.completed, activeMod);
+      const k = didFlow
+        ? (cfg.podPayout + cfg.flowBonus) * comboMult
+        : cfg.podPayout * comboMult;
+      const coins = s.tapPower * BALANCE.postCoinConversion * s.multiplier * k;
+      pushFloatText({ text: `+${formatCount(coins)}`, kind: "coin", magnitude: k });
+    }
+    prevCompletedRef.current = wave.completed;
+  // activeMod and wave.firstArmedAt are needed for isFlowed inside the effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wave.completed]);
+
   const firedRef = useRef(false);
   useEffect(() => {
     if (flowed && !firedRef.current) {
       firedRef.current = true;
+      pushFloatText({ text: "FLOW", kind: "flow", magnitude: 0 });
       onFlow();
     }
-    if (wave.completed < BALANCE.elements.duetLoop.pods) firedRef.current = false;
+    if (wave.completed < cfg.pods) firedRef.current = false;
   }, [flowed, wave.completed, onFlow]);
 
   return (
