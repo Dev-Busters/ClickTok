@@ -2,7 +2,8 @@ import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 import { UPGRADE_CATALOG } from "../features/upgrades/catalog";
-import type { UpgradeCategory, UpgradeDef } from "../features/upgrades/types";
+import type { UpgradeDef } from "../features/upgrades/types";
+import { isFeatureUnlocked } from "../features/metrics/unlocks";
 
 function requirementLabel(def: UpgradeDef): string | null {
   const req = def.requires;
@@ -21,15 +22,150 @@ function requirementLabel(def: UpgradeDef): string | null {
 }
 
 export function UpgradeShop() {
+  const metricsReached = useGameStore(s => s.metricsReached);
+  const upgradesUnlocked = isFeatureUnlocked("upgrades", metricsReached);
+
   return (
     <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <UpgradeCategorySection category="gear" title="GEAR" />
-      <UpgradeCategorySection category="software" title="SOFTWARE" />
+      <RepeatableSection />
+      {upgradesUnlocked && <UpgradeCategorySection category="gear" title="GEAR" />}
+      {upgradesUnlocked && <UpgradeCategorySection category="software" title="SOFTWARE" />}
     </div>
   );
 }
 
-function UpgradeCategorySection({ category, title }: { category: UpgradeCategory; title: string }) {
+// ── Repeatable / leveled upgrades ─────────────────────────────────────────────
+
+function RepeatableSection() {
+  const items = UPGRADE_CATALOG.filter(u => u.repeatable);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--cyan)', letterSpacing: '0.2em' }}>
+          LEVEL UP
+        </span>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(37,244,238,0.15)' }} />
+      </div>
+
+      {items.map(def => (
+        <RepeatableRow key={def.id} def={def} />
+      ))}
+    </div>
+  );
+}
+
+function RepeatableRow({ def }: { def: UpgradeDef }) {
+  const level = useGameStore(s => s.upgradeLevels[def.id] ?? 0);
+  const wallet = useGameStore(s => s.wallet);
+  const levelUpgrade = useGameStore(s => s.levelUpgrade);
+  const upgradeCost = useGameStore(s => s.upgradeCost);
+
+  const cost = upgradeCost(def.id);
+  const isMaxed = def.maxLevel !== undefined && level >= def.maxLevel;
+  const canAfford = !isMaxed && wallet.coins >= cost;
+  const buyable = canAfford && !isMaxed;
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '14px',
+      width: '100%',
+      padding: '13px 14px',
+      background: 'rgba(37,244,238,0.03)',
+      border: `1px solid ${buyable ? 'rgba(37,244,238,0.12)' : 'rgba(255,255,255,0.03)'}`,
+    }}>
+      {/* Level badge */}
+      <div style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: '22px',
+        color: isMaxed ? 'var(--gold)' : level > 0 ? 'var(--cyan)' : 'var(--dim)',
+        lineHeight: 1,
+        width: '34px',
+        flexShrink: 0,
+        textAlign: 'center',
+      }}>
+        {isMaxed ? '★' : `L${level}`}
+      </div>
+
+      {/* Name + description */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '19px',
+          color: 'var(--text)',
+          lineHeight: 1,
+          letterSpacing: '0.03em',
+        }}>
+          {def.name.toUpperCase()}
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          color: 'var(--dim)',
+          letterSpacing: '0.04em',
+        }}>
+          {def.description}
+        </div>
+      </div>
+
+      {/* Cost + button */}
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+        {isMaxed ? (
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            color: 'var(--gold)',
+            letterSpacing: '0.18em',
+          }}>
+            MAXED
+          </div>
+        ) : (
+          <>
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '18px',
+              color: canAfford ? 'var(--cyan)' : 'var(--dim)',
+              lineHeight: 1,
+            }}>
+              {formatCount(cost)}
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '8px',
+              color: 'var(--dim)',
+              letterSpacing: '0.1em',
+            }}>
+              COINS
+            </div>
+            <motion.button
+              whileTap={buyable ? { scale: 0.95 } : undefined}
+              onClick={() => buyable && levelUpgrade(def.id)}
+              style={{
+                marginTop: '2px',
+                padding: '4px 10px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '9px',
+                letterSpacing: '0.15em',
+                color: buyable ? '#000' : 'var(--dim)',
+                background: buyable ? 'var(--cyan)' : 'rgba(255,255,255,0.06)',
+                border: 'none',
+                cursor: buyable ? 'pointer' : 'default',
+              }}>
+              LEVEL UP
+            </motion.button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── One-time gear / software ───────────────────────────────────────────────────
+
+function UpgradeCategorySection({ category, title }: { category: "gear" | "software"; title: string }) {
   const ownedUpgrades = useGameStore(s => s.ownedUpgrades);
   const wallet = useGameStore(s => s.wallet);
   const isUpgradeUnlocked = useGameStore(s => s.isUpgradeUnlocked);
@@ -50,7 +186,8 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
       {items.map((def, idx) => {
         const owned = !!ownedUpgrades[def.id];
         const unlocked = isUpgradeUnlocked(def.id);
-        const canAfford = (Object.entries(def.cost) as [keyof typeof wallet, number][])
+        const cost = def.cost ?? {};
+        const canAfford = (Object.entries(cost) as [keyof typeof wallet, number][])
           .every(([currency, amount]) => wallet[currency] >= amount);
         const buyable = unlocked && !owned && canAfford;
         const dimmed = owned || !unlocked;
@@ -136,7 +273,7 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
                     color: canAfford && unlocked ? 'var(--cyan)' : 'var(--dim)',
                     lineHeight: 1,
                   }}>
-                    {formatCount(def.cost.coins ?? 0)}
+                    {formatCount(cost.coins ?? 0)}
                   </div>
                   <div style={{
                     fontFamily: 'var(--font-mono)',
@@ -146,7 +283,7 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
                   }}>
                     COINS
                   </div>
-                  {def.cost.diamonds !== undefined && (
+                  {cost.diamonds !== undefined && (
                     <div style={{
                       fontFamily: 'var(--font-mono)',
                       fontSize: '10px',
@@ -154,7 +291,7 @@ function UpgradeCategorySection({ category, title }: { category: UpgradeCategory
                       letterSpacing: '0.1em',
                       marginTop: '2px',
                     }}>
-                      +{formatCount(def.cost.diamonds)} 💎
+                      +{formatCount(cost.diamonds)} 💎
                     </div>
                   )}
                 </>

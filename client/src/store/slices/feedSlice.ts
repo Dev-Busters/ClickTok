@@ -55,7 +55,7 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   reactedByVideo: {},
 
   engageTap: () => {
-    const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, activeWave, deck, deckIndex, tapsThisCard } = get();
+    const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, activeWave, deck, deckIndex, tapsThisCard, viewsTotal, coinsEarned } = get();
     const now = Date.now();
     const cap = BALANCE.feed.comboCap;
     const wasViral = viralUntil > now;
@@ -96,6 +96,8 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
       viralUntil: newViralUntil,
       lastTapAt: now,
       tapsThisCard: tapsThisCard + 1,  // 7.6: batched for engage flush on swipe-away
+      viewsTotal: viewsTotal + 1,
+      coinsEarned: coinsEarned + coinsGain + burstCoins,
     });
 
     // 01 §8.2 / 04 §13.2: a TAP CORE tap arms the next DUET LOOP pod (energy beam).

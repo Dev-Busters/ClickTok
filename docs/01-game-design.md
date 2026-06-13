@@ -320,3 +320,78 @@ pods. Four locked responses:
 - Monetization/IAP, ads.
 - Sound design (optional juice, Phase 3+).
 - Anti-cheat / server authority (runs are client-trusted until Phase 4 hardening).
+
+## 10. Onboarding, Creator Insights & progressive unlock (Phase 9; design LOCKED 2026-06-13)
+
+**Origin: post-Phase-8 review.** A 0-follower player landing on Home faces the full Phase-8
+surface — video pager, engagement rail, element pods — with almost none of it usable or legible
+cold. There's also no fast early-reward loop and the clicker has no first-press teaching. This
+pass makes the early game legible and motivating.
+
+### 10.1 The Engagement Button (TEB) — display rename
+
+Display/fiction: the clicker is **The Engagement Button (TEB)**. On the player's very first tap
+ever a one-time callout appears: "The Engagement Button — tap to grow your channel." The
+existing idle "TAP" micro-label stays. Internal identifiers (`TapCore.tsx`, `engageTap`,
+`combo`) are unchanged.
+
+### 10.2 Creator Insights — the progression spine
+
+A **Creator Insights** screen (TikTok-authentic analytics fiction) surfaces a ladder of
+**metrics** the player climbs. Each metric: a tracked stat → a threshold → a reward
+(coins / 💎) → an optional feature unlock. The whole ladder is always visible — completed
+(checked), upcoming with requirement + reward + unlock — so the player always has the next
+target in sight. Desire before access.
+
+Metrics are real TikTok analytics stats:
+- **Views** = lifetime TEB taps (persisted as `viewsTotal`; incremented by `engageTap`).
+- **Followers** = `wallet.totalFollowers` (monotonic). **Likes** = `wallet.likes`.
+- **Streams** = lifetime runs completed. **Coins earned** (lifetime).
+
+This generalizes today's `FOLLOWER_MILESTONES` / `checkMilestones` / `milestonesReached`.
+
+### 10.3 Progressive-unlock framework
+
+`isFeatureUnlocked(featureId)` derives from which unlock-bearing metrics have been crossed
+(reads `metricsReached`; no extra persisted set needed). UI surfaces render nothing until
+unlocked. Gated surfaces and their unlock metric:
+
+- Creator Tools / Upgrades (Profile) → 100 Views
+- GO LIVE pill + Create/Live tab → 100 Followers
+- Diamonds pill → 50 Followers; passive-income readout → first passive source owned
+- Inbox tab + daily reward → first Stream completed
+- Discover tab (trends) → 500 Followers
+- Feed pager + engagement rail + mod banner + element stage → 1,000 Followers
+
+**Fresh Home** = TEB (named, first-press teaching) + followers/coins stat strip + ambient
+`VideoCanvas` backdrop. Nothing else until metrics are crossed. An "active metric" tracker
+chip on Home always shows what to aim for next.
+
+### 10.4 Dual-axis upgrades — repeatable leveled upgrades
+
+The existing one-time gear/software catalog ("obtain new content") gains a second axis:
+**repeatable leveled upgrades** ("improve along the way"). A `repeatable: true` flag on
+`UpgradeDef` adds `baseCost`, `costGrowth`, `maxLevel`; levels stored in a new persisted
+`upgradeLevels: Record<string, number>`. Cost at level L = `round(baseCost × costGrowth^L)`.
+Effects scale linearly with level (`postPowerAdd`, `followerConversionAdd`,
+`passiveCoinsAdd`); `multiplierMult` compounds via `Math.pow`. See `04` §14 for numbers.
+
+**Early repeatable catalog** (available immediately, no gating):
+1. **Engagement Boost** — +postPower/level. 10 🪙 base, ×1.45/level.
+2. **Loyal Followers** — +followerConversion/level. 40 🪙 base, ×1.5.
+3. **Auto-Engage Bot** — +coins/sec passive/level. 75 🪙 base, ×1.6.
+
+Core loop: tap → coins → buy Engagement Boost → more coins/tap → buy Loyal Followers →
+more followers/tap → cross follower metric → unlock GO LIVE; Auto-Engage earns while idle.
+
+### 10.5 Updated player journey (§6 revision)
+
+1. Onboarding: pick handle. →
+2. **Fresh Home:** TEB pulses — first-press teaching fires. Tap → earn coins → buy Engagement
+   Boost in ~2 taps → visible earnings increase.
+3. Earn followers → cross metric → **Upgrades surface appears** at ~100 views,
+   **GO LIVE unlocks** at 100 followers.
+4. **First run:** big follower payout → Creator Insights fills up.
+5. Loop: spend run rewards on repeatable + one-time upgrades → stronger runs → bigger
+   payouts → unlock Discover, Feed, element pods. →
+6. (Later) Community raids, global trends, prestige.

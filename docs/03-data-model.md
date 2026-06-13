@@ -73,16 +73,25 @@ export type UpgradeDef = {
   category: UpgradeCategory;
   name: string;
   description: string;            // human copy; can be templated from effect
-  cost: Partial<Record<Currency, number>>; // usually { coins } or { coins, diamonds }
-  requires?: { followers?: number; upgrades?: string[] }; // unlock gating
   effect: UpgradeEffect;
+  requires?: { followers?: number; upgrades?: string[] }; // unlock gating
+  // One-time purchase (present iff repeatable is absent):
+  cost?: Partial<Record<Currency, number>>; // usually { coins } or { coins, diamonds }
+  // Repeatable/leveled (all three present iff repeatable: true — see `01` §10.4):
+  repeatable?: true;
+  baseCost?: Partial<Record<Currency, number>>; // cost at level 0 (first buy)
+  costGrowth?: number;                          // cost(L) = round(baseCost × costGrowth^L)
+  maxLevel?: number;                            // if absent, unlimited
 };
 
 // store/slices/upgradesSlice.ts
 export type UpgradesSlice = {
   ownedUpgrades: Record<string, boolean>;
-  buyUpgrade: (id: string) => boolean;        // false if locked/can't afford
-  isUpgradeUnlocked: (id: string) => boolean; // passes `requires`
+  upgradeLevels: Record<string, number>;         // (Phase 9.1) current level per repeatable id
+  buyUpgrade: (id: string) => boolean;           // false if locked/can't afford/repeatable
+  isUpgradeUnlocked: (id: string) => boolean;    // passes `requires`
+  upgradeCost: (id: string) => number;           // coins for next level (0 if maxed/not repeatable)
+  levelUpgrade: (id: string) => boolean;         // false if can't afford/maxed/not repeatable
 };
 ```
 
@@ -545,15 +554,42 @@ export type FullState =
   & ElementsSlice; // Phase 7.3+
 ```
 
+## 8.5 Metrics & Creator Insights (Phase 9.2 — data model preview)
+
+```ts
+// features/metrics/types.ts  (Phase 9.2 — stub the types now; full impl 9.2)
+export type MetricStatId = "views" | "followers" | "likes" | "streams" | "coinsEarned";
+
+export type MetricDef = {
+  id: string;
+  stat: MetricStatId;
+  threshold: number;
+  reward: Partial<Record<Currency, number>>;
+  unlocks?: string;   // featureId string, consumed by isFeatureUnlocked (9.3)
+};
+
+// ⚠ viewsTotal (lifetime TEB taps) is NEW persisted state in Phase 9.2:
+//   viewsTotal: number;   — added to ChannelSlice + PersistedVN + migrate (default 0)
+//
+// metricsReached: string[]  — Phase 9.2, replaces milestonesReached (mapped in migration)
+//   When a metric's threshold is crossed, its id is pushed here + reward granted + notif fired.
+//
+// isFeatureUnlocked(featureId): boolean  — Phase 9.3, derived from metricsReached.
+```
+
 ## 9. Save shape & versioning
 
 ```ts
 // store/slices/meta.ts
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 5; // current (as of Phase 9.1)
+// v1 → base shape; v2 → wallet/skills/videos; v3 → inbox/milestones;
+// v4 → ownedElements (7.3); v5 → upgradeLevels + tebTeachSeen (9.1)
 // Persisted (partialize) — durable slices only:
-//   handle, wallet, postPower, passiveCoinsPerSec, multiplier, followerConversion,
-//   lastSeenAt, ownedUpgrades, skillLevels, videos
-// Excluded: run*, social* (except activeTrend optionally), ui*
+//   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
+//   multiplier, followerConversion, boonMultiplier, lastSeenAt,
+//   ownedUpgrades, upgradeLevels (9.1), skillLevels, videos,
+//   notifications, lastDailyClaimAt, milestonesReached, ownedElements, tebTeachSeen (9.1)
+// Excluded: run* (ephemeral), social* (server-owned), ui.activeTab/openSheet (session)
 export type PersistedV1 = {
   version: 1;
   handle: string;

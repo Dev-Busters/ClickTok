@@ -260,6 +260,54 @@ Build these once, reuse everywhere:
 - `IconButton` / nav icons — keep the SVG style already in `public/icons.svg` / `TapButton`.
 - `LockBadge` — shows `requires` on locked upgrades/skills.
 
+## 10. Phase 9 — Onboarding & progressive unlock (`01` §10)
+
+### 10.1 TEB first-press teaching (Phase 9.1 — `TapCore.tsx`)
+
+On the very first TEB tap ever (`!tebTeachSeen`): a one-time callout tooltip slides in above
+the combo multiplier readout — copy: **"The Engagement Button"** (display font, large) with
+sub-line **"tap to grow your channel"** (mono, small). Auto-dismisses after 3 s via
+`AnimatePresence`. After dismiss, `setTebTeachSeen()` fires (persists across sessions). The
+idle "TAP" micro-label inside the button is unchanged.
+
+### 10.2 Creator Insights screen (Phase 9.4 — `screens/CreatorInsights/`)
+
+Reached from a "CREATOR INSIGHTS ›" row on the Profile screen's stats section.
+
+- **Header:** "CREATOR INSIGHTS" (display font), subtitle "lifetime metrics" (mono, dim).
+- **Metric ladder:** scrollable list. Each row:
+  - Icon + stat name + threshold (e.g. "100 VIEWS")
+  - Reward badge: coin/diamond icon + amount
+  - Unlock label if applicable ("↳ unlocks Creator Tools")
+  - State: ✓ checked (cyan) if reached; highlighted/gold for the *next* unmet metric; dimmer
+    beyond the next two.
+- **Home tracker chip** (Phase 9.3): bottom of Home screen, above nav — "▶ 100 VIEWS → +60🪙 ·
+  Creator Tools". Tap → navigate to Creator Insights. Updates as metrics are crossed.
+
+### 10.3 Fresh Home layout (Phase 9.3 — post progressive-unlock)
+
+Before any metric is crossed, Home renders ONLY:
+1. Top stat strip: followers (hero) + coins pill.
+2. TEB at center, with first-press teaching (§10.1) + idle "TAP" attract.
+3. Ambient `VideoCanvas` backdrop (always on, NPC seed pre-7.5).
+4. Bottom nav: Home tab active; other tabs hidden/dimmed until their unlock metric is crossed.
+
+Each feature appears silently as its metric is crossed — no ceremony beyond the inbox
+notification. The "next metric" tracker chip appears on Home from the first metric onward.
+
+### 10.4 Repeatable upgrade section in UpgradeShop (Phase 9.1 — `components/UpgradeShop.tsx`)
+
+A new **LEVEL UP** section renders at the TOP of the UpgradeShop list (before GEAR/SOFTWARE).
+Each row:
+- **Name** (display font, 19px) + **description** (mono, 10px dim) — e.g. "+1 POST POWER/LV"
+- **LV N** badge (mono, cyan) showing the current level
+- **Next cost** (display, 22px, cyan if affordable / dim if not) + "COINS" label
+- **LEVEL UP** button (full-width, cyan bg when affordable, dim when not/maxed)
+- At `maxLevel`: replace cost/button with "MAXED" (gold, mono) — row stays visible as a trophy
+
+The section header reads "LEVEL UP" with the same mono + hairline-divider treatment as GEAR /
+SOFTWARE. No "OWNED" state — repeatables are always levelable until maxed.
+
 ## 9. Visual language rules
 
 - Layout = TikTok (familiar, clean, dark, bottom-nav, profile grid). Accents = our CRT/terminal

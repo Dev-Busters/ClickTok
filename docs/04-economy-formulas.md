@@ -586,6 +586,48 @@ Multiplier stacking is multiplicative and order-free:
 `payout = base × gainPerPost × comboMult × modMult × viralMult`. A full cycle is ≈75 core taps
 (climb 25→100) → burst + 8s of doubled payouts — pump-and-pop beats quiet saturation.
 
+## 14. Repeatable upgrades & the metric ladder (Phase 9; `01` §10.4, §10.2)
+
+### 14.1 Repeatable upgrade cost curve
+
+```
+cost(L) = round(baseCost × costGrowth^L)     // L = current level BEFORE the purchase
+```
+
+The per-level effect is defined in the `UpgradeDef.effect` field and applied ×level in
+`recomputeStats()`. `multiplierMult` compounds: `multiplierMult^level` (not additive).
+
+### 14.2 Early repeatable catalog
+
+| id | name | category | baseCost | costGrowth | maxLevel | per-level effect |
+|---|---|---|---|---|---|---|
+| `engagement_boost` | Engagement Boost | repeatable | 10 🪙 | ×1.45 | 25 | postPowerAdd +1 |
+| `loyal_followers`  | Loyal Followers  | repeatable | 40 🪙 | ×1.50 | 15 | followerConversionAdd +0.2 |
+| `auto_engage_bot`  | Auto-Engage Bot  | repeatable | 75 🪙 | ×1.60 | 20 | passiveCoinsAdd +0.5/sec |
+
+Early-curve checkpoints:
+- `engagement_boost` L1: 10 🪙 → ~2 taps cold (6 🪙/tap) — teaches the loop immediately.
+- `loyal_followers` L1: 40 🪙 → ~4 taps after EB L1 (earning ~12/tap).
+- `auto_engage_bot` L1: 75 🪙 → ~5–7 taps in total; first idle income.
+
+### 14.3 Metric ladder — thresholds, rewards, unlocks
+
+| stat | threshold | reward | unlocks |
+|---|---|---|---|
+| Views (taps) | 25 | +25 🪙 | — (teaches the loop) |
+| Views | 100 | +60 🪙 | **Creator Tools / Upgrades** |
+| Followers | 10 | +30 🪙 | — |
+| Followers | 50 | +5 💎 | **Diamonds display** |
+| Followers | 100 | +120 🪙 | **GO LIVE** (pill + Create/Live tab) |
+| Streams | 1 | +5 💎 | **Inbox + daily reward** |
+| Followers | 500 | +10 💎 | **Discover / trends** |
+| Followers | 1,000 | +15 💎 | **Feed pager + engagement rail + element stage** |
+| Followers | 5,000 | +25 💎 | **Duet Loop** (already follower-gated) |
+
+Reward is granted once, atomically, in `checkMetrics()` (Phase 9.2). See §11 for tuning
+guidance — repeatable upgrades should make first metric crossings land within a few minutes
+of active play.
+
 ### 13.9 Tuning guidance (was 13.6 — renumbered when §13.7–13.8 landed)
 - Elements should make active feed time worth ~1.5–2× bare tapping, and runs must STILL dominate
   per-minute income (§11 rules everything).

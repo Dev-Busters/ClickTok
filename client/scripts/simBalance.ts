@@ -18,12 +18,14 @@ import type { GiftTier } from "../src/features/livestream/types";
 
 type Skills = Record<SkillId, number>;
 type OwnedUpgrades = Record<string, boolean>;
+type UpgradeLevels = Record<string, number>;
 type Wallet = { coins: number; followers: number; totalFollowers: number; diamonds: number; likes: number };
 
 interface Snapshot {
   label: string;
   wallet: Wallet;
   ownedUpgrades: OwnedUpgrades;
+  upgradeLevels: UpgradeLevels;
   skillLevels: Skills;
 }
 
@@ -38,24 +40,42 @@ function zeroWallet(): Wallet {
 }
 
 function zeroUpgrades(): OwnedUpgrades {
-  return Object.fromEntries(UPGRADE_CATALOG.map(u => [u.id, false]));
+  return Object.fromEntries(UPGRADE_CATALOG.filter(u => !u.repeatable).map(u => [u.id, false]));
 }
 
-/** Recompute derived stats from owned upgrades and skill levels.
+function zeroLevels(): UpgradeLevels {
+  return {};
+}
+
+/** Recompute derived stats from owned upgrades, upgrade levels, and skill levels.
  *  Mirrors channelSlice.recomputeStats exactly (no boon/algo mult — sim is STARVED). */
-function recomputeStats(owned: OwnedUpgrades, skills: Skills) {
+function recomputeStats(owned: OwnedUpgrades, skills: Skills, levels: UpgradeLevels = {}) {
   let postPowerAdd = 0;
   let passiveCoinsAdd = 0;
   let multiplierMult = 1;
   let followerConversionAdd = 0;
 
+  // One-time gear/software
   for (const def of UPGRADE_CATALOG) {
+    if (def.repeatable) continue;
     if (!owned[def.id]) continue;
     const e = def.effect;
     if (e.postPowerAdd) postPowerAdd += e.postPowerAdd;
     if (e.passiveCoinsAdd) passiveCoinsAdd += e.passiveCoinsAdd;
     if (e.multiplierMult) multiplierMult *= e.multiplierMult;
     if (e.followerConversionAdd) followerConversionAdd += e.followerConversionAdd;
+  }
+
+  // Repeatable upgrades: effect × level
+  for (const def of UPGRADE_CATALOG) {
+    if (!def.repeatable) continue;
+    const level = levels[def.id] ?? 0;
+    if (level === 0) continue;
+    const e = def.effect;
+    if (e.postPowerAdd) postPowerAdd += e.postPowerAdd * level;
+    if (e.passiveCoinsAdd) passiveCoinsAdd += e.passiveCoinsAdd * level;
+    if (e.multiplierMult) multiplierMult *= Math.pow(e.multiplierMult, level);
+    if (e.followerConversionAdd) followerConversionAdd += e.followerConversionAdd * level;
   }
 
   const tapPower = BALANCE.basePostPower + postPowerAdd + skills.charisma;
@@ -67,8 +87,8 @@ function recomputeStats(owned: OwnedUpgrades, skills: Skills) {
 }
 
 /** One post: returns { coins, followers } gained. */
-function postGain(owned: OwnedUpgrades, skills: Skills) {
-  const { tapPower, multiplier, followerConversion } = recomputeStats(owned, skills);
+function postGain(owned: OwnedUpgrades, skills: Skills, levels: UpgradeLevels = {}) {
+  const { tapPower, multiplier, followerConversion } = recomputeStats(owned, skills, levels);
   return {
     coins: tapPower * BALANCE.postCoinConversion * multiplier,
     followers: tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier,
@@ -76,23 +96,33 @@ function postGain(owned: OwnedUpgrades, skills: Skills) {
 }
 
 /** Cheapest upgrade the player can afford next, or null. */
-function nextAffordable(wallet: Wallet, owned: OwnedUpgrades, skills: Skills): string | null {
+function nextAffordable(wallet: Wallet, owned: OwnedUpgrades, skills: Skills, levels: UpgradeLevels = {}): string | null {
   let bestId: string | null = null;
   let bestCost = Infinity;
 
   for (const def of UPGRADE_CATALOG) {
-    if (owned[def.id]) continue;
-
-    // Follower gate
-    if (def.requires?.followers && wallet.totalFollowers < def.requires.followers) continue;
-    // Upgrade prerequisite
-    if (def.requires?.upgrades?.some(r => !owned[r])) continue;
-
-    const coinCost = def.cost.coins ?? 0;
-    const diamondCost = def.cost.diamonds ?? 0;
-    if (wallet.coins >= coinCost && wallet.diamonds >= diamondCost && coinCost < bestCost) {
-      bestCost = coinCost;
-      bestId = def.id;
+    if (def.repeatable) {
+      // Repeatable: check if affordable at current level
+      const level = levels[def.id] ?? 0;
+      if (def.maxLevel !== undefined && level >= def.maxLevel) continue;
+      const base = def.baseCost?.coins ?? 0;
+      const cost = Math.round(base * Math.pow(def.costGrowth ?? 1, level));
+      if (wallet.coins >= cost && cost < bestCost) {
+        bestCost = cost;
+        bestId = def.id;
+      }
+    } else {
+      if (owned[def.id]) continue;
+      // Follower gate
+      if (def.requires?.followers && wallet.totalFollowers < def.requires.followers) continue;
+      // Upgrade prerequisite
+      if (def.requires?.upgrades?.some(r => !owned[r])) continue;
+      const coinCost = def.cost?.coins ?? 0;
+      const diamondCost = def.cost?.diamonds ?? 0;
+      if (wallet.coins >= coinCost && wallet.diamonds >= diamondCost && coinCost < bestCost) {
+        bestCost = coinCost;
+        bestId = def.id;
+      }
     }
   }
 
@@ -111,8 +141,8 @@ function nextAffordable(wallet: Wallet, owned: OwnedUpgrades, skills: Skills): s
   return bestId;
 }
 
-/** Buy an upgrade or skill level. Mutates wallet, owned, skills. */
-function buy(id: string, wallet: Wallet, owned: OwnedUpgrades, skills: Skills): void {
+/** Buy an upgrade or skill level. Mutates wallet, owned, skills, levels. */
+function buy(id: string, wallet: Wallet, owned: OwnedUpgrades, skills: Skills, levels: UpgradeLevels = {}): void {
   if (id.startsWith("skill:")) {
     const skillId = id.slice(6) as SkillId;
     const def = SKILL_CATALOG.find(d => d.id === skillId)!;
@@ -121,9 +151,17 @@ function buy(id: string, wallet: Wallet, owned: OwnedUpgrades, skills: Skills): 
     skills[skillId]++;
   } else {
     const def = UPGRADE_CATALOG.find(d => d.id === id)!;
-    wallet.coins -= def.cost.coins ?? 0;
-    wallet.diamonds -= def.cost.diamonds ?? 0;
-    owned[id] = true;
+    if (def.repeatable) {
+      const level = levels[id] ?? 0;
+      const base = def.baseCost?.coins ?? 0;
+      const cost = Math.round(base * Math.pow(def.costGrowth ?? 1, level));
+      wallet.coins -= cost;
+      levels[id] = level + 1;
+    } else {
+      wallet.coins -= def.cost?.coins ?? 0;
+      wallet.diamonds -= def.cost?.diamonds ?? 0;
+      owned[id] = true;
+    }
   }
 }
 
@@ -180,7 +218,7 @@ interface RunStats {
  *  Assumes a "typical C–B grade run": hype averages ~55 (starting 50, modest reaction
  *  use), peakViewers ~1.25× start, finalHype ~60.  Good enough for balance checking. */
 function analyzeRun(snap: Snapshot): RunStats {
-  const stats = recomputeStats(snap.ownedUpgrades, snap.skillLevels);
+  const stats = recomputeStats(snap.ownedUpgrades, snap.skillLevels, snap.upgradeLevels);
   const params = computeRunParams(
     {
       followers: snap.wallet.followers,
@@ -246,7 +284,7 @@ function makeSnapshot(
   for (const id of upgradeIds) ownedUpgrades[id] = true;
   const skillLevels = { ...zeroSkills(), ...skillOverrides };
   const wallet = { ...zeroWallet(), followers: followerCount, totalFollowers: followerCount };
-  return { label, wallet, ownedUpgrades, skillLevels };
+  return { label, wallet, ownedUpgrades, upgradeLevels: zeroLevels(), skillLevels };
 }
 
 // Fresh: no upgrades, no skills.
@@ -277,6 +315,7 @@ const SNAPSHOTS: Snapshot[] = [FRESH, MID, LATE];
 
 interface EarlySimResult {
   postsForFirstGear: number;          // posts until ring_light affordable
+  postsForFirstRepeatable: number;    // posts until first repeatable upgrade affordable (target f)
   activeSecFor200Followers: number;   // active seconds until 200 followers reached
   maxDeadZoneSec: number;             // max active seconds with nothing affordable
   firstLiveFollowers: number;         // follower count when first run becomes viable
@@ -285,10 +324,12 @@ interface EarlySimResult {
 function simulateEarlyGame(maxActiveSec = 1200): EarlySimResult {
   const wallet = zeroWallet();
   const owned = zeroUpgrades();
+  const levels = zeroLevels();
   const skills = zeroSkills();
 
   let activeSec = 0;
   let postsForFirstGear = -1;
+  let postsForFirstRepeatable = -1;
   let activeSecFor200Followers = -1;
   let lastPurchaseSec = 0;
   let maxDeadZoneSec = 0;
@@ -296,29 +337,33 @@ function simulateEarlyGame(maxActiveSec = 1200): EarlySimResult {
 
   while (activeSec < maxActiveSec) {
     // One post per active second
-    const gain = postGain(owned, skills);
+    const gain = postGain(owned, skills, levels);
     wallet.coins += gain.coins;
     wallet.followers += gain.followers;
     wallet.totalFollowers += gain.followers;
     activeSec += 1;
 
     // Check dead-zone: is anything affordable this second?
-    const nextBuy = nextAffordable(wallet, owned, skills);
+    const nextBuy = nextAffordable(wallet, owned, skills, levels);
     if (nextBuy === null) {
       maxDeadZoneSec = Math.max(maxDeadZoneSec, activeSec - lastPurchaseSec);
     }
 
     // Greedy buy: buy cheapest affordable thing each second
-    let bought = nextAffordable(wallet, owned, skills);
+    let bought = nextAffordable(wallet, owned, skills, levels);
     while (bought !== null) {
-      buy(bought, wallet, owned, skills);
+      buy(bought, wallet, owned, skills, levels);
       lastPurchaseSec = activeSec;
 
-      if (postsForFirstGear === -1 && !bought.startsWith("skill:")) {
-        postsForFirstGear = activeSec; // first non-skill gear purchase
+      const def = UPGRADE_CATALOG.find(d => d.id === bought);
+      if (def?.repeatable && postsForFirstRepeatable === -1) {
+        postsForFirstRepeatable = activeSec;
+      }
+      if (!bought.startsWith("skill:") && !def?.repeatable && postsForFirstGear === -1) {
+        postsForFirstGear = activeSec; // first one-time gear purchase
       }
 
-      bought = nextAffordable(wallet, owned, skills);
+      bought = nextAffordable(wallet, owned, skills, levels);
     }
 
     // 200-follower milestone
@@ -333,6 +378,7 @@ function simulateEarlyGame(maxActiveSec = 1200): EarlySimResult {
 
   return {
     postsForFirstGear,
+    postsForFirstRepeatable,
     activeSecFor200Followers,
     maxDeadZoneSec,
     firstLiveFollowers,
@@ -367,13 +413,24 @@ console.log();
 
 // ── Target (a): first gear affordable in 5–10 posts ──────────────────────────
 console.log("── Target (a): first Gear affordable within 5–10 posts ───────");
-const ringLightCost = UPGRADE_CATALOG.find(u => u.id === "ring_light")!.cost.coins ?? 0;
+const ringLightDef = UPGRADE_CATALOG.find(u => u.id === "ring_light")!;
+const ringLightCost = ringLightDef.cost?.coins ?? 0;
 const coinsPerPost = BALANCE.basePostPower * BALANCE.postCoinConversion;
 const postsForRingLight = Math.ceil(ringLightCost / coinsPerPost);
 const passA = postsForRingLight >= 5 && postsForRingLight <= 10;
 console.log(`  ring_light costs ${ringLightCost} coins; fresh post earns ${coinsPerPost.toFixed(1)} coins`);
 console.log(`  Posts to afford ring_light : ${postsForRingLight}`);
 console.log(`  ${pass(passA)}  (target: 5–10 posts)\n`);
+
+// ── Target (f): first repeatable affordable within 3 taps ────────────────────
+console.log("── Target (f): first repeatable buy within 3 taps (cold start) ─");
+const engBoostDef = UPGRADE_CATALOG.find(u => u.id === "engagement_boost")!;
+const engBoostFirstCost = engBoostDef.baseCost?.coins ?? 0;
+const tapsForFirstRepeatable = Math.ceil(engBoostFirstCost / (BALANCE.basePostPower * BALANCE.postCoinConversion));
+const passF = tapsForFirstRepeatable <= 3;
+console.log(`  engagement_boost L1 costs ${engBoostFirstCost} coins; fresh tap earns ${BALANCE.basePostPower * BALANCE.postCoinConversion} coins`);
+console.log(`  Taps to afford first repeatable: ${tapsForFirstRepeatable}`);
+console.log(`  ${pass(passF)}  (target: ≤ 3 taps)\n`);
 
 // ── Early game simulation (targets b and e) ───────────────────────────────────
 console.log("── Early game simulation (1 post/sec, greedy upgrades) ────────");
@@ -382,6 +439,7 @@ const early = simulateEarlyGame(1800);
 // Target (b): first LIVE viable at ~200 followers within ~5 active minutes
 const TARGET_B_SEC = 5 * 60; // 5 minutes
 const passB = early.activeSecFor200Followers !== -1 && early.activeSecFor200Followers <= TARGET_B_SEC;
+console.log(`  First repeatable purchase   : post ${early.postsForFirstRepeatable}`);
 console.log(`  First gear purchase at post : ${early.postsForFirstGear}`);
 console.log(`  Active time to 200 followers: ${early.activeSecFor200Followers}s (${(early.activeSecFor200Followers / 60).toFixed(1)} min)`);
 console.log(`  Followers at that point     : ${early.firstLiveFollowers}`);
@@ -415,7 +473,7 @@ const snapshotResults: SnapshotResult[] = [];
 
 for (const snap of SNAPSHOTS) {
   const run = analyzeRun(snap);
-  const { passiveCoinsPerSec } = recomputeStats(snap.ownedUpgrades, snap.skillLevels);
+  const { passiveCoinsPerSec } = recomputeStats(snap.ownedUpgrades, snap.skillLevels, snap.upgradeLevels);
   const idleCoins = passiveCoinsPerSec * run.hypeDecayPerSec <= 0
     ? passiveCoinsPerSec * BALANCE.run.durationSec
     : passiveCoinsPerSec * BALANCE.run.durationSec;
@@ -469,8 +527,9 @@ console.log(`  (b) first LIVE in ≤5 min         : ${pass(passB)}`);
 console.log(`  (c) run ≥ 2× idle at all stages  : ${pass(allPassC)}${failedC.length ? "  → fails at: " + failedC.join(", ") : ""}`);
 console.log(`  (d) diamonds 2–10 per run        : ${pass(allPassD)}${failedD.length ? "  → fails at: " + failedD.join(", ") : ""}`);
 console.log(`  (e) no 10-min dead zone          : ${pass(passE)}`);
+console.log(`  (f) first repeatable ≤ 3 taps    : ${pass(passF)}`);
 console.log();
 
-const allPass = passA && passB && allPassC && allPassD && passE;
+const allPass = passA && passB && allPassC && allPassD && passE && passF;
 console.log(allPass ? "  ✅ ALL TARGETS PASS" : "  ❌ SOME TARGETS FAIL — tune balance.ts and re-run");
 console.log("═══════════════════════════════════════════════════════════════\n");

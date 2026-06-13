@@ -5,7 +5,7 @@ import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 6;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -45,7 +45,24 @@ export type PersistedV4 = Omit<PersistedV3, "version"> & {
   ownedElements: Partial<Record<ElementId, boolean>>;
 };
 
-export type PersistedState = PersistedV4;
+// 9.1: adds repeatable upgrade levels + TEB first-press teach flag.
+export type PersistedV5 = Omit<PersistedV4, "version"> & {
+  version: 5;
+  upgradeLevels: Record<string, number>;
+  tebTeachSeen: boolean;
+};
+
+// 9.2: replaces milestonesReached (number[]) with metricsReached (string[]);
+//      adds lifetime counters viewsTotal, coinsEarned, streams.
+export type PersistedV6 = Omit<PersistedV5, "version" | "milestonesReached"> & {
+  version: 6;
+  metricsReached: string[];
+  viewsTotal: number;
+  coinsEarned: number;
+  streams: number;
+};
+
+export type PersistedState = PersistedV6;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -64,12 +81,17 @@ export function toPersistedState(state: FullState): PersistedState {
     boonMultiplier: state.boonMultiplier,
     lastSeenAt: Date.now(),
     ownedUpgrades: state.ownedUpgrades,
+    upgradeLevels: state.upgradeLevels,
     skillLevels: state.skillLevels,
     videos: state.videos,
     notifications: state.notifications,
     lastDailyClaimAt: state.lastDailyClaimAt,
-    milestonesReached: state.milestonesReached,
+    metricsReached: state.metricsReached,
     ownedElements: state.ownedElements,
+    tebTeachSeen: state.tebTeachSeen,
+    viewsTotal: state.viewsTotal,
+    coinsEarned: state.coinsEarned,
+    streams: state.streams,
   };
 }
 
@@ -89,8 +111,16 @@ const V1_TO_V2_UPGRADE_MAP: Record<string, string> = {
   ring_light: "usb_mic",
 };
 
+// Maps old numeric follower milestone values (FOLLOWER_MILESTONES) to the
+// new string metric IDs used in 9.2+. Only the thresholds present in both
+// the old and new catalogs are mapped; extras are dropped.
+const MILESTONE_TO_METRIC: Record<number, string> = {
+  100: "follower_100",
+  1000: "follower_1000",
+};
+
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -139,6 +169,35 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       version: 4,
       // v3 saves predate the element framework (7.3) — nothing unlocked yet.
       ownedElements: {},
+    };
+  }
+
+  if (version < 5) {
+    const v4 = state as PersistedV4;
+    state = {
+      ...v4,
+      version: 5,
+      // v4 saves predate repeatable upgrades (9.1) — no levels purchased yet.
+      upgradeLevels: {},
+      // v4 saves predate TEB teach (9.1) — show the teaching on next first tap.
+      tebTeachSeen: false,
+    };
+  }
+
+  if (version < 6) {
+    const v5 = state as PersistedV5;
+    const oldMilestones: number[] = v5.milestonesReached ?? [];
+    const metricsReached = oldMilestones.flatMap(
+      m => MILESTONE_TO_METRIC[m] ? [MILESTONE_TO_METRIC[m]] : [],
+    );
+    const { milestonesReached: _drop, ...rest } = v5;
+    state = {
+      ...rest,
+      version: 6,
+      metricsReached,
+      viewsTotal: 0,
+      coinsEarned: 0,
+      streams: 0,
     };
   }
 

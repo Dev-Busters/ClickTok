@@ -11,6 +11,15 @@ import { generateNpcDeck, formatCaption } from "../../features/feed/npcVideos";
 import { MOD_CATALOG, viralMult } from "../../features/feed/mods";
 import { TapCore } from "./TapCore";
 import { FloatingTextLayer, pushFloatText } from "../../components/fx/FloatingTextLayer";
+import {
+  isFeatureUnlocked,
+  getNextMetric,
+  metricCurrentValue,
+  featureLabel,
+  statLabel,
+  type UnlockStatCtx,
+} from "../../features/metrics/unlocks";
+import type { MetricDef } from "../../features/metrics/types";
 import type { VideoCard, ReactionKind } from "../../party/types";
 
 // 06 §3 Phase 8: canned comment one-liner pool — cosmetic only, moderation-safe.
@@ -51,6 +60,24 @@ export function HomeFeed() {
   const tapPower      = useGameStore(s => s.tapPower);
   const reactedByVideo = useGameStore(s => s.reactedByVideo);
   const reactToCard   = useGameStore(s => s.reactToCard);
+  const metricsReached = useGameStore(s => s.metricsReached);
+  const viewsTotal    = useGameStore(s => s.viewsTotal);
+  const streams       = useGameStore(s => s.streams);
+  const coinsEarned   = useGameStore(s => s.coinsEarned);
+
+  // 9.3: derive unlock flags from metricsReached (no extra persisted set)
+  const goLiveUnlocked    = isFeatureUnlocked("go_live",    metricsReached);
+  const diamondsUnlocked  = isFeatureUnlocked("diamonds",   metricsReached);
+  const feedPagerUnlocked = isFeatureUnlocked("feed_pager", metricsReached);
+
+  // 9.3: next-metric chip (shown from first crossing onward)
+  const unlockCtx: UnlockStatCtx = {
+    viewsTotal,
+    totalFollowers: wallet.totalFollowers,
+    streams,
+    coinsEarned,
+  };
+  const nextMetric = metricsReached.length > 0 ? getNextMetric(metricsReached) : null;
 
   // 7.5a: pad with a local NPC deck (offline-playable; server feed arrives in 7.5b)
   useEffect(() => {
@@ -157,54 +184,49 @@ export function HomeFeed() {
       style={{ position: 'relative', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}
     >
 
-      {/* ── Pager card layer (06 §3 / 8.3): backdrop + mod banner + poster
-           block follow the finger during drag and slide off/in with a
-           spring on release. The HUD (stat strip, stage, core, GO LIVE)
-           lives outside this layer and stays fixed. ─────────────────── */}
-      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-        <AnimatePresence initial={false} custom={swipeDir}>
-          <motion.div
-            key={activeCard?.videoId ?? "loading"}
-            custom={swipeDir}
-            variants={cardVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ y: { type: "spring", stiffness: 300, damping: 32 } }}
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={1}
-            dragMomentum={false}
-            onDragEnd={handlePagerDragEnd}
-            style={{ position: 'absolute', inset: 0 }}
-          >
-            {/* VideoCanvas ambient backdrop */}
-            <VideoCanvas
-              seed={activeCard?.handle ?? "fyp"}
-              topic={activeCard?.topic ?? "trending"}
-              intensity={canvasIntensity}
-            />
+      {/* ── Background layer: full pager when feed_pager unlocked, static canvas before ── */}
+      {feedPagerUnlocked ? (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          <AnimatePresence initial={false} custom={swipeDir}>
+            <motion.div
+              key={activeCard?.videoId ?? "loading"}
+              custom={swipeDir}
+              variants={cardVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ y: { type: "spring", stiffness: 300, damping: 32 } }}
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={1}
+              dragMomentum={false}
+              onDragEnd={handlePagerDragEnd}
+              style={{ position: 'absolute', inset: 0 }}
+            >
+              <VideoCanvas
+                seed={activeCard?.handle ?? "fyp"}
+                topic={activeCard?.topic ?? "trending"}
+                intensity={canvasIntensity}
+              />
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.48)', pointerEvents: 'none' }} />
+              {activeCard && <ModBanner mod={activeCard.mod} />}
+              <VideoInfoOverlay card={activeCard} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <VideoCanvas seed="fyp" topic="trending" intensity={canvasIntensity} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.48)', pointerEvents: 'none' }} />
+        </div>
+      )}
 
-            {/* Dark scrim */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'rgba(0,0,0,0.48)',
-              pointerEvents: 'none',
-            }} />
-
-            {/* Mod banner (06 §3 Phase 8: own centered full-width band, y 56-88) */}
-            {activeCard && <ModBanner mod={activeCard.mod} />}
-
-            {/* Poster info: @handle, caption, #topic, tap counter, sound marquee */}
-            <VideoInfoOverlay card={activeCard} />
-          </motion.div>
+      {/* ── Idle swipe-up hint (feed_pager only) ────────────────────────── */}
+      {feedPagerUnlocked && (
+        <AnimatePresence>
+          {showSwipeHint && <SwipeUpHint />}
         </AnimatePresence>
-      </div>
-
-      {/* ── Idle swipe-up hint (06 §3 Phase 8: first session only) ──────── */}
-      <AnimatePresence>
-        {showSwipeHint && <SwipeUpHint />}
-      </AnimatePresence>
+      )}
 
       {/* ── Top stat strip ───────────────────────────────────────────────── */}
       <div style={{
@@ -232,132 +254,142 @@ export function HomeFeed() {
         {/* Currency pills */}
         <div style={{ display: 'flex', gap: 6 }}>
           <CurrencyPill value={wallet.coins} icon="🪙" color="var(--gold)" />
-          <CurrencyPill value={wallet.diamonds} icon="💎" color="var(--cyan)" />
+          {diamondsUnlocked && <CurrencyPill value={wallet.diamonds} icon="💎" color="var(--cyan)" />}
         </div>
       </div>
 
-      {/* ── Element stage (upper ~35%, waves spawn here) ────────────────── */}
-      <ElementStage />
+      {/* ── Element stage (feed_pager only) ─────────────────────────────── */}
+      {feedPagerUnlocked && <ElementStage />}
 
       {/* ── TAP CORE v2 — dead center ─────────────────────────────────────── */}
       <TapCore />
 
-      {/* ── Arcade FX layer (task 8.2) — payout floats route here ─────────── */}
+      {/* ── Arcade FX layer ───────────────────────────────────────────────── */}
       <FloatingTextLayer />
 
-      {/* ── Engagement rail (task 8.5): part of the CARD layer, slides with it ── */}
-      <div
-        onPointerDown={e => e.stopPropagation()}
-        style={{
-          position: 'absolute', right: 10, bottom: 120,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
-          zIndex: 2,
-        }}
-      >
-        <FollowBadge
-          card={activeCard}
-          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.follow)}
-          onPress={() => pressReaction("follow")}
-          sweepTrigger={sweepTrigger}
-          sweepDelay={0}
-        />
-        <RailButton
-          count={activeCard?.reactions.likes ?? 0}
-          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.like)}
-          activeColor="var(--red)"
-          onPress={() => pressReaction("like")}
-          sweepTrigger={sweepTrigger}
-          sweepDelay={0.08}
-          icon={
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-            </svg>
-          }
-        />
-        <RailButton
-          count={activeCard?.reactions.comments ?? 0}
-          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.comment)}
-          activeColor="var(--cyan)"
-          onPress={() => pressReaction("comment")}
-          sweepTrigger={sweepTrigger}
-          sweepDelay={0.16}
-          icon={
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.5 2 2 6 2 11c0 2.6 1.2 4.9 3.2 6.6-.2 1.2-.8 2.6-2 3.6 0 0 2.8.2 5-1.4 1.2.4 2.5.6 3.8.6 5.5 0 10-4 10-9S17.5 2 12 2Z" />
-            </svg>
-          }
-        />
-        <RailButton
-          count={activeCard?.reactions.shares ?? 0}
-          active={!!(activeCard && reactedByVideo[activeCard.videoId]?.share)}
-          activeColor="var(--gold)"
-          onPress={() => pressReaction("share")}
-          sweepTrigger={sweepTrigger}
-          sweepDelay={0.24}
-          icon={
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 17 17 7M9 7h8v8" />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* ── Canned comment one-liner (task 8.5): cosmetic, bottom-left ──────── */}
-      <AnimatePresence>
-        {commentLine && (
-          <motion.div
-            key={commentLine.id}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.25 }}
-            style={{
-              position: 'absolute', left: 12, bottom: 145,
-              maxWidth: 240,
-              padding: '5px 10px',
-              borderRadius: 999,
-              background: 'rgba(0,0,0,0.5)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              pointerEvents: 'none', zIndex: 2,
-            }}
-          >
-            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: '#fff' }}>
-              💬 {commentLine.text}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Bottom: GO LIVE pill (persists across swipes) ────────────────── */}
-      <div style={{
-        position: 'absolute', left: 12, bottom: 14,
-        pointerEvents: 'none',
-        zIndex: 2,
-      }}>
-        <motion.button
-          onPointerDown={e => { e.stopPropagation(); setSheet('create'); }}
-          whileHover={{ scale: 1.05, boxShadow: '0 0 22px rgba(255,31,75,0.5)' }}
-          whileTap={{ scale: 0.94 }}
-          transition={{ type: "spring", stiffness: 520, damping: 24 }}
+      {/* ── Engagement rail (feed_pager only) ───────────────────────────── */}
+      {feedPagerUnlocked && (
+        <div
+          onPointerDown={e => e.stopPropagation()}
           style={{
-            pointerEvents: 'auto',
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '7px 14px',
-            borderRadius: 999,
-            background: 'rgba(255,31,75,0.16)',
-            border: '1px solid var(--red)',
-            cursor: 'pointer',
+            position: 'absolute', right: 10, bottom: 120,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
+            zIndex: 2,
           }}
         >
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', boxShadow: '0 0 8px var(--red)', animation: 'dot-pulse 1.6s ease-in-out infinite' }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.14em', color: 'var(--red)' }}>
-            GO LIVE
-          </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>
-            ~{formatCount(projectedViewers)} viewers
-          </span>
-        </motion.button>
-      </div>
+          <FollowBadge
+            card={activeCard}
+            active={!!(activeCard && reactedByVideo[activeCard.videoId]?.follow)}
+            onPress={() => pressReaction("follow")}
+            sweepTrigger={sweepTrigger}
+            sweepDelay={0}
+          />
+          <RailButton
+            count={activeCard?.reactions.likes ?? 0}
+            active={!!(activeCard && reactedByVideo[activeCard.videoId]?.like)}
+            activeColor="var(--red)"
+            onPress={() => pressReaction("like")}
+            sweepTrigger={sweepTrigger}
+            sweepDelay={0.08}
+            label="LIKE"
+            icon={
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            }
+          />
+          <RailButton
+            count={activeCard?.reactions.comments ?? 0}
+            active={!!(activeCard && reactedByVideo[activeCard.videoId]?.comment)}
+            activeColor="var(--cyan)"
+            onPress={() => pressReaction("comment")}
+            sweepTrigger={sweepTrigger}
+            sweepDelay={0.16}
+            label="COMMENT"
+            icon={
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.5 2 2 6 2 11c0 2.6 1.2 4.9 3.2 6.6-.2 1.2-.8 2.6-2 3.6 0 0 2.8.2 5-1.4 1.2.4 2.5.6 3.8.6 5.5 0 10-4 10-9S17.5 2 12 2Z" />
+              </svg>
+            }
+          />
+          <RailButton
+            count={activeCard?.reactions.shares ?? 0}
+            active={!!(activeCard && reactedByVideo[activeCard.videoId]?.share)}
+            activeColor="var(--gold)"
+            onPress={() => pressReaction("share")}
+            sweepTrigger={sweepTrigger}
+            sweepDelay={0.24}
+            label="SHARE"
+            icon={
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 17 17 7M9 7h8v8" />
+              </svg>
+            }
+          />
+        </div>
+      )}
+
+      {/* ── Canned comment one-liner (feed_pager only) ──────────────────── */}
+      {feedPagerUnlocked && (
+        <AnimatePresence>
+          {commentLine && (
+            <motion.div
+              key={commentLine.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.25 }}
+              style={{
+                position: 'absolute', left: 12, bottom: 145,
+                maxWidth: 240,
+                padding: '5px 10px',
+                borderRadius: 999,
+                background: 'rgba(0,0,0,0.5)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                pointerEvents: 'none', zIndex: 2,
+              }}
+            >
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: '#fff' }}>
+                💬 {commentLine.text}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
+      {/* ── GO LIVE pill (go_live unlock only) ──────────────────────────── */}
+      {goLiveUnlocked && (
+        <div style={{ position: 'absolute', left: 12, bottom: 14, pointerEvents: 'none', zIndex: 2 }}>
+          <motion.button
+            onPointerDown={e => { e.stopPropagation(); setSheet('create'); }}
+            whileHover={{ scale: 1.05, boxShadow: '0 0 22px rgba(255,31,75,0.5)' }}
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 520, damping: 24 }}
+            style={{
+              pointerEvents: 'auto',
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '7px 14px',
+              borderRadius: 999,
+              background: 'rgba(255,31,75,0.16)',
+              border: '1px solid var(--red)',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', boxShadow: '0 0 8px var(--red)', animation: 'dot-pulse 1.6s ease-in-out infinite' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.14em', color: 'var(--red)' }}>
+              GO LIVE
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text)' }}>
+              ~{formatCount(projectedViewers)} viewers
+            </span>
+          </motion.button>
+        </div>
+      )}
+
+      {/* ── Next metric tracker chip (from first crossing onward) ────────── */}
+      {nextMetric && (
+        <NextMetricChip metric={nextMetric} ctx={unlockCtx} />
+      )}
     </div>
   );
 }
@@ -462,6 +494,52 @@ function VideoInfoOverlay({ card }: { card: VideoCard | undefined }) {
 }
 
 
+// ── Next metric tracker chip (09 §10.3) ─────────────────────────────────────
+
+function NextMetricChip({ metric, ctx }: { metric: MetricDef; ctx: UnlockStatCtx }) {
+  const current = Math.min(metricCurrentValue(metric, ctx), metric.threshold);
+  const pct = current / metric.threshold;
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      style={{
+        position: 'absolute', right: 12, bottom: 14, zIndex: 2,
+        display: 'flex', flexDirection: 'column', gap: 4,
+        padding: '6px 10px',
+        borderRadius: 10,
+        background: 'rgba(0,0,0,0.62)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        pointerEvents: 'none',
+        minWidth: 110,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--dim)', letterSpacing: '0.15em' }}>
+          NEXT
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text)', letterSpacing: '0.08em' }}>
+          {formatCount(metric.threshold)} {statLabel(metric.stat)}
+        </span>
+      </div>
+      {/* Progress bar */}
+      <div style={{ height: 2, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.round(pct * 100)}%`, background: 'var(--cyan)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--dim)' }}>
+          {formatCount(current)} / {formatCount(metric.threshold)}
+        </span>
+        {metric.unlocks && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--cyan)', letterSpacing: '0.08em' }}>
+            → {featureLabel(metric.unlocks)}
+          </span>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function CurrencyPill({ value, icon, color }: { value: number; icon: string; color: string }) {
   return (
     <div style={{
@@ -483,7 +561,7 @@ function CurrencyPill({ value, icon, color }: { value: number; icon: string; col
 // a successful (once-per-video) reaction; a spent press shakes ~2px and pays
 // nothing. SUPERFAN sweep: all 4 rail icons flash gold in sequence, staggered
 // by `sweepDelay`.
-function RailButton({ icon, count, active, activeColor, onPress, sweepTrigger, sweepDelay }: {
+function RailButton({ icon, count, active, activeColor, onPress, sweepTrigger, sweepDelay, label }: {
   icon: React.ReactNode;
   count: number;
   active: boolean;
@@ -491,6 +569,7 @@ function RailButton({ icon, count, active, activeColor, onPress, sweepTrigger, s
   onPress: () => boolean;
   sweepTrigger: number;
   sweepDelay: number;
+  label: string;
 }) {
   const controls = useAnimationControls();
   const sweepRef = useRef(sweepTrigger);
@@ -536,6 +615,13 @@ function RailButton({ icon, count, active, activeColor, onPress, sweepTrigger, s
       }}>
         {formatCount(count)}
       </span>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: '7px', letterSpacing: '0.12em',
+        color: 'rgba(255,255,255,0.45)',
+        textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+      }}>
+        {label}
+      </span>
     </motion.button>
   );
 }
@@ -571,37 +657,46 @@ function FollowBadge({ card, active, onPress, sweepTrigger, sweepDelay }: {
   };
 
   return (
-    <div style={{ position: 'relative', width: 44, height: 44 }}>
-      <motion.div
-        whileHover={{ scale: 1.1 }}
-        style={{
-          width: 44, height: 44, borderRadius: '50%',
-          background: avatarGradient(card?.handle ?? "fyp"),
-          border: '1.5px solid #fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: '17px', color: '#fff' }}>
-          {(card?.handle || "?").slice(0, 2).toUpperCase()}
-        </span>
-      </motion.div>
-      <motion.button
-        onPointerDown={e => { e.stopPropagation(); handlePress(); }}
-        animate={controls}
-        initial={false}
-        whileTap={{ scale: 0.85 }}
-        style={{
-          position: 'absolute', left: '50%', bottom: '-7px', transform: 'translateX(-50%)',
-          width: 18, height: 18, borderRadius: '50%',
-          background: restColor,
-          border: 'none', padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1,
-          cursor: 'pointer',
-        }}
-      >
-        {active ? '✓' : '+'}
-      </motion.button>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'relative', width: 44, height: 44 }}>
+        <motion.div
+          whileHover={{ scale: 1.1 }}
+          style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: avatarGradient(card?.handle ?? "fyp"),
+            border: '1.5px solid #fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '17px', color: '#fff' }}>
+            {(card?.handle || "?").slice(0, 2).toUpperCase()}
+          </span>
+        </motion.div>
+        <motion.button
+          onPointerDown={e => { e.stopPropagation(); handlePress(); }}
+          animate={controls}
+          initial={false}
+          whileTap={{ scale: 0.85 }}
+          style={{
+            position: 'absolute', left: '50%', bottom: '-7px', transform: 'translateX(-50%)',
+            width: 18, height: 18, borderRadius: '50%',
+            background: restColor,
+            border: 'none', padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1,
+            cursor: 'pointer',
+          }}
+        >
+          {active ? '✓' : '+'}
+        </motion.button>
+      </div>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: '7px', letterSpacing: '0.12em',
+        color: active ? 'var(--cyan)' : 'rgba(255,255,255,0.45)',
+        textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+      }}>
+        {active ? 'FOLLOWING' : 'FOLLOW'}
+      </span>
     </div>
   );
 }

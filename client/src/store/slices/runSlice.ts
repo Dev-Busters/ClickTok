@@ -519,10 +519,12 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       grade,
     };
 
+    const { streams } = get();
     set({
       phase: "results",
       lastResult: result,
       boonChoices: grade !== "FLOP" ? BOON_LIST : null,
+      streams: streams + 1,
       wallet: {
         ...wallet,
         followers: wallet.followers + followers,

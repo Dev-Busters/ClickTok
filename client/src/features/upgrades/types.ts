@@ -1,7 +1,7 @@
 import type { Currency } from "../economy/types";
 import type { ReactionId } from "../livestream/types";
 
-export type UpgradeCategory = "gear" | "software";
+export type UpgradeCategory = "gear" | "software" | "repeatable";
 
 export type UpgradeEffect = {
   postPowerAdd?: number;
@@ -22,7 +22,13 @@ export type UpgradeDef = {
   category: UpgradeCategory;
   name: string;
   description: string;            // human copy; can be templated from effect
-  cost: Partial<Record<Currency, number>>; // usually { coins } or { coins, diamonds }
-  requires?: { followers?: number; upgrades?: string[] }; // unlock gating
   effect: UpgradeEffect;
+  requires?: { followers?: number; upgrades?: string[] }; // unlock gating
+  // One-time purchase (present iff repeatable is absent):
+  cost?: Partial<Record<Currency, number>>; // usually { coins } or { coins, diamonds }
+  // Repeatable/leveled (all three present iff repeatable: true — see 01 §10.4):
+  repeatable?: true;
+  baseCost?: Partial<Record<Currency, number>>; // cost at level 0 (first buy)
+  costGrowth?: number;                          // cost(L) = round(baseCost × costGrowth^L)
+  maxLevel?: number;                            // if absent, unlimited
 };

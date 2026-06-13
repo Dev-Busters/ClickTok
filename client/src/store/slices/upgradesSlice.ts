@@ -5,12 +5,16 @@ import type { Currency } from "../../features/economy/types";
 
 export type UpgradesSlice = {
   ownedUpgrades: Record<string, boolean>;
-  buyUpgrade: (id: string) => boolean;        // false if locked/can't afford
+  upgradeLevels: Record<string, number>;
+  buyUpgrade: (id: string) => boolean;        // false if locked/can't afford/repeatable
   isUpgradeUnlocked: (id: string) => boolean; // passes `requires`
+  upgradeCost: (id: string) => number;        // coins for next level (0 if maxed/not repeatable)
+  levelUpgrade: (id: string) => boolean;      // false if can't afford/maxed/not repeatable
 };
 
 export const createUpgradesSlice: StateCreator<FullState, [], [], UpgradesSlice> = (set, get) => ({
   ownedUpgrades: {},
+  upgradeLevels: {},
 
   isUpgradeUnlocked: (id) => {
     const def = UPGRADE_CATALOG.find(u => u.id === id);
@@ -25,22 +29,49 @@ export const createUpgradesSlice: StateCreator<FullState, [], [], UpgradesSlice>
 
   buyUpgrade: (id) => {
     const def = UPGRADE_CATALOG.find(u => u.id === id);
-    if (!def) return false;
+    if (!def || def.repeatable) return false; // repeatables use levelUpgrade
     const { ownedUpgrades, wallet, isUpgradeUnlocked } = get();
     if (ownedUpgrades[id] || !isUpgradeUnlocked(id)) return false;
 
-    for (const [currency, amount] of Object.entries(def.cost) as [Currency, number][]) {
+    const cost = def.cost ?? {};
+    for (const [currency, amount] of Object.entries(cost) as [Currency, number][]) {
       if (wallet[currency] < amount) return false;
     }
 
     const newWallet = { ...wallet };
-    for (const [currency, amount] of Object.entries(def.cost) as [Currency, number][]) {
+    for (const [currency, amount] of Object.entries(cost) as [Currency, number][]) {
       newWallet[currency] -= amount;
     }
 
     set({
       ownedUpgrades: { ...ownedUpgrades, [id]: true },
       wallet: newWallet,
+    });
+    get().recomputeStats();
+    return true;
+  },
+
+  upgradeCost: (id) => {
+    const def = UPGRADE_CATALOG.find(u => u.id === id);
+    if (!def?.repeatable || !def.baseCost || def.costGrowth === undefined) return 0;
+    const level = get().upgradeLevels[id] ?? 0;
+    if (def.maxLevel !== undefined && level >= def.maxLevel) return 0;
+    const base = def.baseCost.coins ?? 0;
+    return Math.round(base * Math.pow(def.costGrowth, level));
+  },
+
+  levelUpgrade: (id) => {
+    const def = UPGRADE_CATALOG.find(u => u.id === id);
+    if (!def?.repeatable) return false;
+    const { upgradeLevels, wallet } = get();
+    const level = upgradeLevels[id] ?? 0;
+    if (def.maxLevel !== undefined && level >= def.maxLevel) return false;
+    const cost = get().upgradeCost(id);
+    if (cost === 0) return false;
+    if (wallet.coins < cost) return false;
+    set({
+      upgradeLevels: { ...upgradeLevels, [id]: level + 1 },
+      wallet: { ...wallet, coins: wallet.coins - cost },
     });
     get().recomputeStats();
     return true;

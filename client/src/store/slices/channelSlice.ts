@@ -21,6 +21,15 @@ export type ChannelSlice = {
 
   lastSeenAt: number; // ms epoch, for idle income (04 § Idle)
 
+  // Phase 9.1 — TEB first-press teaching
+  tebTeachSeen: boolean;
+  setTebTeachSeen: () => void;
+
+  // Phase 9.2 — lifetime metric counters
+  viewsTotal: number;   // lifetime engageTap taps
+  coinsEarned: number;  // lifetime coins earned via active tapping
+  streams: number;      // lifetime completed runs
+
   setHandle: (handle: string) => void;
   tap: () => void;
   tick: (dt: number) => void;
@@ -44,10 +53,15 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   multiplier: 1,
   followerConversion: 1,
   boonMultiplier: 1,
+  tebTeachSeen: false,
+  viewsTotal: 0,
+  coinsEarned: 0,
+  streams: 0,
 
   lastSeenAt: Date.now(),
 
   setHandle: (handle) => set({ handle }),
+  setTebTeachSeen: () => set({ tebTeachSeen: true }),
 
   tap: () => {
     const { tapPower, multiplier, followerConversion, wallet } = get();
@@ -70,7 +84,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     // 3.2: runs every frame (the meta loop always calls tick()), so this is
     // the single integration point that catches totalFollowers crossing a
     // milestone from any source (taps, passive income, idle income, runs).
-    get().checkMilestones();
+    get().checkMetrics();
     get().decayCombo(dt);
     get().expireOrResolveWave();
 
@@ -88,9 +102,9 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   },
 
   // 04 §1/§2: postPower/multiplier/followerConversion/passiveCoinsPerSec from
-  // owned gear+software effects and Charisma/Editing skill levels.
+  // owned gear+software effects, repeatable upgrade levels, and Charisma/Editing skills.
   recomputeStats: () => {
-    const { ownedUpgrades, skillLevels, boonMultiplier, algorithm } = get();
+    const { ownedUpgrades, upgradeLevels, skillLevels, boonMultiplier, algorithm } = get();
 
     let postPowerAdd = 0;
     let postPowerMult = 1;
@@ -98,7 +112,9 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     let multiplierMult = 1;
     let followerConversionAdd = 0;
 
+    // One-time gear/software
     for (const def of UPGRADE_CATALOG) {
+      if (def.repeatable) continue;
       if (!ownedUpgrades[def.id]) continue;
       const e = def.effect;
       if (e.postPowerAdd) postPowerAdd += e.postPowerAdd;
@@ -106,6 +122,18 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
       if (e.passiveCoinsAdd) passiveCoinsAdd += e.passiveCoinsAdd;
       if (e.multiplierMult) multiplierMult *= e.multiplierMult;
       if (e.followerConversionAdd) followerConversionAdd += e.followerConversionAdd;
+    }
+
+    // Repeatable upgrades: effect × level (multiplierMult compounds via Math.pow)
+    for (const def of UPGRADE_CATALOG) {
+      if (!def.repeatable) continue;
+      const level = upgradeLevels[def.id] ?? 0;
+      if (level === 0) continue;
+      const e = def.effect;
+      if (e.postPowerAdd) postPowerAdd += e.postPowerAdd * level;
+      if (e.passiveCoinsAdd) passiveCoinsAdd += e.passiveCoinsAdd * level;
+      if (e.multiplierMult) multiplierMult *= Math.pow(e.multiplierMult, level);
+      if (e.followerConversionAdd) followerConversionAdd += e.followerConversionAdd * level;
     }
 
     const charismaPostBonus = skillLevels.charisma * 1;

@@ -135,6 +135,13 @@ export const BALANCE = {
     npcSeedLikesMax: 100000,       //   [min, max]; comments/shares derived (§13.7)
   },
 
+  // Phase 9 — repeatable upgrades (04 §14)
+  upgrades: {
+    engagementBoost: { baseCost: 10, costGrowth: 1.45, maxLevel: 25, postPowerAddPerLevel: 1 },
+    loyalFollowers:  { baseCost: 40, costGrowth: 1.50, maxLevel: 15, followerConversionAddPerLevel: 0.2 },
+    autoEngageBot:   { baseCost: 75, costGrowth: 1.60, maxLevel: 20, passiveCoinsAddPerLevel: 0.5 },
+  },
+
   // Phase 7.3 — the element framework (04 §13.2)
   elements: {
     waveIdleGapSec: 6,             // scheduler: breathing room between waves (one wave at a time)

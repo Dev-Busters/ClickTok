@@ -47,7 +47,10 @@ export const createCloudSlice: StateCreator<FullState, [], [], CloudSlice> = (se
       videos: persisted.videos,
       notifications: persisted.notifications,
       lastDailyClaimAt: persisted.lastDailyClaimAt,
-      milestonesReached: persisted.milestonesReached,
+      metricsReached: persisted.metricsReached,
+      viewsTotal: persisted.viewsTotal,
+      coinsEarned: persisted.coinsEarned,
+      streams: persisted.streams,
     });
     get().recomputeStats();
   },

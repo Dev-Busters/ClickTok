@@ -1,8 +1,44 @@
 import type { UpgradeDef } from "./types";
+import { BALANCE } from "../economy/balance";
 
-// IDs are stable — see `04-economy-formulas.md` §4. Costs in coins unless noted.
-// Each category is gated linearly: owning the previous item unlocks the next.
+// IDs are stable — see `04-economy-formulas.md` §4 (one-time) and §14 (repeatable).
+// Each one-time category is gated linearly: owning the previous item unlocks the next.
 export const UPGRADE_CATALOG: UpgradeDef[] = [
+  // --- Repeatable (leveled) ---
+  {
+    id: "engagement_boost",
+    category: "repeatable",
+    name: "Engagement Boost",
+    description: `+${BALANCE.upgrades.engagementBoost.postPowerAddPerLevel} post power per level`,
+    effect: { postPowerAdd: BALANCE.upgrades.engagementBoost.postPowerAddPerLevel },
+    repeatable: true,
+    baseCost: { coins: BALANCE.upgrades.engagementBoost.baseCost },
+    costGrowth: BALANCE.upgrades.engagementBoost.costGrowth,
+    maxLevel: BALANCE.upgrades.engagementBoost.maxLevel,
+  },
+  {
+    id: "loyal_followers",
+    category: "repeatable",
+    name: "Loyal Followers",
+    description: `+${BALANCE.upgrades.loyalFollowers.followerConversionAddPerLevel} follower conversion per level`,
+    effect: { followerConversionAdd: BALANCE.upgrades.loyalFollowers.followerConversionAddPerLevel },
+    repeatable: true,
+    baseCost: { coins: BALANCE.upgrades.loyalFollowers.baseCost },
+    costGrowth: BALANCE.upgrades.loyalFollowers.costGrowth,
+    maxLevel: BALANCE.upgrades.loyalFollowers.maxLevel,
+  },
+  {
+    id: "auto_engage_bot",
+    category: "repeatable",
+    name: "Auto-Engage Bot",
+    description: `+${BALANCE.upgrades.autoEngageBot.passiveCoinsAddPerLevel} coins/sec per level`,
+    effect: { passiveCoinsAdd: BALANCE.upgrades.autoEngageBot.passiveCoinsAddPerLevel },
+    repeatable: true,
+    baseCost: { coins: BALANCE.upgrades.autoEngageBot.baseCost },
+    costGrowth: BALANCE.upgrades.autoEngageBot.costGrowth,
+    maxLevel: BALANCE.upgrades.autoEngageBot.maxLevel,
+  },
+
   // --- Gear ---
   {
     id: "ring_light",

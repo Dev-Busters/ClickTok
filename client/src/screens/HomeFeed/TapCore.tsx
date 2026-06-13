@@ -254,6 +254,8 @@ export function TapCore() {
   const tapPower = useGameStore(s => s.tapPower);
   const multiplier = useGameStore(s => s.multiplier);
   const activeMod = useGameStore(s => s.deck[s.deckIndex]?.mod ?? null);
+  const tebTeachSeen = useGameStore(s => s.tebTeachSeen);
+  const setTebTeachSeen = useGameStore(s => s.setTebTeachSeen);
 
   const [tapFxs, setTapFxs] = useState<TapFx[]>([]);
   const [tierFlash, setTierFlash] = useState(false);
@@ -261,6 +263,9 @@ export function TapCore() {
   const [eruption, setEruption] = useState(false);
   const [ringDrain, setRingDrain] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  // TEB first-press teach: show once per lifetime, auto-dismiss after 3s
+  const [showTebTeach, setShowTebTeach] = useState(false);
+  const tebTeachTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fxTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const eruptionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const ringDrainTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -324,6 +329,7 @@ export function TapCore() {
       fxTimers.current.forEach(clearTimeout);
       clearTimeout(eruptionTimer.current);
       clearTimeout(ringDrainTimer.current);
+      clearTimeout(tebTeachTimer.current);
     };
   }, []);
 
@@ -331,6 +337,14 @@ export function TapCore() {
     e.stopPropagation();
     const now = Date.now();
     const wasViral = viralUntil > now;
+
+    // TEB first-press teaching: show once ever on the very first tap
+    if (!tebTeachSeen) {
+      setTebTeachSeen();
+      setShowTebTeach(true);
+      clearTimeout(tebTeachTimer.current);
+      tebTeachTimer.current = setTimeout(() => setShowTebTeach(false), 3000);
+    }
     // Compute gain at current combo BEFORE engageTap increments it
     const cMult = comboMult; // already computed from clampedCombo above
     const modMult = coreCoinMult(activeMod);
@@ -378,6 +392,39 @@ export function TapCore() {
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
       zIndex: 3,
     }}>
+      {/* 9.1: TEB first-press teaching callout — one-time, auto-dismisses after 3s */}
+      <AnimatePresence>
+        {showTebTeach && (
+          <motion.div
+            key="teb-teach"
+            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              padding: '6px 16px', borderRadius: 8,
+              background: 'rgba(0,0,0,0.7)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              pointerEvents: 'none',
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--font-display)', fontSize: '15px', letterSpacing: '0.08em',
+              color: 'var(--text)',
+            }}>
+              THE ENGAGEMENT BUTTON
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em',
+              color: 'var(--dim)',
+            }}>
+              TAP TO GROW YOUR CHANNEL
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 8.4: "🔥 VIRAL ×2" banner with draining time bar — shown above the core */}
       <AnimatePresence>
         {isViral && (
