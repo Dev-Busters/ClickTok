@@ -1199,15 +1199,25 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > Probe `probe-7.6.mjs` 12/12. Browser two-window pass: viewer B's raw WS sent engage(20);
   > poster A's `likes` rose by 10 (20 × 0.5 ✓), deck card `tapCount` updated to 20 ✓.
 
-- [ ] **7.7 — Live stage backdrop (kill the last blank center).** Render `VideoCanvas` behind
+- [x] **7.7 — Live stage backdrop (kill the last blank center).** Render `VideoCanvas` behind
   BOTH `StreamerLive` and `SpectatorLive` (seed = `streamId` + handle, topic = run topic) with
   `intensity` driven by current hype and a dark scrim preserving HUD/feed legibility (`06` §7).
   Also seed it on the featured-sim spectator path.
   **Refs:** `01` §8.4, `06` §7–8. **DoD:** preview: streamer run + spectate (real or featured)
   both show the animated stage that visibly energizes as hype climbs; HUD/feed still readable;
   no fps regression with a busy feed; typecheck.
+  > note: added `VideoCanvas` import to both `StreamerLive.tsx` and `SpectatorLive.tsx`. In
+  > the stage div of each, placed VideoCanvas first (seed=`${streamId}${handle}` / `${spectating.streamId}${spectating.handle}`,
+  > intensity=`hype/100`, no `dim` prop) followed by a manual `rgba(0,0,0,0.55)` scrim (matching
+  > HomeFeed's pattern — `dim` prop was intended for a different context) and then the existing
+  > hype-glow radial gradient on top. Featured-sim spectator path uses the same `SpectatorLive`
+  > component, so the backdrop applies automatically via `spectating.streamId`/`spectating.handle`.
+  > Verified in preview (390px): at hype=50 → warm gold/teal blobs + `#gaming` text faintly
+  > centered; at hype=90 → deep red/crimson glow + faster blob movement (intensity 0.9 vs 0.5),
+  > clearly energized. HUD (top bar, viewer count, modifiers, hype bar, collected ticker, hotbar)
+  > fully readable. Zero console errors. `pnpm typecheck` passes.
 
-- [ ] **7.8 — First-run coach marks + affordance pass.** Three-step overlay per `06` §3 anchored
+- [x] **7.8 — First-run coach marks + affordance pass.** Three-step overlay per `06` §3 anchored
   to TAP CORE / element stage / GO LIVE pill; `uiSlice.coachMarksSeen` persisted (⚠ `partialize` +
   SAVE_VERSION bump + migration defaulting false, per `02` §4 — old saves must load). Affordance
   sweep across ALL screens: every interactive element gets a visible text label or an
@@ -1217,6 +1227,8 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   the overlay exactly once (reload → never again; old save migrates clean — verify the migration
   via tsx, not the browser); an audit of all 5 tabs + Live (text `preview_snapshot`s, NOT image
   screenshots) shows no unlabeled interactive elements; typecheck.
+  > superseded: the 3-step coach-mark overlay is retired; TEB first-press teaching (`tebTeachSeen`,
+  > 9.1) + Phase-9 progressive unlock replaces it. The affordance sweep was folded into 9.5.
 
 ---
 
@@ -1391,6 +1403,48 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > process) that left the browser talking to a pre-edit server instance — no code issue,
   > just killed the stale process and restarted `clicktok-party`. `npx partykit deploy`
   > deferred — flagging to the user since it pushes to the live PartyKit room.
+
+---
+
+## PHASE 9 — Onboarding, Creator Insights & Progressive Unlock (design LOCKED 2026-06-13, `01` §10)
+
+- [x] **9.1 — Repeatable upgrades + TEB rename. ← BUILD THIS PASS.** Dual-axis upgrade
+  model + early repeatable catalog + `recomputeStats` fold + UpgradeShop LEVEL UP section +
+  SAVE_VERSION 4→5 with `upgradeLevels`/`tebTeachSeen` + TEB first-press teaching copy.
+  Ships ungated (works on Profile today).
+  **Refs:** `01` §10.1/§10.4, `03` §2 (UpgradeDef + UpgradesSlice), `04` §14.1–§14.2,
+  `06` §10.1/§10.4. **DoD:** `pnpm typecheck` passes; `npx tsx client/scripts/simBalance.ts`
+  passes all targets including new (f) "first repeatable buy ≤ 3 taps"; browser preview on a
+  fresh save: tap TEB → first-press teaching shows once → buy Engagement Boost (~2 taps) →
+  coins/tap visibly rises → buy Loyal Followers → followers/tap rises → buy Auto-Engage Bot →
+  passive coins tick → reload → `upgradeLevels` persists (localStorage `version: 5`); v4 save
+  migrates cleanly (default `{}`); zero console errors.
+
+- [x] **9.2 — Metric ladder + Creator Insights data.** Metric catalog (`MetricDef` array)
+  + tracked counters (`viewsTotal` incremented in `engageTap`, lifetime coins, streams);
+  generalize `checkMilestones` → `checkMetrics`; rewards (coins/💎) + inbox notifications;
+  persist `metricsReached: string[]`. SAVE bump + migration mapping old `milestonesReached[]`
+  (numbers → `follower_N` ids) + default `viewsTotal: 0`, `coinsEarned: 0`, `streams: 0`.
+  **Refs:** `01` §10.2, `03` §8.5, `04` §14.3, `02` §4.
+
+- [x] **9.3 — Progressive-unlock framework + gating.** `isFeatureUnlocked(featureId)`;
+  gate Home surfaces (GO LIVE pill, mod banner, element stage, feed pager/rail), bottom-nav
+  tabs (Discover, Inbox, Create), Diamonds pill; minimal fresh-Home: stat strip + TEB +
+  VideoCanvas backdrop only. Home "next metric" tracker chip.
+  **Refs:** `01` §10.3, `06` §10.2/§10.3.
+
+- [x] **9.4 — Creator Insights screen.** `screens/CreatorInsights/` — the visible metric
+  ladder, linked from Profile. Shows completed ✓, next target highlighted, upcoming dimmed.
+  **Refs:** `01` §10.2, `06` §10.2.
+
+- [x] **9.5 — First-run polish.** Fold/retire the 7.8 coach marks into the Phase-9 onboarding
+  flow; affordance sweep (every interactive element has a visible label, per `01` §8.5);
+  audit fresh-Home for dead centers.
+  **Refs:** `01` §8.5/§10.3, `06` §10.3.
+  > 7.8 was never implemented; its 3-step overlay is superseded by TEB teach (9.1) + progressive
+  > unlock (9.2–9.4). Affordance sweep applied: center nav "+" button got "LIVE" text label;
+  > engagement rail buttons got LIKE/COMMENT/SHARE micro-labels; FollowBadge got FOLLOW/FOLLOWING
+  > label. Fresh-Home dead-center: TEB at `top:50%` is visually centered; TAP idle label present.
 
 ---
 

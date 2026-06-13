@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useGameStore } from "../../store";
 import { ProgressBar } from "../../components/ProgressBar";
 import { HeartRain } from "../../components/HeartRain";
+import { VideoCanvas } from "../../components/VideoCanvas";
 import { avatarGradient } from "../../lib/avatar";
 import { formatCount } from "../../lib/format";
 import { hypeColor, formatTimer } from "./shared";
@@ -154,6 +155,12 @@ export function SpectatorLive() {
 
       {/* Stage + spectator feed */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <VideoCanvas
+          seed={`${spectating.streamId}${spectating.handle}`}
+          topic={spectating.topic}
+          intensity={hype / 100}
+        />
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
         <div style={{
           position: "absolute",
           inset: 0,

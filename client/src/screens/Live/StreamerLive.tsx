@@ -6,6 +6,7 @@ import { ProgressBar } from "../../components/ProgressBar";
 import { LiveFeed } from "../../components/LiveFeed";
 import { ReactionHotbar } from "../../components/ReactionHotbar";
 import { HeartRain } from "../../components/HeartRain";
+import { VideoCanvas } from "../../components/VideoCanvas";
 import { avatarGradient } from "../../lib/avatar";
 import { formatCount } from "../../lib/format";
 import { BALANCE } from "../../features/economy/balance";
@@ -71,6 +72,7 @@ export function StreamerLive() {
   const phase = useGameStore(s => s.phase);
   const params = useGameStore(s => s.params);
   const handle = useGameStore(s => s.handle);
+  const streamId = useGameStore(s => s.streamId);
   const viewers = useGameStore(s => s.viewers);
   const realViewers = useGameStore(s => s.realViewers);
   const peakViewers = useGameStore(s => s.peakViewers);
@@ -213,6 +215,12 @@ export function StreamerLive() {
 
       {/* Stage + live feed */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <VideoCanvas
+          seed={streamId ? `${streamId}${handle}` : handle}
+          topic={params.topic}
+          intensity={hype / 100}
+        />
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
         <div style={{
           position: "absolute",
           inset: 0,
