@@ -2,7 +2,7 @@ import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import type { VideoCard, LobbyClientMessage } from "../../party/types";
 import { BALANCE } from "../../features/economy/balance";
-import { coreCoinMult, effectiveWaveIdleGapSec, MOD_IDS } from "../../features/feed/mods";
+import { coreCoinMult, effectiveWaveIdleGapSec, viralMult, MOD_IDS } from "../../features/feed/mods";
 import { CAPTION_IDS } from "../../features/feed/npcVideos";
 import { lobbySendRef } from "../../party/socketRefs";
 
@@ -16,6 +16,7 @@ function computeCreatorLevel(totalFollowers: number): number {
 export type FeedSlice = {
   combo: number;        // consecutive-tap counter (float during decay)
   lastTapAt: number;   // ms epoch — drives combo decay check
+  viralUntil: number;  // (8.4) ms epoch — combo frozen + all payouts ×viralGainMult until this
   // 7.5+ fields (stubs until the pager exists)
   deck: VideoCard[];
   deckIndex: number;
@@ -35,6 +36,7 @@ export type FeedSlice = {
 export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set, get) => ({
   combo: 0,
   lastTapAt: 0,
+  viralUntil: 0,
   deck: [],
   deckIndex: 0,
   tapsThisCard: 0,
@@ -42,24 +44,46 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   royaltyToast: null,
 
   engageTap: () => {
-    const { tapPower, multiplier, followerConversion, wallet, combo, activeWave, deck, deckIndex, tapsThisCard } = get();
+    const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, activeWave, deck, deckIndex, tapsThisCard } = get();
+    const now = Date.now();
+    const cap = BALANCE.feed.comboCap;
+    const wasViral = viralUntil > now;
+    // 04 §13.8: while VIRAL, combo is frozen at comboCap (taps don't overfill); decay is paused.
+    const newCombo = wasViral ? cap : combo + 1;
     // 04 §13.1: comboMult = 1 + min(combo, comboCap) × comboPerTap
-    const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
+    const comboMult = 1 + Math.min(newCombo, cap) * BALANCE.feed.comboPerTap;
+    const vMult = viralMult(viralUntil, now);
+    const k = comboMult * vMult;
     // 04 §13.5: `core_surge` multiplies TAP CORE coin payout while its card is on screen.
     const activeMod = deck[deckIndex]?.mod ?? null;
-    const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * comboMult * coreCoinMult(activeMod);
-    const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * comboMult;
-    const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * comboMult;
+    const modMult = coreCoinMult(activeMod);
+    const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * k * modMult;
+    const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k;
+    const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * k;
+
+    // 04 §13.8: trigger VIRAL the instant combo reaches comboCap (not already viral).
+    const triggersViral = !wasViral && combo < cap && newCombo >= cap;
+    let burstCoins = 0, burstFollowers = 0, burstLikes = 0;
+    let newViralUntil = viralUntil;
+    if (triggersViral) {
+      const burstK = BALANCE.feed.viralBurstMult * comboMult;
+      burstCoins = tapPower * BALANCE.postCoinConversion * multiplier * burstK * modMult;
+      burstFollowers = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * burstK;
+      burstLikes = tapPower * BALANCE.postLikeConversion * multiplier * burstK;
+      newViralUntil = now + BALANCE.feed.viralSec * 1000;
+    }
+
     set({
       wallet: {
         ...wallet,
-        coins: wallet.coins + coinsGain,
-        followers: wallet.followers + followersGain,
-        totalFollowers: wallet.totalFollowers + followersGain,
-        likes: wallet.likes + likesGain,
+        coins: wallet.coins + coinsGain + burstCoins,
+        followers: wallet.followers + followersGain + burstFollowers,
+        totalFollowers: wallet.totalFollowers + followersGain + burstFollowers,
+        likes: wallet.likes + likesGain + burstLikes,
       },
-      combo: combo + 1,
-      lastTapAt: Date.now(),
+      combo: newCombo,
+      viralUntil: newViralUntil,
+      lastTapAt: now,
       tapsThisCard: tapsThisCard + 1,  // 7.6: batched for engage flush on swipe-away
     });
 
@@ -78,9 +102,17 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   },
 
   decayCombo: (dt) => {
-    const { combo, lastTapAt } = get();
+    const { combo, lastTapAt, viralUntil } = get();
+    const now = Date.now();
+    // 04 §13.8: VIRAL just ended — settle combo to the exit floor and resume decay.
+    if (viralUntil > 0 && now >= viralUntil) {
+      set({ combo: BALANCE.feed.viralExitCombo, viralUntil: 0, lastTapAt: now });
+      return;
+    }
+    // 04 §13.8: while VIRAL, combo is frozen — decay is paused.
+    if (viralUntil > now) return;
     if (combo <= 0) return;
-    const idleSec = (Date.now() - lastTapAt) / 1000;
+    const idleSec = (now - lastTapAt) / 1000;
     if (idleSec < BALANCE.feed.comboDecayDelaySec) return;
     set({ combo: Math.max(0, combo - BALANCE.feed.comboDecayPerSec * dt) });
   },

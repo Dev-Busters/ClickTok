@@ -118,6 +118,12 @@ export const BALANCE = {
     feedMinDeck: 10,
     engageMaxTapsPerMsg: 120,
     serverPublishCooldownSec: 60,
+
+    // §13.8 VIRAL overdrive (Phase 8.4)
+    viralBurstMult: 25,            // ring hits comboCap → instant 25 × gainPerPost × comboMult
+    viralSec: 8,                   // VIRAL duration: combo frozen at cap, decay paused
+    viralGainMult: 2,              // ALL payouts ×2 while viral (core taps, elements, rail)
+    viralExitCombo: 25,            // combo settles here when VIRAL ends (the climb restarts)
   },
 
   // Phase 7.3 — the element framework (04 §13.2)

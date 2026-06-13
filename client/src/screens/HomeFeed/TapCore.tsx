@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../../store";
 import { BALANCE } from "../../features/economy/balance";
 import { formatCount } from "../../lib/format";
-import { coreCoinMult } from "../../features/feed/mods";
+import { coreCoinMult, viralMult } from "../../features/feed/mods";
 import { pushFloatText } from "../../components/fx/FloatingTextLayer";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -130,6 +130,24 @@ function GoldSkin({ op }: { op: number }) {
   );
 }
 
+// ── VIRAL skin: white-hot overlay, painted on top of the tier skin ─────────────
+function ViralSkin({ op }: { op: number }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', opacity: op, transition: 'opacity 0.25s', pointerEvents: 'none' }}>
+      <motion.div
+        animate={{ opacity: [0.75, 1, 0.75] }}
+        transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute', inset: 0, borderRadius: '50%',
+          background: 'radial-gradient(circle at 50% 50%, #fff 0%, var(--gold) 55%, var(--red) 100%)',
+          mixBlendMode: 'screen',
+        }}
+      />
+      <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', boxShadow: 'inset 0 0 30px rgba(255,255,255,0.85)' }} />
+    </div>
+  );
+}
+
 // ── Shockwave: two staggered rings + flash disc ────────────────────────────────
 function ShockwaveFx({ ringColor, comboMult }: { ringColor: string; comboMult: number }) {
   const flashOpacity = Math.min(0.55, 0.15 + (comboMult - 1) * 0.12);
@@ -231,6 +249,7 @@ function GravParticle({ p, ringColor }: { p: Particle; ringColor: string }) {
 export function TapCore() {
   const combo = useGameStore(s => s.combo);
   const lastTapAt = useGameStore(s => s.lastTapAt);
+  const viralUntil = useGameStore(s => s.viralUntil);
   const engageTap = useGameStore(s => s.engageTap);
   const tapPower = useGameStore(s => s.tapPower);
   const multiplier = useGameStore(s => s.multiplier);
@@ -239,15 +258,44 @@ export function TapCore() {
   const [tapFxs, setTapFxs] = useState<TapFx[]>([]);
   const [tierFlash, setTierFlash] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
+  const [eruption, setEruption] = useState(false);
+  const [ringDrain, setRingDrain] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const fxTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const eruptionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const ringDrainTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const prevTier = useRef(0);
+  const prevViralUntil = useRef(0);
 
   const clampedCombo = Math.min(combo, BALANCE.feed.comboCap);
   const fillFraction = clampedCombo / BALANCE.feed.comboCap;
   const tier = getTier(combo);
   const comboMult = 1 + clampedCombo * BALANCE.feed.comboPerTap;
-  const ringColor = TIER_COLORS[tier];
+  const isViral = viralUntil > nowTick;
+  const ringColor = isViral ? "var(--gold)" : TIER_COLORS[tier];
   const ringOffset = RING_CIRC * (1 - fillFraction);
+
+  // 8.4: tick every 100ms while VIRAL is active — drives the blazing ring/core/banner.
+  useEffect(() => {
+    if (viralUntil <= Date.now()) return;
+    const iv = setInterval(() => {
+      const now = Date.now();
+      setNowTick(now);
+      if (now >= viralUntil) clearInterval(iv);
+    }, 100);
+    return () => clearInterval(iv);
+  }, [viralUntil]);
+
+  // 8.4: VIRAL just ended — give the ring a slow drain transition to viralExitCombo,
+  // then revert to the snappy per-tap transition.
+  useEffect(() => {
+    if (prevViralUntil.current > 0 && viralUntil === 0) {
+      setRingDrain(true);
+      ringDrainTimer.current = setTimeout(() => setRingDrain(false), 1400);
+    }
+    prevViralUntil.current = viralUntil;
+    return () => clearTimeout(ringDrainTimer.current);
+  }, [viralUntil]);
 
   // Tier-up flash + callout
   useEffect(() => {
@@ -272,15 +320,22 @@ export function TapCore() {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => { fxTimers.current.forEach(clearTimeout); };
+    return () => {
+      fxTimers.current.forEach(clearTimeout);
+      clearTimeout(eruptionTimer.current);
+      clearTimeout(ringDrainTimer.current);
+    };
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
+    const now = Date.now();
+    const wasViral = viralUntil > now;
     // Compute gain at current combo BEFORE engageTap increments it
     const cMult = comboMult; // already computed from clampedCombo above
     const modMult = coreCoinMult(activeMod);
-    const magnitude = cMult * modMult;
+    const vMult = viralMult(viralUntil, now);
+    const magnitude = cMult * modMult * vMult;
     const gainCoins = tapPower * BALANCE.postCoinConversion * multiplier * magnitude;
 
     // Push via shared FX layer (replaces old FloatingGain)
@@ -300,6 +355,18 @@ export function TapCore() {
       fxTimers.current.delete(id);
     }, 1000);
     fxTimers.current.set(id, t);
+
+    // 04 §13.8: this tap just pushed combo to comboCap → VIRAL triggers.
+    if (!wasViral && useGameStore.getState().viralUntil > now) {
+      const capComboMult = 1 + BALANCE.feed.comboCap * BALANCE.feed.comboPerTap;
+      const burstMag = BALANCE.feed.viralBurstMult * capComboMult * modMult;
+      const burstCoins = tapPower * BALANCE.postCoinConversion * multiplier * burstMag;
+      pushFloatText({ text: `+${formatCount(burstCoins)}`, kind: "coin", magnitude: burstMag, color: "var(--gold)" });
+      pushFloatText({ text: "VIRAL!!", kind: "callout", magnitude: 0 });
+      setEruption(true);
+      clearTimeout(eruptionTimer.current);
+      eruptionTimer.current = setTimeout(() => setEruption(false), 450);
+    }
   };
 
   const showTapLabel = lastTapAt === 0 || isIdle;
@@ -311,13 +378,49 @@ export function TapCore() {
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
       zIndex: 3,
     }}>
+      {/* 8.4: "🔥 VIRAL ×2" banner with draining time bar — shown above the core */}
+      <AnimatePresence>
+        {isViral && (
+          <motion.div
+            key="viral-banner"
+            initial={{ opacity: 0, y: -8, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 24 }}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              padding: '4px 14px', borderRadius: 999,
+              background: 'rgba(0,0,0,0.55)',
+              border: '1px solid var(--gold)',
+              boxShadow: '0 0 18px var(--gold)',
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--font-display)', fontSize: '13px', letterSpacing: '0.12em',
+              color: 'var(--gold)', textShadow: '0 0 10px var(--gold)',
+            }}>
+              🔥 VIRAL ×{BALANCE.feed.viralGainMult}
+            </span>
+            <div style={{ width: 90, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+              <motion.div
+                key={viralUntil}
+                initial={{ width: '100%' }}
+                animate={{ width: '0%' }}
+                transition={{ duration: BALANCE.feed.viralSec, ease: 'linear' }}
+                style={{ height: '100%', background: 'var(--gold)' }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Combo multiplier readout */}
       <div style={{
         fontFamily: 'var(--font-mono)', fontSize: '13px', letterSpacing: '0.1em',
         color: combo > 0 ? ringColor : 'var(--dim)',
         transition: 'color 0.3s', minHeight: 18, textAlign: 'center',
       }}>
-        ×{comboMult.toFixed(2)}
+        ×{(comboMult * (isViral ? BALANCE.feed.viralGainMult : 1)).toFixed(2)}
       </div>
 
       {/* Ring + button container (220px gives shockwaves room to expand) */}
@@ -329,14 +432,35 @@ export function TapCore() {
           style={{
             position: 'absolute', top: 25, left: 25,
             transform: 'rotate(-90deg)', transition: 'filter 0.3s',
-            filter: combo > 0 ? `drop-shadow(0 0 6px ${ringColor})` : 'none',
+            filter: isViral
+              ? `drop-shadow(0 0 16px #fff) drop-shadow(0 0 10px var(--gold))`
+              : combo > 0 ? `drop-shadow(0 0 6px ${ringColor})` : 'none',
           }}
         >
+          {isViral && (
+            <defs>
+              <motion.linearGradient
+                id="viralGrad"
+                animate={{
+                  x1: ["0%", "100%", "0%"],
+                  y1: ["0%", "100%", "0%"],
+                  x2: ["100%", "0%", "100%"],
+                  y2: ["100%", "0%", "100%"],
+                }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
+              >
+                <stop offset="0%" stopColor="#fff" />
+                <stop offset="40%" stopColor="var(--gold)" />
+                <stop offset="100%" stopColor="var(--red)" />
+              </motion.linearGradient>
+            </defs>
+          )}
           <circle cx={RING_R + 5} cy={RING_R + 5} r={RING_R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
           <circle
-            cx={RING_R + 5} cy={RING_R + 5} r={RING_R} fill="none" stroke={ringColor} strokeWidth="3"
+            cx={RING_R + 5} cy={RING_R + 5} r={RING_R} fill="none"
+            stroke={isViral ? "url(#viralGrad)" : ringColor} strokeWidth={isViral ? 4 : 3}
             strokeLinecap="round" strokeDasharray={RING_CIRC} strokeDashoffset={ringOffset}
-            style={{ transition: 'stroke-dashoffset 0.08s linear, stroke 0.3s' }}
+            style={{ transition: ringDrain ? 'stroke-dashoffset 1.4s ease-out, stroke 0.3s, stroke-width 0.3s' : 'stroke-dashoffset 0.08s linear, stroke 0.3s, stroke-width 0.3s' }}
           />
         </svg>
 
@@ -389,6 +513,7 @@ export function TapCore() {
           <NeonSkin   op={tier === 1 ? 1 : 0} />
           <PlasmaSkin op={tier === 2 ? 1 : 0} />
           <GoldSkin   op={tier === 3 ? 1 : 0} />
+          <ViralSkin  op={isViral ? 1 : 0} />
 
           {/* Center ♪ glyph */}
           <span style={{
@@ -436,6 +561,20 @@ export function TapCore() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* 8.4: VIRAL eruption — full-screen white flash on trigger */}
+      <AnimatePresence>
+        {eruption && (
+          <motion.div
+            key="eruption"
+            initial={{ opacity: 0.9 }}
+            animate={{ opacity: 0 }}
+            exit={{}}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            style={{ position: 'fixed', inset: 0, background: '#fff', pointerEvents: 'none', zIndex: 100 }}
+          />
+        )}
+      </AnimatePresence>
 
     </div>
   );

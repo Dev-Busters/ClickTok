@@ -34,6 +34,7 @@ export function HomeFeed() {
   const activeTrend   = useGameStore(s => s.activeTrend);
   const trendsAvailable = useGameStore(s => s.trendsAvailable);
   const combo         = useGameStore(s => s.combo);
+  const viralUntil    = useGameStore(s => s.viralUntil);
   const setSheet      = useGameStore(s => s.setSheet);
   const deck          = useGameStore(s => s.deck);
   const deckIndex     = useGameStore(s => s.deckIndex);
@@ -75,7 +76,8 @@ export function HomeFeed() {
 
   // combo only needed here for canvasIntensity (TapCore reads it from store directly)
   const fillFraction    = Math.min(combo, BALANCE.feed.comboCap) / BALANCE.feed.comboCap;
-  const canvasIntensity = 0.15 + fillFraction * 0.85;
+  // 8.4: VIRAL pins canvas intensity to max.
+  const canvasIntensity = viralUntil > Date.now() ? 1 : 0.15 + fillFraction * 0.85;
 
   // Projected viewers for GO LIVE pill
   const projectedViewers = useMemo(() => {

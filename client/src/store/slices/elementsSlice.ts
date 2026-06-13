@@ -5,7 +5,7 @@ import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { BALANCE } from "../../features/economy/balance";
 import { ringScale, gradeForScale, GRADE_MULT } from "../../features/elements/beatSync";
 import { armProgress, isFlowed } from "../../features/elements/duetLoop";
-import { effectiveBeatSyncConfig, effectiveWaveIdleGapSec } from "../../features/feed/mods";
+import { effectiveBeatSyncConfig, effectiveWaveIdleGapSec, viralMult } from "../../features/feed/mods";
 
 export type ElementsSlice = {
   ownedElements: Partial<Record<ElementId, boolean>>; // ⚠ PERSISTED — SAVE_VERSION bump +
@@ -63,7 +63,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
   },
 
   tapRing: (ringId) => {
-    const { activeWave, tapPower, multiplier, followerConversion, combo, wallet, deck, deckIndex } = get();
+    const { activeWave, tapPower, multiplier, followerConversion, combo, viralUntil, wallet, deck, deckIndex } = get();
     if (!activeWave || activeWave.element !== "beat_sync") return;
     const ring = activeWave.rings.find(r => r.id === ringId);
     if (!ring || ring.grade) return;
@@ -73,9 +73,9 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
     const gradeMult = GRADE_MULT[grade];
 
     if (gradeMult > 0) {
-      // 04 §13.2: per-ring payout = gradeMult × gainPerPost × comboMult
+      // 04 §13.2/13.8: per-ring payout = gradeMult × gainPerPost × comboMult × viralMult
       const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
-      const k = gradeMult * comboMult;
+      const k = gradeMult * comboMult * viralMult(viralUntil);
       const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * k;
       const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k;
       const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * k;
@@ -95,7 +95,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
   },
 
   tapDuetPod: () => {
-    const { activeWave, tapPower, multiplier, followerConversion, combo, wallet, deck, deckIndex } = get();
+    const { activeWave, tapPower, multiplier, followerConversion, combo, viralUntil, wallet, deck, deckIndex } = get();
     if (!activeWave || activeWave.element !== "duet_loop") return;
     if (activeWave.armedIndex === null) return;
 
@@ -104,12 +104,13 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
     const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
     const completed = activeWave.completed + 1;
 
-    // 04 §13.2: pod tap pays podPayout; the final pod ALSO pays flowBonus if the
-    // chain completed within flowSec of the wave's first core tap.
+    // 04 §13.2/13.8: pod tap pays podPayout; the final pod ALSO pays flowBonus if the
+    // chain completed within flowSec of the wave's first core tap. All ×viralMult.
     let k = cfg.podPayout * comboMult;
     if (isFlowed(activeWave.firstArmedAt, completed, activeMod)) {
       k += cfg.flowBonus * comboMult;
     }
+    k *= viralMult(viralUntil);
 
     const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * k;
     const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k;
@@ -153,9 +154,9 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
 
       if (rings.every(r => r.grade)) {
         if (rings.every(r => r.grade === "perfect")) {
-          const { tapPower, multiplier, followerConversion, combo, wallet } = get();
+          const { tapPower, multiplier, followerConversion, combo, viralUntil, wallet } = get();
           const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
-          const k = cfg.perfectWaveBonus * comboMult;
+          const k = cfg.perfectWaveBonus * comboMult * viralMult(viralUntil);
           set({
             wallet: {
               ...wallet,

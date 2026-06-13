@@ -90,3 +90,8 @@ export function effectiveWaveIdleGapSec(mod: FeedModId | null): number {
 export function coreCoinMult(mod: FeedModId | null): number {
   return mod === "core_surge" ? 1.5 : 1;
 }
+
+// 04 §13.8 — while `viralUntil` is in the future, ALL payout paths pay ×viralGainMult.
+export function viralMult(viralUntil: number, now: number = Date.now()): number {
+  return viralUntil > now ? BALANCE.feed.viralGainMult : 1;
+}

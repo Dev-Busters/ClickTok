@@ -1297,7 +1297,7 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   > end-to-end (old card + banner slide off, new card slides in and settles, combo → ×1.00).
   > typecheck passes.
 
-- [ ] **8.4 — VIRAL overdrive (the combo-cap payoff).** `feedSlice`: `viralUntil` (ephemeral);
+- [x] **8.4 — VIRAL overdrive (the combo-cap payoff).** `feedSlice`: `viralUntil` (ephemeral);
   `engageTap` triggers VIRAL at `comboCap` per `04` §13.8 (burst payout, freeze combo, pause
   decay), exit to `viralExitCombo`. Add ONE shared `viralMult()` helper (in `features/feed/mods.ts`
   beside the mod helpers) and wire it into every payout path — core taps, Beat Sync resolutions,
@@ -1309,6 +1309,21 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
   viral a core tap and a PERFECT ring both pay exactly ×2 their non-viral value; decay during
   viral = 0; exit sets combo to 25 and decay resumes — paste the numbers in the note. ONE preview
   pass: eruption → banner countdown → smooth drain visible; typecheck.
+  > verified (vite-node on real slices, combo→99 then engageTap twice):
+  > burst = 225 = viralBurstMult(25) × gainPerPost(6) × comboMult(cap)=1.5 — exact match.
+  > core tap during viral = 18 vs 9 non-viral → exactly ×2 (viralGainMult).
+  > Beat Sync PERFECT ring during viral = 72 vs 36 non-viral → exactly ×2.
+  > decayCombo during viral: combo unchanged (100 → 100) — decay paused.
+  > on exit: combo → 25 (viralExitCombo), viralUntil → 0, decay resumes afterward.
+  > note: the §13.8 constants (`viralBurstMult`, `viralSec`, `viralGainMult`, `viralExitCombo`)
+  > were only documented in `04`, not yet in `balance.ts` — added them here per the doc values.
+  > Combo readout during VIRAL shows the combined `comboMult × viralGainMult` (e.g. ×3.00 at
+  > cap) so the player sees the live ×2, a small UX addition consistent with "ALL payouts ×2".
+  > preview pass (390×844): tap at combo 99 → eruption flash, blazing white/gold/red gradient
+  > ring + white-hot core, "🔥 VIRAL ×2" banner with draining time bar, burst float text and
+  > wallet jump landed (coins 38.7K→38.9K, likes 90→106). On expiry: banner exited via
+  > AnimatePresence, ring eased (1.4s) down to the viralExitCombo position and resumed normal
+  > decay/tier coloring — no snap. typecheck passes (client + party).
 
 - [ ] **8.5 — Engagement rail, client half (the rail finally does something).** Add
   `reactions` to `VideoCard` + `ReactionKind` per `03` §6.5 (⚠ mirror BOTH type files now —
