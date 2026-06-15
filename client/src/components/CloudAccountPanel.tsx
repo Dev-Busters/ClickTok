@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGameStore } from "../store";
 import { supabase } from "../lib/supabase";
+import { resetProgress } from "../hooks/useCloudSync";
 
 const STATUS_COLOR: Record<string, string> = {
   offline: "var(--dim)",
@@ -34,6 +35,26 @@ export function CloudAccountPanel() {
     const { error } = await supabase.auth.updateUser({ email });
     setLinking(false);
     setLinkMessage(error ? error.message : `Check ${email} for a confirmation link.`);
+  };
+
+  const [resetArmed, setResetArmed] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  // Disarm the "tap again to confirm" state after a few seconds.
+  useEffect(() => {
+    if (!resetArmed) return;
+    const timer = setTimeout(() => setResetArmed(false), 4000);
+    return () => clearTimeout(timer);
+  }, [resetArmed]);
+
+  const handleReset = () => {
+    if (resetting) return;
+    if (!resetArmed) {
+      setResetArmed(true);
+      return;
+    }
+    setResetting(true);
+    void resetProgress();
   };
 
   return (
@@ -114,6 +135,31 @@ export function CloudAccountPanel() {
           )}
         </div>
       )}
+
+      {/* Playtesting: wipe local + cloud save, stay signed in */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.2em' }}>
+          DANGER ZONE
+        </span>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+      </div>
+      <button
+        onClick={handleReset}
+        disabled={resetting}
+        style={{
+          width: '100%',
+          padding: '10px 16px',
+          background: resetArmed ? 'rgba(255,71,87,0.12)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${resetArmed ? 'var(--red)' : 'rgba(255,255,255,0.09)'}`,
+          color: resetting ? 'var(--dim)' : 'var(--red)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '10px',
+          letterSpacing: '0.14em',
+          cursor: resetting ? 'default' : 'pointer',
+        }}
+      >
+        {resetting ? "ERASING…" : resetArmed ? "TAP AGAIN TO ERASE ALL PROGRESS" : "RESET PROGRESS"}
+      </button>
     </div>
   );
 }

@@ -30,3 +30,10 @@ export async function pushCloudSave(userId: string, handle: string, persisted: P
   });
   return updatedAt.getTime();
 }
+
+// Playtesting: wipe this user's cloud save row (RLS scopes this to their own
+// `auth.uid()`, so it can only ever delete their own row).
+export async function deleteCloudSave(userId: string): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("saves").delete().eq("user_id", userId);
+}

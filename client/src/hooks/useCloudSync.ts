@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useGameStore } from "../store";
 import { supabase } from "../lib/supabase";
 import { toPersistedState } from "../store/slices/meta";
-import { pullCloudSave, pushCloudSave } from "../features/cloud/sync";
+import { pullCloudSave, pushCloudSave, deleteCloudSave } from "../features/cloud/sync";
 import type { User } from "@supabase/supabase-js";
 
 const PUSH_INTERVAL_MS = 30_000;
@@ -25,6 +25,18 @@ function applyAuthUser(user: User | null | undefined) {
     isAnonymous: user?.is_anonymous ?? true,
     email: user?.email ?? null,
   });
+}
+
+// Playtesting: wipe local + cloud save so the next load behaves like a brand
+// new player, while staying signed in as the same account.
+export async function resetProgress(): Promise<void> {
+  const { cloudUserId } = useGameStore.getState();
+  if (cloudUserId) {
+    await deleteCloudSave(cloudUserId);
+  }
+  useGameStore.persist.clearStorage();
+  localStorage.removeItem(SYNCED_AT_KEY);
+  window.location.reload();
 }
 
 // 4.5: anonymous-upgradeable Supabase auth + cloud save sync at the
