@@ -242,7 +242,14 @@ bad). All meta progress (gear/skills) is untouched by a flop.
 
 ## 11. Tuning guidance for whoever balances later
 
-- Keep early game fast: first Gear affordable in ~5–10 posts; first LIVE viable by ~200 followers.
+- **11.2 revision — slower early game (deliberate reversal of the old "keep it fast" rule, see
+  `07 §B`):** first repeatable upgrade (Engagement Boost L1) lands after ~5 taps; first Gear
+  (Ring Light) after ~28 taps; first element (Beat Sync) after ~37 taps; GO LIVE (the "posting"
+  pillar) now gates at 200 followers (~71 taps from a fresh save). Tune future levers toward `07
+  §B`'s target table (~30–60s / ~3–4min / ~4–6min / ~15–20min respectively at a real tapping
+  pace) — the GO LIVE and all-elements milestones still land roughly 2× faster than that target
+  and may need a further pass (e.g. `postFollowerConversion` or late-gear costs, not touched by
+  11.2).
 - Runs should out-earn ~5 min of idle by a healthy margin (runs are primary income).
 - Diamonds stay scarce — they gate the few elite upgrades; ~2–10 per good run.
 - If runs feel too swingy, lower `followerSqrtCoeff` variance sources and raise `flopGraceSec`.
@@ -601,14 +608,15 @@ The per-level effect is defined in the `UpgradeDef.effect` field and applied ×l
 
 | id | name | category | baseCost | costGrowth | maxLevel | per-level effect |
 |---|---|---|---|---|---|---|
-| `engagement_boost` | Engagement Boost | repeatable | 10 🪙 | ×1.45 | 25 | postPowerAdd +1 |
-| `loyal_followers`  | Loyal Followers  | repeatable | 40 🪙 | ×1.50 | 15 | followerConversionAdd +0.2 |
-| `auto_engage_bot`  | Auto-Engage Bot  | repeatable | 75 🪙 | ×1.60 | 20 | passiveCoinsAdd +0.5/sec |
+| `engagement_boost` | Engagement Boost | repeatable | 10 🪙 | ×1.75 | 25 | postPowerAdd +1 |
+| `loyal_followers`  | Loyal Followers  | repeatable | 40 🪙 | ×1.80 | 15 | followerConversionAdd +0.2 |
+| `auto_engage_bot`  | Auto-Engage Bot  | repeatable | 75 🪙 | ×1.90 | 20 | passiveCoinsAdd +0.5/sec |
 
-Early-curve checkpoints:
-- `engagement_boost` L1: 10 🪙 → ~2 taps cold (6 🪙/tap) — teaches the loop immediately.
-- `loyal_followers` L1: 40 🪙 → ~4 taps after EB L1 (earning ~12/tap).
-- `auto_engage_bot` L1: 75 🪙 → ~5–7 taps in total; first idle income.
+Early-curve checkpoints (11.2, `postCoinConversion: 1.0` → ~1 🪙/tap cold):
+- `engagement_boost` L1: 10 🪙 → ~5 taps cold — teaches the loop immediately.
+- first Gear (`ring_light`, 50 🪙): ~28 taps cumulative, after buying EB L1.
+- `loyal_followers` / `auto_engage_bot` L1 costs (40 🪙 / 75 🪙) land within the same early
+  window once EB L1's +1 postPower raises the per-tap rate above 1 🪙.
 
 ### 14.3 Metric ladder — thresholds, rewards, unlocks
 
@@ -618,7 +626,7 @@ Early-curve checkpoints:
 | Views | 100 | +60 🪙 | **Creator Tools / Upgrades** |
 | Followers | 10 | +30 🪙 | — |
 | Followers | 50 | +5 💎 | **Diamonds display** |
-| Followers | 100 | +120 🪙 | **GO LIVE** (pill + Create/Live tab) |
+| Followers | 200 | +120 🪙 | **GO LIVE** (pill + Create/Live tab; "posting" pillar in code) |
 | Streams | 1 | +5 💎 | **Inbox + daily reward** |
 | Followers | 500 | +10 💎 | **Discover / trends** |
 | Followers | 1,000 | +15 💎 | **Feed pager + engagement rail + element stage** |

@@ -5,7 +5,7 @@ import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -69,7 +69,14 @@ export type PersistedV7 = Omit<PersistedV6, "version"> & {
   affordableNotifiedPillars: string[];
 };
 
-export type PersistedState = PersistedV7;
+// 11.2: the GO LIVE / "posting" metric was raised from 100 → 200 followers
+// (07 §B3) — rename its id in metricsReached so saves that already crossed
+// the old gate keep the unlock.
+export type PersistedV8 = Omit<PersistedV7, "version"> & {
+  version: 8;
+};
+
+export type PersistedState = PersistedV8;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -128,7 +135,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -216,6 +223,18 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       version: 7,
       // v6 saves predate the affordable-upgrade notification dedup set (10.2).
       affordableNotifiedPillars: [],
+    };
+  }
+
+  if (version < 8) {
+    const v7 = state as PersistedV7;
+    state = {
+      ...v7,
+      version: 8,
+      // 11.2: the "posting" pillar's gate moved from 100 → 200 followers
+      // (id follower_100 → follower_200) — preserve the unlock for saves
+      // that already crossed the old threshold.
+      metricsReached: v7.metricsReached.map(id => id === "follower_100" ? "follower_200" : id),
     };
   }
 

@@ -3,7 +3,7 @@ export const BALANCE = {
   basePostPower: 1,
   postFollowerConversion: 0.6,   // followers per post = postPower * this
   postLikeConversion: 0.4,
-  postCoinConversion: 6.0,       // coins per post = postPower * this
+  postCoinConversion: 1.0,       // coins per post = postPower * this
 
   // passive / idle
   idleCapSec: 8 * 3600,          // max 8h of offline income granted on return
@@ -100,8 +100,8 @@ export const BALANCE = {
     boostCoinSurge: 0.5,           // +50% coins per tap
     boostFanMagnet: 0.5,           // +50% followers per tap
     boostLikeStorm: 1.0,           // +100% (×2) likes per tap
-    luckyTapChance: 0.08,
-    luckyTapMult: 10,
+    luckyTapChance: 0.05,
+    luckyTapMult: 6,
     hypeSeedTapsPer: 50,
     hypeSeedHype: 5,
     hypeSeedCap: 25,
@@ -137,18 +137,18 @@ export const BALANCE = {
 
   // Phase 9 — repeatable upgrades (04 §14)
   upgrades: {
-    engagementBoost: { baseCost: 10, costGrowth: 1.45, maxLevel: 25, postPowerAddPerLevel: 1 },
-    loyalFollowers:  { baseCost: 40, costGrowth: 1.50, maxLevel: 15, followerConversionAddPerLevel: 0.2 },
-    autoEngageBot:   { baseCost: 75, costGrowth: 1.60, maxLevel: 20, passiveCoinsAddPerLevel: 0.5 },
+    engagementBoost: { baseCost: 10, costGrowth: 1.75, maxLevel: 25, postPowerAddPerLevel: 1 },
+    loyalFollowers:  { baseCost: 40, costGrowth: 1.80, maxLevel: 15, followerConversionAddPerLevel: 0.2 },
+    autoEngageBot:   { baseCost: 75, costGrowth: 1.90, maxLevel: 20, passiveCoinsAddPerLevel: 0.5 },
   },
 
   // Phase 7.3 — the element framework (04 §13.2)
   elements: {
     waveIdleGapSec: 3,             // scheduler: breathing room between waves (one wave at a time)
 
-    // BEAT SYNC (timing rings) — unlock: 50 coins, gated at viewer level (~10 followers)
+    // BEAT SYNC (timing rings) — unlock: 50 coins, gated at viewer level (~25 followers)
     beatSync: {
-      unlock: { coins: 50, followers: 10 },
+      unlock: { coins: 50, followers: 25 },
       rings: 3,
       shrinkSec: 1.6,              // ring travels scale 2.2 → 1.0 in this time
       staggerSec: 0.45,            // spawn offset between rings — THE rhythm
@@ -158,9 +158,9 @@ export const BALANCE = {
       perfectWaveBonus: 5,         // all-3-PERFECT: +5 × gainPerPost on top
     },
 
-    // DUET LOOP (call-and-response) — unlock: 200 coins, gated at viewer level (~10 followers)
+    // DUET LOOP (call-and-response) — unlock: 200 coins, gated at viewer level (~25 followers)
     duetLoop: {
-      unlock: { coins: 200, followers: 10 },
+      unlock: { coins: 200, followers: 25 },
       pods: 3,
       armTimeoutSec: 2.5,          // an armed pod fades back to dormant if not tapped
       podPayout: 3,                // each pod tap pays 3 × gainPerPost (core taps pay normal)
@@ -168,9 +168,9 @@ export const BALANCE = {
       flowBonus: 6,                // +6 × gainPerPost
     },
 
-    // HOLD DROP (charge ring) — unlock: 300 coins, gated at viewer level (~10 followers)
+    // HOLD DROP (charge ring) — unlock: 300 coins, gated at viewer level (~25 followers)
     holdDrop: {
-      unlock: { coins: 300, followers: 10 },
+      unlock: { coins: 300, followers: 25 },
       chargeSec: 2.0,      // ring fills fully in this many seconds
       windowStart: 0.35,   // target window: 35%–65% charge = PERFECT
       windowEnd: 0.65,
@@ -179,9 +179,9 @@ export const BALANCE = {
       expiryAfterSec: 5.0, // wave auto-expires if never pressed
     },
 
-    // SWIPE HITS (directional) — unlock: 450 coins, gated at viewer level (~10 followers)
+    // SWIPE HITS (directional) — unlock: 450 coins, gated at viewer level (~25 followers)
     swipeHits: {
-      unlock: { coins: 450, followers: 10 },
+      unlock: { coins: 450, followers: 25 },
       arrows: 2,           // arrows per wave
       staggerSec: 0.6,     // DDR stagger: arrow i activates at startedAt + i * staggerSec * 1000ms
       activeSec: 1.8,      // window each arrow can be hit (progress 0 → 1)

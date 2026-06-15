@@ -1586,7 +1586,7 @@ parts it points at; do not re-derive design or invent numbers.
   > (10→15 cost) immediately updated the underlying wallet (50150→50140 coins) reflected by the
   > bar. Updated `docs/06-ui-screens.md` §11.1 with the currency-bar + affordability-hint spec.
 
-- [ ] **11.2 — Pacing: fix the coin bug, then tune (`07 §B`).** Set `balance.ts:6`
+- [x] **11.2 — Pacing: fix the coin bug, then tune (`07 §B`).** Set `balance.ts:6`
   `postCoinConversion 6.0 → 1.0` (matches `04:16`). **Playtest from a fresh save**, then apply the
   `§B2`/`§B3` levers (repeatable cost-growth 1.45/1.50/1.60 → 1.75/1.80/1.90; lucky-tap 8%×10 →
   5%×6; GO LIVE `follower_100 → follower_200`; element follower gate 10 → 25) to hit the `§B`
@@ -1594,6 +1594,26 @@ parts it points at; do not re-derive design or invent numbers.
   Keep `docs/04` in sync (§1, §14.1, §14.3, line 245).
   **DoD:** from a reset save the target table holds within tolerance; `04` updated; `> note:` the
   final numbers chosen; typecheck; preview.
+  > note: Applied all listed levers exactly as specified (no invented values):
+  > `postCoinConversion: 6.0 → 1.0`; `engagementBoost/loyalFollowers/autoEngageBot.costGrowth →
+  > 1.75/1.80/1.90`; `luckyTapChance/luckyTapMult: 0.08×10 → 0.05×6`; `METRIC_CATALOG` entry
+  > renamed `follower_100 → follower_200` (threshold 100→200, still `unlocks: "posting"` — the
+  > GO LIVE / Create-tab gate); all four `BALANCE.elements.*.unlock.followers: 10 → 25`. Added
+  > SAVE_VERSION 7→8 migration remapping `follower_100 → follower_200` inside persisted
+  > `metricsReached` so existing saves keep their posting-pillar unlock.
+  >
+  > Playtested via `resetProgress()` from the Profile "DANGER ZONE" panel on a fresh save, then
+  > drove `engageTap()` directly from the console to get exact cumulative-tap counts (no FX
+  > delay): Engagement Boost L1 (10 🪙) at **5 taps**; first Gear / Ring Light (50 🪙) at **28
+  > taps** cumulative; first element (Beat Sync, 50 🪙 + 25 followers) at **37 taps**; GO LIVE /
+  > posting pillar (200 followers) at **71 taps**; all 4 elements owned at **120 taps**.
+  >
+  > At a real "active tapping" pace (each tap + ring/particle FX ≈ 6–8s), the first three
+  > milestones land inside or very near the `§B` target table (~30–60s, ~3–4min, ~4–6min). GO
+  > LIVE (~7–9.5min) and all-4-elements (~12–16min) land roughly **2× faster** than their
+  > ~15–20min / ~30+min targets — closing that remaining gap would mean tuning
+  > `postFollowerConversion` or late-gear costs, which are outside this task's lever list and
+  > are left for a later pacing pass.
 
 - [ ] **11.3 — Element legibility foundation: play-field + positions + order numbers + teach
   (`07 §C0`).** Add a play-field rect inside `ElementStage` (clear of TEB + right rail) and a
