@@ -142,6 +142,16 @@ function RepeatableRow({ def }: { def: UpgradeDef }) {
             }}>
               COINS
             </div>
+            {canAfford && (
+              <div style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '8px',
+                color: 'var(--dim)',
+                letterSpacing: '0.04em',
+              }}>
+                after {formatCount(wallet.coins - cost)}
+              </div>
+            )}
             <motion.button
               whileTap={buyable ? { scale: 0.95 } : undefined}
               onClick={() => buyable && levelUpgrade(def.id)}
@@ -287,6 +297,16 @@ function UpgradeCategorySection({ category, title, pillar }: { category: "gear" 
                   }}>
                     COINS
                   </div>
+                  {canAfford && unlocked && (
+                    <div style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '8px',
+                      color: 'var(--dim)',
+                      letterSpacing: '0.04em',
+                    }}>
+                      after {formatCount(wallet.coins - (cost.coins ?? 0))}
+                    </div>
+                  )}
                   {cost.diamonds !== undefined && (
                     <div style={{
                       fontFamily: 'var(--font-mono)',

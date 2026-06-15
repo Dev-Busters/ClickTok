@@ -1,6 +1,7 @@
 import { useGameStore } from "../store";
 import { avatarGradient } from "../lib/avatar";
 import { formatCount } from "../lib/format";
+import { CurrencyPill } from "./CurrencyBar";
 
 export function ProfileHeader() {
   const handle = useGameStore(s => s.handle);
@@ -70,22 +71,4 @@ function ProfileStat({ label, value }: { label: string; value: string }) {
 
 function StatDivider() {
   return <div style={{ width: '1px', height: '22px', background: 'rgba(255,255,255,0.1)' }} />;
-}
-
-function CurrencyPill({ color, label, value, shape }: { color: string; label: string; value: string; shape: "coin" | "diamond" }) {
-  return (
-    <div
-      title={label}
-      style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 14px', borderRadius: '999px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-    >
-      {shape === "coin" ? (
-        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0 }} />
-      ) : (
-        <span style={{ width: '10px', height: '10px', background: color, boxShadow: `0 0 6px ${color}`, transform: 'rotate(45deg)', flexShrink: 0 }} />
-      )}
-      <span style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', fontWeight: 700, color }}>
-        {value}
-      </span>
-    </div>
-  );
 }

@@ -140,6 +140,16 @@ export function SkillsPanel({ pillar }: { pillar?: UpgradePillar } = {}) {
                   }}>
                     COINS
                   </div>
+                  {canAfford && (
+                    <div style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '8px',
+                      color: 'var(--dim)',
+                      letterSpacing: '0.04em',
+                    }}>
+                      after {formatCount(wallet.coins - cost)}
+                    </div>
+                  )}
                 </>
               )}
             </div>

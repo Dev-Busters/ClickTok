@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "../../store";
 import { isFeatureUnlocked } from "../../features/metrics/unlocks";
+import { CurrencyBar } from "../../components/CurrencyBar";
 import { UpgradeShop } from "../../components/UpgradeShop";
 import { SkillsPanel } from "../../components/SkillsPanel";
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
@@ -126,6 +127,9 @@ export function CreatorStudio({ onClose }: { onClose: () => void }) {
           })}
         </div>
       )}
+
+      {/* ── Currency bar (sticky, stays visible while the list scrolls) ── */}
+      <CurrencyBar />
 
       {/* ── Scrollable content ── */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>

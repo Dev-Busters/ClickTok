@@ -321,6 +321,12 @@ Full-screen hub opened via:
 - Header: "CREATOR STUDIO" (display font) + close ✕ button (top-right).
 - Pill-tab row: **VIEWER · POSTING · LIVE**. A tab is only rendered if its pillar is unlocked.
   Active tab: cyan underline + `--text`. Inactive: `--dim`.
+- **Currency bar** (`components/CurrencyBar.tsx`, Phase 11.1): a sticky sub-header directly below
+  the pill-tab row, above the scrollable content — outside the scroll container so it never
+  scrolls away. Shows three pills (coins 🪙 gold, followers red, diamonds 💎 cyan), same visual
+  language as `ProfileHeader`'s currency pills (which now import `CurrencyPill` from this file).
+  Likes are omitted (not spent on upgrades). Reads live from `wallet` via store selector, so it
+  updates immediately on any purchase.
 - Scrollable content area per tab:
   - **VIEWER**: repeatable upgrades (viewer pillar) + gear/software (viewer pillar, linear-locked
     as on Profile) + Charisma + Editing skills + element unlock list.
@@ -329,6 +335,11 @@ Full-screen hub opened via:
 
 Buying/leveling from the Studio updates the store exactly like buying from Profile. No separate
 action needed.
+
+**Buy-button affordability hint (Phase 11.1):** when a repeatable upgrade, one-time gear/software
+item, or skill is affordable, its cost block shows a small dim "after {formatCount(coins after
+purchase)}" line below the "COINS" label — lets the player see their post-purchase balance without
+mental math.
 
 ### 11.2 FYP top stat-strip additions
 

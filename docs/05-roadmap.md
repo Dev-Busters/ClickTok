@@ -1559,6 +1559,96 @@ Pegfinity-grade legibility and juice.
 
 ---
 
+## PHASE 11 — Playtest-3 revamp (design LOCKED 2026-06-15; full spec in `docs/07-playtest-3-revamp.md`)
+
+Goal: act on the third playtest. Show resources on purchase screens; slow progression way down
+(fix the 6× coin bug + tune); fix and redesign the FYP elements so they actually work and are
+legible to a first-timer; fill the empty video/livestream backdrops; and turn Profile into a
+channel-analytics page. **Each task names its `07 §`** — read that section + the `03`/`04`/`06`
+parts it points at; do not re-derive design or invent numbers.
+
+- [x] **11.1 — Resource bar on purchase screens (`07 §A`).** New `components/CurrencyBar.tsx`
+  (reuse `ProfileHeader`'s `CurrencyPill` look) mounted as a **sticky** sub-header in
+  `CreatorStudio/index.tsx` under the title, showing coins/followers/diamonds; live-updates on
+  buy. Optional "after: N left" hint under buy buttons (`formatCount`).
+  **DoD:** balances visible on every Studio tab without scrolling; numbers drop on purchase; bar
+  stays pinned while the list scrolls; typecheck; preview.
+  > note: extracted `CurrencyPill` out of `ProfileHeader.tsx` into the new
+  > `components/CurrencyBar.tsx` (now imported by `ProfileHeader`, no duplication) and added a
+  > third "followers" pill shape (a small red triangle) alongside the existing coin/diamond
+  > shapes. `CurrencyBar` is placed below the pill-tab row as a `flexShrink: 0` sibling
+  > immediately before the `flex: 1, overflow: auto` content container — it's structurally
+  > outside the scroll area, so "sticky" needs no `position: sticky`/z-index; verified via DOM
+  > inspection that its next sibling is the `overflow: auto` content div. Added the "after: N
+  > left" hint to all three buy surfaces (`UpgradeShop.tsx` repeatable rows + one-time gear/
+  > software, and `SkillsPanel.tsx`), shown only when affordable. Verified in preview: bar shows
+  > coins/followers/diamonds pills on the VIEWER tab, and leveling up Engagement Boost
+  > (10→15 cost) immediately updated the underlying wallet (50150→50140 coins) reflected by the
+  > bar. Updated `docs/06-ui-screens.md` §11.1 with the currency-bar + affordability-hint spec.
+
+- [ ] **11.2 — Pacing: fix the coin bug, then tune (`07 §B`).** Set `balance.ts:6`
+  `postCoinConversion 6.0 → 1.0` (matches `04:16`). **Playtest from a fresh save**, then apply the
+  `§B2`/`§B3` levers (repeatable cost-growth 1.45/1.50/1.60 → 1.75/1.80/1.90; lucky-tap 8%×10 →
+  5%×6; GO LIVE `follower_100 → follower_200`; element follower gate 10 → 25) to hit the `§B`
+  target table. Do **not** also inflate gear/element coin costs (B1 already ×6'd their tap-time).
+  Keep `docs/04` in sync (§1, §14.1, §14.3, line 245).
+  **DoD:** from a reset save the target table holds within tolerance; `04` updated; `> note:` the
+  final numbers chosen; typecheck; preview.
+
+- [ ] **11.3 — Element legibility foundation: play-field + positions + order numbers + teach
+  (`07 §C0`).** Add a play-field rect inside `ElementStage` (clear of TEB + right rail) and a
+  helper that picks N non-overlapping, `startedAt`-seeded positions; store positions **in wave
+  state** (`elements/types.ts` + mirror `03 §6.5`), set in `elementsSlice.spawnWave`. Render a bold
+  order number in each pod. Add a one-time per-element teach caption (mirror the TEB teach pattern;
+  persist a per-element seen-flag; bump `SAVE_VERSION` + migration).
+  **DoD:** beat/duet waves spawn in varied non-overlapping spots with `1/2/3` numbers; first wave
+  of each element shows its teach caption once (persists across reload); typecheck; preview.
+
+- [ ] **11.4 — SWIPE HITS → TRACE redesign (`07 §C1`).** Replace the broken direction-swipe.
+  Change the `swipe_hits` wave from `arrows:[{dir}]` to `traces:[{id,from,to,grade?}]`
+  (`elements/types.ts` + `03 §6.5`); rework `elements/swipeHits.ts` (`detectSwipeDir` →
+  `isOnTarget`), `elementsSlice` spawn/resolve, and rebuild `SwipeHitsWave.tsx` to render a start
+  dot, end dot, path, and an anchored press-drag-release graded by release-near-target + window.
+  New balance `hitRadiusPx`. Keep `stopPropagation`+`setPointerCapture` so the feed doesn't page.
+  **DoD:** wave spawns two on-screen dots + path; drag start→end pays out; off-target = MISS w/
+  feedback; vertical drags don't page the feed; typecheck; preview.
+
+- [ ] **11.5 — BEAT SYNC + DUET LOOP intuitiveness (`07 §C2`, `§C3`).** Beat Sync: use 11.3
+  positions/numbers; consider `windowPerfect 0.08 → 0.12`. Duet Loop: visually differentiate pods
+  from Beat Sync (distinct skin/icon/color), number them, **alternate the pulse between TEB and the
+  next pod**, and show an explicit "↓ TAP TEB" cue when the chain awaits a core tap (surface
+  "TEB's turn" from `elementsSlice`/`feedSlice` and glow the TEB in `TapCore.tsx`).
+  **DoD:** beat waves scatter+numbered; a duet wave is unmistakably different from a beat wave,
+  numbered, pulses TEB↔pod, and a cold player can complete it without prior knowledge; typecheck;
+  preview.
+
+- [ ] **11.6 — HOLD DROP: fix input + better application (`07 §C4`).** Confirm press→hold→release
+  grades/pays in preview (resolve any TEB/pager pointer collision). Replace the static 35–65% band
+  with an expressive timing (moving/narrowing sweet-spot or charge-through-then-release-at-crest);
+  payout burst scales with closeness; add a hype/combo kick on a perfect drop; telegraph overcharge
+  (ring pulses red before WEAK). New balance as needed under `balance.ts:172`.
+  **DoD:** hold reliably grades/pays; overcharge is telegraphed; perfect drop reads as a payoff;
+  window is no longer a fixed band; typecheck; preview.
+
+- [ ] **11.7 — Fill the blank backdrops (`07 §D`).** Densify `VideoCanvas` (scanline/grid overlay
+  + more/reactive blobs or energy rings; topic text `0.05 → 0.10` + glow). Make the idle Element
+  Stage a gentle beat visualizer. Live stage: drifting `+follower`/`+coin` motes from the collect
+  zone + a thin right-edge live-stats ticker; optional faint stream frame + STREAM TIME bar
+  (`clockSec`/`durationSec`). Transform/opacity/box-shadow only.
+  **DoD:** before/after preview of a FYP video and a livestream — center no longer reads empty,
+  topic legible, idle band animates, live stage has ambient motes/ticker; no fps regression.
+
+- [ ] **11.8 — Profile → channel analytics (`07 §E`).** Remove `UpgradeShop` + `SkillsPanel` from
+  `Profile/index.tsx` (keep the Creator Studio link). Expand `ProfileHeader` stats (primary
+  Following/Followers/Likes + lifetime Views/Total Followers/Streams + passive-income pill); fold
+  `CreatorInsights` in-page; add a per-pillar Creator Breakdown (reuse the 10.2 affordable-pillar
+  selector) and an Element Portfolio (`ownedElements`); keep `CloudAccountPanel`. Update
+  `06-ui-screens.md` Profile section.
+  **DoD:** no buy UI on Profile; expanded stats render; Insights reads as part of the page;
+  breakdown + portfolio gate correctly; Studio reachable; typecheck; preview.
+
+---
+
 ## How to update this file
 When you finish a task: change `[ ]`→`[x]`, and if you deviated from the spec, add a one-line
 `> note:` under it explaining what changed and why (so the next model and the docs stay honest).
