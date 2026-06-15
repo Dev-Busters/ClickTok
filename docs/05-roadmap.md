@@ -1448,6 +1448,92 @@ are pushed to each platform's own env store. Interactive CLI logins (`partykit l
 
 ---
 
+## PHASE 10 — Creator Studio, clicker revamp & whole-game polish (design LOCKED 2026-06-14; `01` §11)
+
+Goal: a **Creator Studio** housing all upgrades off the FYP; the element system fixed and expanded
+so the clicker loop is varied and rhythmic; and a whole-game polish pass bringing every screen to
+Pegfinity-grade legibility and juice.
+
+- [x] **10.1 — Creator Studio screen + de-clutter the FYP.**
+  > note: `UpgradePillar` added to `UpgradeDef`; all catalog entries pillar-tagged; `SkillsPanel` + `UpgradeShop` accept optional `pillar` prop; locked pods fully removed from `ElementStage`; Studio opened via `openSheet:"creatorStudio"` in `Shell`; STUDIO pill on Home stat-strip + Profile entry; `follower_10` tagged `unlocks:"viewer"`; pnpm typecheck passed; browser preview verified.
+  New `client/src/screens/CreatorStudio/index.tsx` — full-screen hub, pill-tab sections
+  **VIEWER / POSTING / LIVE** (a section is hidden until its pillar unlocks). Reuse
+  `components/UpgradeShop.tsx`, `components/SkillsPanel.tsx`, `components/ElementUnlockSheet.tsx`
+  + `ELEMENT_CATALOG` for the per-section lists.
+  Add `pillar: "viewer" | "posting" | "live"` to `UpgradeDef` (`features/upgrades/types.ts`) +
+  a skill→pillar map; categorize existing gear/software/skills into 3 pillars (post-power/passive
+  gear → viewer; run-stat gear + reactions → live; element unlocks → viewer).
+  HUD entry: **STUDIO** button on Home stat-strip + Profile entry; both route to Studio via
+  `openSheet: "creatorStudio"` in `uiSlice`.
+  Add `unlocks: "viewer"` to `follower_10` in `features/metrics/catalog.ts` (~10 follower gate).
+  **Remove locked "???" element pods from `components/ElementStage.tsx`** — FYP renders ONLY
+  active waves; element unlocking moves to Studio → Viewer.
+  **DoD:** Studio opens from Home HUD + Profile; sections gate correctly; buying gear/software/
+  skills/elements works from Studio; FYP no longer shows locked pods or overlap; `pnpm typecheck`;
+  browser preview verified.
+
+- [x] **10.2 — Pillar unlock ladder + affordable-upgrade alerts (the onboarding).**
+  Rework `features/metrics/` so unlocks hang off the 3 pillars (viewer/posting/live thresholds);
+  update every `isFeatureUnlocked(...)` read. New selector: which Studio sections contain an
+  affordable unpurchased upgrade → badge dot on Studio HUD button + section pill-tabs. On first
+  becoming "has-affordable", push ONE notification via `inboxSlice.pushNotification` (dedupe with
+  a tracked "notified" set, persisted like `metricsReached`). Bump SAVE_VERSION if needed.
+  **DoD:** crossing each follower threshold reveals the right HUD/Studio surfaces + notification;
+  earning enough for an upgrade lights the badge + fires one alert; reload persists; typecheck.
+
+- [x] **10.3 — Fix element interactivity + make elements central.**
+  Diagnose the dead-taps bug live (preview): active-wave layer must sit ABOVE the pager `drag="y"`
+  layer — give the active-wave render an explicit high `zIndex` and ensure wrapper owns pointer
+  events. Enlarge pods + add clear "TAP" affordance per `06` §3. Un-gate element play to the
+  `viewer` unlock (~10f, not 1k); raise spawn frequency / shrink idle gap so elements are a
+  recurring part of the loop. Rebalance via `client/scripts/simBalance.ts` so runs still
+  dominate per-minute income.
+  **DoD:** unlock Beat Sync in preview → wave spawns → tapping a pod registers a grade + pays out
+  (wallet moves) for BOTH Beat Sync and Duet Loop; scheduler alternates; typecheck.
+
+- [x] **10.4 — New elements: HOLD DROP + SWIPE HITS.**
+  Extend element framework: `ElementId` += `hold_drop` | `swipe_hits`; catalog entries; components
+  `HoldDropWave.tsx` / `SwipeHitsWave.tsx`; `elementsSlice` spawn/tap/resolve cases; numbers in
+  `BALANCE.elements`. HOLD DROP: press-and-hold fills a charge ring; release inside target window
+  for big payout. SWIPE HITS: directional arrows appear; swipe indicated direction in time.
+  **DoD:** both unlock from Studio → Viewer; spawn through scheduler; pay formula-exact; one
+  preview pass; typecheck.
+  > note: no framework surgery needed — `ElementId`/`ElementWave`/catalog/`elementsSlice`/
+  > `ELEMENT_CATALOG`-driven Studio unlock list (7.3/7.4/10.1) all extended cleanly per-element.
+  > Two leftovers from the prior session's WIP were fixed: `ElementStage.tsx` imported
+  > `HoldDropWave`/`SwipeHitsWave` but never rendered them (added the `hold_drop`/`swipe_hits`
+  > render branches, swipe_hits wired to the existing `onAllPerfect` celebration flash); and an
+  > unused `cfg` in `elementsSlice.expireOrResolveWave`'s swipe_hits branch (removed). Both were
+  > the only `pnpm typecheck` failures.
+  > Headless verify (`npx tsx`, throwaway script importing the real `elementsSlice`/`BALANCE`,
+  > deleted after): HOLD DROP — unlock cost 300 ✓; PERFECT release (progress 0.5, in
+  > [0.35,0.65]) pays `perfectPayout=8`×mults ✓; WEAK release (undercharge) and auto-overcharge
+  > (held past `chargeSec`) both pay `weakPayout=1.5`×mults ✓. SWIPE HITS — unlock cost 450 ✓;
+  > correct-direction swipe in-window pays `perfectPayout=5`×mults, all-arrows-perfect adds
+  > `allPerfectBonus=8`×mults on the final arrow ✓; wrong-direction/expired swipe pays 0 and
+  > grades MISS ✓. ALL PASS.
+  > Browser preview (dev save, wallet/followers boosted via `window.gameStore` for gating):
+  > unlocked both from Creator Studio → VIEWER → ELEMENTS (now shows all 4 elements OWNED);
+  > both spawn through the scheduler — HOLD DROP renders the charge ring + gold target window,
+  > a real pointerdown→(hold)→pointerup dispatch graded WEAK and paid wallet +36 coins; SWIPE
+  > HITS renders arrow glyphs + countdown rings, auto-MISS on expiry renders correctly, and
+  > `swipeArrow` (the action the swipe gesture calls) graded arrow0 PERFECT (+120 coins,
+  > matches `perfectPayout` ratio to HOLD DROP's `weakPayout` exactly) and arrow1 MISS, with
+  > the "+120"/MISS pop-text cascade visible. Zero console errors. `pnpm typecheck` (client +
+  > party) passes.
+  > Did NOT start 10.5.
+
+- [ ] **10.5 — Whole-game polish pass (Pegfinity-grade juice).**
+  Pop-numbers v2 (`FloatingTextLayer.tsx`): bigger, bolder, color-coded by source/magnitude,
+  denser cascade with arc + scatter. Celebration popups: radial-ray burst + icon + label on
+  element unlocks / pillar unlocks / affordable alerts. Cohesive CRT/arcade meters (combo ring,
+  hype) across all screens. Per-screen sweep: Home, Creator Studio, Discover, Inbox, Profile,
+  Live — legibility + juice.
+  **DoD:** before/after preview of FYP combo cascade + unlock celebration; no fps regression
+  (transforms/opacity only); typecheck.
+
+---
+
 ## How to update this file
 When you finish a task: change `[ ]`→`[x]`, and if you deviated from the spec, add a one-line
 `> note:` under it explaining what changed and why (so the next model and the docs stay honest).

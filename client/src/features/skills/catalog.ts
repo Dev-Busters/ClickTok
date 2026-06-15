@@ -1,5 +1,15 @@
 import { BALANCE } from "../economy/balance";
 import type { SkillDef } from "./types";
+import type { UpgradePillar } from "../upgrades/types";
+
+// Which pillar each skill belongs to (01 §11.1). Shared by SkillsPanel + affordability logic.
+export const SKILL_PILLAR: Record<string, UpgradePillar> = {
+  charisma:     "viewer",
+  editing:      "viewer",
+  stagecraft:   "live",
+  monetization: "live",
+  network:      "live",
+};
 
 // IDs are stable — see `04-economy-formulas.md` §5. Costs in coins.
 export const SKILL_CATALOG: SkillDef[] = [

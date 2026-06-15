@@ -9,8 +9,8 @@ export function BottomNav() {
   const setSheet = useGameStore(s => s.setSheet);
   const metricsReached = useGameStore(s => s.metricsReached);
 
-  const goLiveUnlocked  = isFeatureUnlocked("go_live",  metricsReached);
-  const inboxUnlocked   = isFeatureUnlocked("inbox",    metricsReached);
+  const postingUnlocked  = isFeatureUnlocked("posting",  metricsReached);
+  const inboxUnlocked    = isFeatureUnlocked("inbox",    metricsReached);
   const discoverUnlocked = isFeatureUnlocked("discover", metricsReached);
 
   return (
@@ -39,14 +39,14 @@ export function BottomNav() {
         locked={!discoverUnlocked}
       />
 
-      {/* Center "+" — opens the Create sheet; locked until go_live */}
+      {/* Center "+" — opens the Create sheet; unlocked at posting pillar (~100f) */}
       <motion.button
-        onClick={goLiveUnlocked ? () => setSheet('create') : undefined}
+        onClick={postingUnlocked ? () => setSheet('create') : undefined}
         aria-label="Create"
-        whileHover={goLiveUnlocked ? { scale: 1.12, y: -2 } : {}}
-        whileTap={goLiveUnlocked ? { scale: 0.88 } : {}}
+        whileHover={postingUnlocked ? { scale: 1.12, y: -2 } : {}}
+        whileTap={postingUnlocked ? { scale: 0.88 } : {}}
         transition={{ type: "spring", stiffness: 520, damping: 22 }}
-        style={{ ...createButtonStyle, opacity: goLiveUnlocked ? 1 : 0.25, cursor: goLiveUnlocked ? 'pointer' : 'default' }}
+        style={{ ...createButtonStyle, opacity: postingUnlocked ? 1 : 0.25, cursor: postingUnlocked ? 'pointer' : 'default' }}
       >
         <CreateIcon />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em', color: 'var(--dim)', marginTop: '4px' }}>

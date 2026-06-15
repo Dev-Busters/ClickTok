@@ -65,10 +65,13 @@ export function HomeFeed() {
   const streams       = useGameStore(s => s.streams);
   const coinsEarned   = useGameStore(s => s.coinsEarned);
 
-  // 9.3: derive unlock flags from metricsReached (no extra persisted set)
-  const goLiveUnlocked    = isFeatureUnlocked("go_live",    metricsReached);
+  // 10.2: derive unlock flags from metricsReached via 3-pillar ladder
+  const goLiveUnlocked    = isFeatureUnlocked("live",       metricsReached);
   const diamondsUnlocked  = isFeatureUnlocked("diamonds",   metricsReached);
   const feedPagerUnlocked = isFeatureUnlocked("feed_pager", metricsReached);
+  const viewerUnlocked    = isFeatureUnlocked("viewer",     metricsReached);
+  const affordablePillars = useGameStore(s => s.affordablePillars);
+  const hasAffordableBadge = affordablePillars.length > 0;
 
   // 9.3: next-metric chip (shown from first crossing onward)
   const unlockCtx: UnlockStatCtx = {
@@ -256,6 +259,37 @@ export function HomeFeed() {
           <CurrencyPill value={wallet.coins} icon="🪙" color="var(--gold)" />
           {diamondsUnlocked && <CurrencyPill value={wallet.diamonds} icon="💎" color="var(--cyan)" />}
         </div>
+
+        {/* Creator Studio HUD button (viewer unlock) */}
+        {viewerUnlocked && (
+          <motion.button
+            onPointerDown={e => { e.stopPropagation(); setSheet('creatorStudio'); }}
+            whileTap={{ scale: 0.9 }}
+            style={{
+              position: 'relative',
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '5px 9px',
+              borderRadius: 999,
+              background: hasAffordableBadge ? 'rgba(37,244,238,0.18)' : 'rgba(37,244,238,0.1)',
+              border: `1px solid ${hasAffordableBadge ? 'rgba(37,244,238,0.55)' : 'rgba(37,244,238,0.3)'}`,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: '11px' }}>🎬</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', color: 'var(--cyan)' }}>
+              STUDIO
+            </span>
+            {hasAffordableBadge && (
+              <span style={{
+                position: 'absolute', top: -3, right: -3,
+                width: 8, height: 8, borderRadius: '50%',
+                background: 'var(--red)',
+                boxShadow: '0 0 6px var(--red)',
+              }} />
+            )}
+          </motion.button>
+        )}
       </div>
 
       {/* ── Element stage (feed_pager only) ─────────────────────────────── */}

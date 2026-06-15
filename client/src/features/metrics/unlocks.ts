@@ -1,9 +1,30 @@
 import { METRIC_CATALOG } from "./catalog";
 import type { MetricDef, MetricStatId } from "./types";
 
+// Features that cascade from a pillar: if the pillar is reached, the feature is also unlocked.
+// This lets old readers (isFeatureUnlocked("go_live", ...)) still work after the pillar rework.
+const FEATURE_TO_PILLAR: Record<string, "viewer" | "posting" | "live"> = {
+  viewer:     "viewer",
+  upgrades:   "viewer",
+  diamonds:   "viewer",
+  feed_pager: "viewer",
+  inbox:      "viewer",
+  posting:    "posting",
+  live:       "live",
+  go_live:    "live",
+  discover:   "live",
+};
+
 // Derives from metricsReached — no extra persisted set needed (01 §10.3).
 export function isFeatureUnlocked(featureId: string, metricsReached: string[]): boolean {
-  return METRIC_CATALOG.some(m => m.unlocks === featureId && metricsReached.includes(m.id));
+  // Direct metric unlock
+  if (METRIC_CATALOG.some(m => m.unlocks === featureId && metricsReached.includes(m.id))) return true;
+  // Pillar cascade safety net
+  const pillar = FEATURE_TO_PILLAR[featureId];
+  if (pillar) {
+    return METRIC_CATALOG.some(m => m.unlocks === pillar && metricsReached.includes(m.id));
+  }
+  return false;
 }
 
 export type UnlockStatCtx = {
@@ -33,7 +54,10 @@ export function metricCurrentValue(metric: MetricDef, ctx: UnlockStatCtx): numbe
 }
 
 const FEATURE_LABELS: Record<string, string> = {
+  viewer:     "CREATOR STUDIO",
   upgrades:   "CREATOR TOOLS",
+  posting:    "POSTING",
+  live:       "GO LIVE",
   go_live:    "GO LIVE",
   diamonds:   "DIAMONDS",
   inbox:      "INBOX",

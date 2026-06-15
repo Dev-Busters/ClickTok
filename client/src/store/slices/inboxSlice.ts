@@ -3,7 +3,12 @@ import type { FullState } from "../index";
 import type { InboxNotification, NotificationType } from "../../features/inbox/types";
 import { computeDailyReward, isNewCalendarDay } from "../../features/inbox/daily";
 import { METRIC_CATALOG } from "../../features/metrics/catalog";
+import { isFeatureUnlocked } from "../../features/metrics/unlocks";
 import type { MetricStatId } from "../../features/metrics/types";
+import { UPGRADE_CATALOG } from "../../features/upgrades/catalog";
+import type { UpgradePillar } from "../../features/upgrades/types";
+import { SKILL_CATALOG, SKILL_PILLAR } from "../../features/skills/catalog";
+import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { formatCount } from "../../lib/format";
 
 const MAX_NOTIFICATIONS = 50;
@@ -32,13 +37,77 @@ function metricNotifTitle(stat: MetricStatId, threshold: number): string {
   }
 }
 
+// Returns which unlocked Studio pillars have at least one affordable, unpurchased upgrade.
+function computeAffordablePillars(state: FullState): UpgradePillar[] {
+  const { wallet, ownedUpgrades, upgradeLevels, skillLevels, ownedElements, metricsReached } = state;
+  const result: UpgradePillar[] = [];
+
+  const pillars: UpgradePillar[] = ["viewer", "posting", "live"];
+  for (const pillar of pillars) {
+    if (!isFeatureUnlocked(pillar, metricsReached)) continue;
+
+    let found = false;
+
+    // Repeatable (leveled) upgrades
+    for (const def of UPGRADE_CATALOG) {
+      if (!def.repeatable || def.pillar !== pillar) continue;
+      const level = upgradeLevels[def.id] ?? 0;
+      if (def.maxLevel !== undefined && level >= def.maxLevel) continue;
+      if (!def.baseCost || def.costGrowth === undefined) continue;
+      const cost = Math.round((def.baseCost.coins ?? 0) * Math.pow(def.costGrowth, level));
+      if (cost > 0 && wallet.coins >= cost) { found = true; break; }
+    }
+
+    if (!found) {
+      // One-time gear/software
+      for (const def of UPGRADE_CATALOG) {
+        if (def.repeatable || def.pillar !== pillar) continue;
+        if (ownedUpgrades[def.id]) continue;
+        if (def.requires?.upgrades && !def.requires.upgrades.every(id => ownedUpgrades[id])) continue;
+        if (def.requires?.followers !== undefined && wallet.followers < def.requires.followers) continue;
+        const coinsCost = def.cost?.coins ?? 0;
+        const diamondsCost = def.cost?.diamonds ?? 0;
+        if (wallet.coins >= coinsCost && wallet.diamonds >= diamondsCost) { found = true; break; }
+      }
+    }
+
+    if (!found) {
+      // Skills
+      for (const def of SKILL_CATALOG) {
+        if (SKILL_PILLAR[def.id] !== pillar) continue;
+        const level = (skillLevels as Record<string, number>)[def.id] ?? 0;
+        if (level >= def.maxLevel) continue;
+        if (def.requires?.followers !== undefined && wallet.followers < def.requires.followers) continue;
+        const cost = Math.round(def.baseCost * Math.pow(def.costGrowth, level));
+        if (wallet.coins >= cost) { found = true; break; }
+      }
+    }
+
+    if (!found && pillar === "viewer") {
+      // Elements (viewer pillar only)
+      for (const def of ELEMENT_CATALOG) {
+        if (ownedElements[def.id]) continue;
+        if (wallet.followers < def.requires.followers) continue;
+        if (wallet.coins >= def.requires.coins) { found = true; break; }
+      }
+    }
+
+    if (found) result.push(pillar);
+  }
+
+  return result;
+}
+
 export type InboxSlice = {
   notifications: InboxNotification[];
   lastDailyClaimAt: number | null;
   metricsReached: string[];
+  affordableNotifiedPillars: string[];  // persisted; dedup set for affordable-upgrade alerts
+  affordablePillars: UpgradePillar[];   // not persisted; derived in tick for badge rendering
 
   pushNotification: (n: { type: NotificationType; title: string; body: string }) => void;
   checkMetrics: () => void;
+  checkAffordableUpgrades: () => void;
   claimDailyReward: () => void;
 };
 
@@ -46,6 +115,8 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
   notifications: [],
   lastDailyClaimAt: null,
   metricsReached: [],
+  affordableNotifiedPillars: [],
+  affordablePillars: [],
 
   pushNotification: ({ type, title, body }) => {
     const { notifications } = get();
@@ -93,6 +164,35 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
         type: "milestone",
         title: metricNotifTitle(m.stat, m.threshold),
         body: rewardParts.join(" · "),
+      });
+    }
+  },
+
+  // 10.2: called every tick; updates affordablePillars badge state and fires
+  // ONE notification per pillar the first time it gains an affordable upgrade.
+  checkAffordableUpgrades: () => {
+    const state = get();
+    const newAffordable = computeAffordablePillars(state);
+
+    // Badge state update (skip set if unchanged to avoid spurious re-renders)
+    const current = state.affordablePillars;
+    if (newAffordable.join(',') !== current.join(',')) {
+      set({ affordablePillars: newAffordable });
+    }
+
+    // Notification dedup: fire once per pillar that first enters the affordable set
+    const { affordableNotifiedPillars } = state;
+    const toNotify = newAffordable.filter(p => !affordableNotifiedPillars.includes(p));
+    if (toNotify.length === 0) return;
+
+    set({ affordableNotifiedPillars: [...affordableNotifiedPillars, ...toNotify] });
+
+    for (const pillar of toNotify) {
+      const label = pillar === "viewer" ? "VIEWER" : pillar === "posting" ? "POSTING" : "LIVE";
+      get().pushNotification({
+        type: "milestone",
+        title: `New upgrade ready — ${label}`,
+        body: `Open Creator Studio → ${label} to level up.`,
       });
     }
   },

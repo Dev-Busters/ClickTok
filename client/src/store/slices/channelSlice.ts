@@ -85,6 +85,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     // the single integration point that catches totalFollowers crossing a
     // milestone from any source (taps, passive income, idle income, runs).
     get().checkMetrics();
+    get().checkAffordableUpgrades();
     get().decayCombo(dt);
     get().expireOrResolveWave();
 

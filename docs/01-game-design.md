@@ -395,3 +395,52 @@ more followers/tap → cross follower metric → unlock GO LIVE; Auto-Engage ear
 5. Loop: spend run rewards on repeatable + one-time upgrades → stronger runs → bigger
    payouts → unlock Discover, Feed, element pods. →
 6. (Later) Community raids, global trends, prestige.
+
+## 11. Creator Studio, clicker revamp & whole-game polish (Phase 10; design LOCKED 2026-06-14)
+
+**Origin: post-Phase-9 playtest.** Three problems surfaced: (1) The FYP is cluttered — locked
+"???" element pods overlap the stage. (2) Gameplay is too TEB-centric and shallow. (3) Visual
+polish is uneven; reference bar: **Pegfinity** (bold, legible cascade of pop-numbers during
+action, cohesive arcade aesthetic, dedicated upgrade page, celebration popups on unlocks).
+
+### 11.1 Creator Studio — the 3-pillar upgrade hub
+
+**Creator Studio** is a full-screen hub housing ALL upgrades, off the FYP. It is a progression
+unlock itself (appears at ~10 followers) and is organized around three **creator pillars** — the
+three things a creator does — each unlocking in turn:
+
+| Pillar | Threshold | What unlocks | Studio section |
+|---|---|---|---|
+| **VIEWER** | ~10 followers | Studio button appears on Home + FYP elements + feed scroll + rail | Viewer tab: clicker/element upgrades + element unlocks |
+| **POSTING** | ~100 followers | Publish videos + Posting tab | Posting tab: publish/royalty/mod upgrades |
+| **LIVE** | ~500 followers | GO LIVE + Live tab | Live tab: run-stat gear, reactions, run skills |
+
+Every `UpgradeDef` carries a `pillar: "viewer" | "posting" | "live"` field so the Studio can
+route it to the right section and the affordability-badge system (Phase 10.2) knows where to show
+the indicator. A skill→pillar map assigns skills to sections:
+- **viewer pillar**: Charisma, Editing (content creation skills)
+- **live pillar**: Stagecraft, Monetization, Network (run-performance skills)
+- **posting pillar**: (reserved for Phase 10.2+)
+
+The Studio is the game's **onboarding / tutorial** — everything appears naturally as thresholds
+are crossed; the player is never shown a list of locked features they can't act on yet.
+
+### 11.2 FYP de-clutter (Phase 10.1)
+
+Remove the locked "???" element pods from the FYP entirely. Element unlocking happens in
+Creator Studio → Viewer section. The FYP renders ONLY active waves; with no locked pods there
+is no overlap clutter.
+
+### 11.3 Elements: fix first, then expand (Phase 10.3–10.4)
+
+Primary goal: make Beat Sync + Duet Loop actually interactive (fix the stacking / pointer-events
+bug so pod taps register). Un-gate to the viewer unlock (~10f, not 1k). Raise spawn frequency.
+Then add two new rhythm elements:
+- **HOLD DROP** — press-and-hold to fill a charge ring; release inside the target window.
+- **SWIPE HITS** — directional flicks in time (DDR-flavored).
+
+### 11.4 Whole-game polish pass (Phase 10.5)
+
+Pop-numbers v2 (bigger, bolder, color-coded, cascade with arc + scatter), celebration popups on
+unlocks (radial burst), cohesive CRT/arcade meters across all screens. Quality reference:
+Pegfinity's f17 frame — a screenful of bold gold/green/cyan numbers during a big moment.

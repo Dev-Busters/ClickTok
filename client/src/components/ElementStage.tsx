@@ -1,24 +1,16 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "../store";
-import { ELEMENT_CATALOG } from "../features/elements/catalog";
-import { formatCount } from "../lib/format";
 import { BeatSyncWave } from "./BeatSyncWave";
 import { DuetLoopWave } from "./DuetLoopWave";
-import { ElementUnlockSheet } from "./ElementUnlockSheet";
-import type { ElementDef } from "../features/elements/types";
-import type { Wallet } from "../features/economy/types";
+import { HoldDropWave } from "./HoldDropWave";
+import { SwipeHitsWave } from "./SwipeHitsWave";
 
 export function ElementStage() {
-  const ownedElements = useGameStore(s => s.ownedElements);
   const activeWave = useGameStore(s => s.activeWave);
-  const wallet = useGameStore(s => s.wallet);
 
-  const [sheetDef, setSheetDef] = useState<ElementDef | null>(null);
   const [bonusFlash, setBonusFlash] = useState(false);
   const [flowFlash, setFlowFlash] = useState(false);
-
-  const locked = ELEMENT_CATALOG.filter(d => !ownedElements[d.id]);
 
   const handleAllPerfect = () => {
     setBonusFlash(true);
@@ -31,20 +23,7 @@ export function ElementStage() {
   };
 
   return (
-    <div style={{ position: 'absolute', top: 88, left: 0, right: 0, height: '30%', pointerEvents: 'none' }}>
-
-      {/* ── Locked element pods (06§3: dock at the stage's top edge) ────── */}
-      {locked.length > 0 && (
-        <div style={{
-          position: 'absolute', top: 4, left: 0, right: 0,
-          display: 'flex', justifyContent: 'center', gap: 12,
-          pointerEvents: 'auto',
-        }}>
-          {locked.map(def => (
-            <LockedPod key={def.id} def={def} wallet={wallet} onTap={() => setSheetDef(def)} />
-          ))}
-        </div>
-      )}
+    <div style={{ position: 'absolute', top: 88, left: 0, right: 0, height: '30%', pointerEvents: 'none', zIndex: 20 }}>
 
       {/* ── Active wave ───────────────────────────────────────────────── */}
       {activeWave?.element === "beat_sync" && (
@@ -55,6 +34,16 @@ export function ElementStage() {
       {activeWave?.element === "duet_loop" && (
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
           <DuetLoopWave wave={activeWave} onFlow={handleFlow} />
+        </div>
+      )}
+      {activeWave?.element === "hold_drop" && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
+          <HoldDropWave wave={activeWave} />
+        </div>
+      )}
+      {activeWave?.element === "swipe_hits" && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
+          <SwipeHitsWave wave={activeWave} onAllPerfect={handleAllPerfect} />
         </div>
       )}
 
@@ -124,36 +113,6 @@ export function ElementStage() {
         )}
       </AnimatePresence>
 
-      {/* ── Unlock sheet ──────────────────────────────────────────────── */}
-      {sheetDef && <ElementUnlockSheet def={sheetDef} onClose={() => setSheetDef(null)} />}
     </div>
-  );
-}
-
-function LockedPod({ def, wallet, onTap }: { def: ElementDef; wallet: Wallet; onTap: () => void }) {
-  const followersMet = wallet.followers >= def.requires.followers;
-  const withinReach = followersMet && wallet.coins >= def.requires.coins * 0.8;
-
-  return (
-    <motion.button
-      onPointerDown={e => { e.stopPropagation(); onTap(); }}
-      animate={withinReach ? { opacity: [0.55, 1, 0.55] } : { opacity: 0.55 }}
-      transition={withinReach ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : undefined}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-        padding: '6px 10px',
-        borderRadius: 12,
-        background: 'rgba(0,0,0,0.4)',
-        border: `1px solid ${withinReach ? 'var(--cyan)' : 'rgba(255,255,255,0.15)'}`,
-        cursor: 'pointer',
-      }}
-    >
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.15em', color: 'var(--dim)' }}>
-        🔒 ???
-      </span>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--dim)' }}>
-        {formatCount(def.requires.coins)} 🪙 · needs {formatCount(def.requires.followers)} followers
-      </span>
-    </motion.button>
   );
 }

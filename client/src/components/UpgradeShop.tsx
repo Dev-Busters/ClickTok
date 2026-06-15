@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 import { UPGRADE_CATALOG } from "../features/upgrades/catalog";
-import type { UpgradeDef } from "../features/upgrades/types";
+import type { UpgradeDef, UpgradePillar } from "../features/upgrades/types";
 import { isFeatureUnlocked } from "../features/metrics/unlocks";
 
 function requirementLabel(def: UpgradeDef): string | null {
@@ -21,23 +21,25 @@ function requirementLabel(def: UpgradeDef): string | null {
   return parts.join(", ");
 }
 
-export function UpgradeShop() {
+export function UpgradeShop({ pillar }: { pillar?: UpgradePillar } = {}) {
   const metricsReached = useGameStore(s => s.metricsReached);
   const upgradesUnlocked = isFeatureUnlocked("upgrades", metricsReached);
 
   return (
     <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <RepeatableSection />
-      {upgradesUnlocked && <UpgradeCategorySection category="gear" title="GEAR" />}
-      {upgradesUnlocked && <UpgradeCategorySection category="software" title="SOFTWARE" />}
+      <RepeatableSection pillar={pillar} />
+      {upgradesUnlocked && <UpgradeCategorySection category="gear" title="GEAR" pillar={pillar} />}
+      {upgradesUnlocked && <UpgradeCategorySection category="software" title="SOFTWARE" pillar={pillar} />}
     </div>
   );
 }
 
 // ── Repeatable / leveled upgrades ─────────────────────────────────────────────
 
-function RepeatableSection() {
-  const items = UPGRADE_CATALOG.filter(u => u.repeatable);
+function RepeatableSection({ pillar }: { pillar?: UpgradePillar }) {
+  const items = UPGRADE_CATALOG.filter(u => u.repeatable && (!pillar || u.pillar === pillar));
+
+  if (items.length === 0) return null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -165,13 +167,15 @@ function RepeatableRow({ def }: { def: UpgradeDef }) {
 
 // ── One-time gear / software ───────────────────────────────────────────────────
 
-function UpgradeCategorySection({ category, title }: { category: "gear" | "software"; title: string }) {
+function UpgradeCategorySection({ category, title, pillar }: { category: "gear" | "software"; title: string; pillar?: UpgradePillar }) {
   const ownedUpgrades = useGameStore(s => s.ownedUpgrades);
   const wallet = useGameStore(s => s.wallet);
   const isUpgradeUnlocked = useGameStore(s => s.isUpgradeUnlocked);
   const buyUpgrade = useGameStore(s => s.buyUpgrade);
 
-  const items = UPGRADE_CATALOG.filter(u => u.category === category);
+  const items = UPGRADE_CATALOG.filter(u => u.category === category && (!pillar || u.pillar === pillar));
+
+  if (items.length === 0) return null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

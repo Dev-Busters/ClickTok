@@ -6,7 +6,7 @@ import type { BeatGrade, ElementWave } from "../features/elements/types";
 import type { FeedModId } from "../party/types";
 import { pushFloatText } from "./fx/FloatingTextLayer";
 
-const POD_SIZE = 50;
+const POD_SIZE = 76;
 const SHARD_ANGLES = [-50, 0, 50].map(d => (d * Math.PI) / 180);
 
 type BeatSyncWaveT = Extract<ElementWave, { element: "beat_sync" }>;
@@ -120,6 +120,19 @@ function BeatPod({ startedAt, ring, activeMod, onTap }: {
           />
         ))}
       </AnimatePresence>
+
+      {/* TAP hint — shows on unresolved pods before approach ring arrives */}
+      {!resolved && !ringVisible && (
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: '9px',
+          letterSpacing: '0.12em',
+          color: 'rgba(255,255,255,0.35)',
+          pointerEvents: 'none',
+        }}>
+          TAP
+        </span>
+      )}
 
       {/* Grade label */}
       <AnimatePresence>

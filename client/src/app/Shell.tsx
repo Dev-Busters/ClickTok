@@ -10,8 +10,10 @@ import { Discover } from "../screens/Discover";
 import { Inbox } from "../screens/Inbox";
 import { Profile } from "../screens/Profile";
 import { CreateSheet } from "../screens/Create";
+import { CreatorStudio } from "../screens/CreatorStudio";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
+import { AnimatePresence } from "framer-motion";
 
 const Live = lazy(() => import("../screens/Live").then(m => ({ default: m.Live })));
 
@@ -77,6 +79,12 @@ export function Shell() {
           {openSheet === 'create' && (
             <CreateSheet onClose={() => setSheet(null)} />
           )}
+
+          <AnimatePresence>
+            {openSheet === 'creatorStudio' && (
+              <CreatorStudio onClose={() => setSheet(null)} />
+            )}
+          </AnimatePresence>
         </>
       )}
 

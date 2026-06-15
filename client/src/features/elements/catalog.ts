@@ -16,4 +16,16 @@ export const ELEMENT_CATALOG: ElementDef[] = [
     tagline: "Tap the core to arm a pod, then tap it back — chain it for FLOW.",
     requires: BALANCE.elements.duetLoop.unlock,
   },
+  {
+    id: "hold_drop",
+    name: "HOLD DROP",
+    tagline: "Press and hold to charge — release inside the target window for a big payout.",
+    requires: BALANCE.elements.holdDrop.unlock,
+  },
+  {
+    id: "swipe_hits",
+    name: "SWIPE HITS",
+    tagline: "Swipe the arrows in the right direction before time runs out. DDR-style.",
+    requires: BALANCE.elements.swipeHits.unlock,
+  },
 ];

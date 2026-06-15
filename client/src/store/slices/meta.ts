@@ -5,7 +5,7 @@ import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -62,7 +62,14 @@ export type PersistedV6 = Omit<PersistedV5, "version" | "milestonesReached"> & {
   streams: number;
 };
 
-export type PersistedState = PersistedV6;
+// 10.2: adds the set of Studio pillars that have already triggered an
+//        "affordable upgrade" notification (dedup key, never fires twice per pillar).
+export type PersistedV7 = Omit<PersistedV6, "version"> & {
+  version: 7;
+  affordableNotifiedPillars: string[];
+};
+
+export type PersistedState = PersistedV7;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -92,6 +99,7 @@ export function toPersistedState(state: FullState): PersistedState {
     viewsTotal: state.viewsTotal,
     coinsEarned: state.coinsEarned,
     streams: state.streams,
+    affordableNotifiedPillars: state.affordableNotifiedPillars,
   };
 }
 
@@ -120,7 +128,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -198,6 +206,16 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       viewsTotal: 0,
       coinsEarned: 0,
       streams: 0,
+    };
+  }
+
+  if (version < 7) {
+    const v6 = state as PersistedV6;
+    state = {
+      ...v6,
+      version: 7,
+      // v6 saves predate the affordable-upgrade notification dedup set (10.2).
+      affordableNotifiedPillars: [],
     };
   }
 

@@ -4,10 +4,11 @@ import { BALANCE } from "../economy/balance";
 // IDs are stable — see `04-economy-formulas.md` §4 (one-time) and §14 (repeatable).
 // Each one-time category is gated linearly: owning the previous item unlocks the next.
 export const UPGRADE_CATALOG: UpgradeDef[] = [
-  // --- Repeatable (leveled) ---
+  // --- Repeatable (leveled) — viewer pillar: core clicker improvements ---
   {
     id: "engagement_boost",
     category: "repeatable",
+    pillar: "viewer",
     name: "Engagement Boost",
     description: `+${BALANCE.upgrades.engagementBoost.postPowerAddPerLevel} post power per level`,
     effect: { postPowerAdd: BALANCE.upgrades.engagementBoost.postPowerAddPerLevel },
@@ -19,6 +20,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "loyal_followers",
     category: "repeatable",
+    pillar: "viewer",
     name: "Loyal Followers",
     description: `+${BALANCE.upgrades.loyalFollowers.followerConversionAddPerLevel} follower conversion per level`,
     effect: { followerConversionAdd: BALANCE.upgrades.loyalFollowers.followerConversionAddPerLevel },
@@ -30,6 +32,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "auto_engage_bot",
     category: "repeatable",
+    pillar: "viewer",
     name: "Auto-Engage Bot",
     description: `+${BALANCE.upgrades.autoEngageBot.passiveCoinsAddPerLevel} coins/sec per level`,
     effect: { passiveCoinsAdd: BALANCE.upgrades.autoEngageBot.passiveCoinsAddPerLevel },
@@ -40,17 +43,21 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   },
 
   // --- Gear ---
+  // viewer: pure clicker/income; no run-stat effects
   {
     id: "ring_light",
     category: "gear",
+    pillar: "viewer",
     name: "Ring Light",
     description: "+3 post power",
     cost: { coins: 50 },
     effect: { postPowerAdd: 3 },
   },
+  // live: has run-stat effect (troll resist)
   {
     id: "usb_mic",
     category: "gear",
+    pillar: "live",
     name: "USB Mic",
     description: "+6 post power, +10% troll resistance",
     cost: { coins: 150 },
@@ -60,6 +67,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "tripod",
     category: "gear",
+    pillar: "viewer",
     name: "Tripod",
     description: "+2 coins/sec passive income",
     cost: { coins: 300 },
@@ -69,6 +77,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "phone_gimbal",
     category: "gear",
+    pillar: "live",
     name: "Gimbal",
     description: "+15 post power, +10 starting LIVE viewers",
     cost: { coins: 800 },
@@ -78,6 +87,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "dslr",
     category: "gear",
+    pillar: "live",
     name: "DSLR Camera",
     description: "+30 post power, ×1.25 starting LIVE viewers",
     cost: { coins: 2500 },
@@ -87,6 +97,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "green_screen",
     category: "gear",
+    pillar: "live",
     name: "Green Screen",
     description: "+25 coins/sec passive income, unlocks Pin Comment reaction",
     cost: { coins: 6000 },
@@ -96,6 +107,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "studio_lights",
     category: "gear",
+    pillar: "live",
     name: "Studio Lights",
     description: "×1.3 all income, ×1.2 LIVE gift rate",
     cost: { coins: 18000 },
@@ -105,6 +117,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "creator_rig",
     category: "gear",
+    pillar: "live",
     name: "Creator Rig",
     description: "+120 post power, ×1.5 starting LIVE viewers",
     cost: { coins: 60000, diamonds: 5 },
@@ -113,17 +126,21 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   },
 
   // --- Software ---
+  // live: unlocks a run reaction
   {
     id: "capcut",
     category: "software",
+    pillar: "live",
     name: "Editing App",
     description: "+0.3 follower conversion, unlocks Clapback reaction",
     cost: { coins: 100 },
     effect: { followerConversionAdd: 0.3, unlocksReaction: "clapback" },
   },
+  // viewer: passive income, no run stats
   {
     id: "scheduler",
     category: "software",
+    pillar: "viewer",
     name: "Post Scheduler",
     description: "+6 coins/sec passive income",
     cost: { coins: 400 },
@@ -133,6 +150,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "hashtag_tool",
     category: "software",
+    pillar: "viewer",
     name: "Hashtag Tool",
     description: "×1.25 all income",
     cost: { coins: 1200 },
@@ -142,6 +160,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "analytics_pro",
     category: "software",
+    pillar: "live",
     name: "Analytics Pro",
     description: "+0.6 follower conversion, ×1.15 LIVE gift rate",
     cost: { coins: 4000 },
@@ -151,6 +170,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "trend_radar",
     category: "software",
+    pillar: "live",
     name: "Trend Radar",
     description: "Unlocks Shoutout reaction, +40 starting LIVE viewers",
     cost: { coins: 10000 },
@@ -160,6 +180,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "algo_hacks",
     category: "software",
+    pillar: "viewer",
     name: "Algorithm Hacks",
     description: "×1.6 all income",
     cost: { coins: 35000 },
@@ -169,6 +190,7 @@ export const UPGRADE_CATALOG: UpgradeDef[] = [
   {
     id: "viral_engine",
     category: "software",
+    pillar: "live",
     name: "Viral Engine",
     description: "×2 all income, unlocks Go Off reaction",
     cost: { coins: 120000, diamonds: 15 },

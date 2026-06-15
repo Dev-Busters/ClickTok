@@ -308,6 +308,38 @@ Each row:
 The section header reads "LEVEL UP" with the same mono + hairline-divider treatment as GEAR /
 SOFTWARE. No "OWNED" state — repeatables are always levelable until maxed.
 
+## 11. Phase 10 — Creator Studio & FYP de-clutter (`01` §11)
+
+### 11.1 Creator Studio screen (`screens/CreatorStudio/`)
+
+Full-screen hub opened via:
+- A **STUDIO** button in the Home top stat-strip (right side, compact icon+label), gated by the
+  `viewer` unlock (~10 followers).
+- A **CREATOR STUDIO ›** entry row on the Profile screen (same gating).
+
+**Layout:**
+- Header: "CREATOR STUDIO" (display font) + close ✕ button (top-right).
+- Pill-tab row: **VIEWER · POSTING · LIVE**. A tab is only rendered if its pillar is unlocked.
+  Active tab: cyan underline + `--text`. Inactive: `--dim`.
+- Scrollable content area per tab:
+  - **VIEWER**: repeatable upgrades (viewer pillar) + gear/software (viewer pillar, linear-locked
+    as on Profile) + Charisma + Editing skills + element unlock list.
+  - **POSTING**: posting-pillar upgrades + posting skills (placeholder until Phase 10.2).
+  - **LIVE**: live-pillar gear/software + Stagecraft/Monetization/Network skills.
+
+Buying/leveling from the Studio updates the store exactly like buying from Profile. No separate
+action needed.
+
+### 11.2 FYP top stat-strip additions
+
+When `viewer` is unlocked, the stat strip gains a **STUDIO** pill button (left of currency
+pills). Tap → open Studio overlay.
+
+### 11.3 FYP element stage (post 10.1)
+
+Remove locked "???" pods entirely. `ElementStage` renders ONLY active waves; the
+`LockedPod` render block is deleted. Unlocking elements happens in Studio → Viewer.
+
 ## 9. Visual language rules
 
 - Layout = TikTok (familiar, clean, dark, bottom-nav, profile grid). Accents = our CRT/terminal

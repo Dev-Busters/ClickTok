@@ -8,7 +8,7 @@ import type { ElementWave } from "../features/elements/types";
 import type { FeedModId } from "../party/types";
 import { pushFloatText } from "./fx/FloatingTextLayer";
 
-const POD_SIZE = 50;
+const POD_SIZE = 76;
 
 type DuetLoopWaveT = Extract<ElementWave, { element: "duet_loop" }>;
 

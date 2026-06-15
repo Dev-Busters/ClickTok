@@ -144,11 +144,11 @@ export const BALANCE = {
 
   // Phase 7.3 — the element framework (04 §13.2)
   elements: {
-    waveIdleGapSec: 6,             // scheduler: breathing room between waves (one wave at a time)
+    waveIdleGapSec: 3,             // scheduler: breathing room between waves (one wave at a time)
 
-    // BEAT SYNC (timing rings) — unlock: 2,500 coins, gated at 1,000 followers
+    // BEAT SYNC (timing rings) — unlock: 50 coins, gated at viewer level (~10 followers)
     beatSync: {
-      unlock: { coins: 2500, followers: 1000 },
+      unlock: { coins: 50, followers: 10 },
       rings: 3,
       shrinkSec: 1.6,              // ring travels scale 2.2 → 1.0 in this time
       staggerSec: 0.45,            // spawn offset between rings — THE rhythm
@@ -158,14 +158,35 @@ export const BALANCE = {
       perfectWaveBonus: 5,         // all-3-PERFECT: +5 × gainPerPost on top
     },
 
-    // DUET LOOP (call-and-response) — unlock: 10,000 coins, gated at 5,000 followers
+    // DUET LOOP (call-and-response) — unlock: 200 coins, gated at viewer level (~10 followers)
     duetLoop: {
-      unlock: { coins: 10000, followers: 5000 },
+      unlock: { coins: 200, followers: 10 },
       pods: 3,
       armTimeoutSec: 2.5,          // an armed pod fades back to dormant if not tapped
       podPayout: 3,                // each pod tap pays 3 × gainPerPost (core taps pay normal)
       flowSec: 4.0,                // full chain (core→pod ×3, 6 taps) inside this → FLOW
       flowBonus: 6,                // +6 × gainPerPost
+    },
+
+    // HOLD DROP (charge ring) — unlock: 300 coins, gated at viewer level (~10 followers)
+    holdDrop: {
+      unlock: { coins: 300, followers: 10 },
+      chargeSec: 2.0,      // ring fills fully in this many seconds
+      windowStart: 0.35,   // target window: 35%–65% charge = PERFECT
+      windowEnd: 0.65,
+      perfectPayout: 8,    // perfect release: 8 × gainPerPost
+      weakPayout: 1.5,     // over/undercharge: 1.5 × gainPerPost
+      expiryAfterSec: 5.0, // wave auto-expires if never pressed
+    },
+
+    // SWIPE HITS (directional) — unlock: 450 coins, gated at viewer level (~10 followers)
+    swipeHits: {
+      unlock: { coins: 450, followers: 10 },
+      arrows: 2,           // arrows per wave
+      staggerSec: 0.6,     // DDR stagger: arrow i activates at startedAt + i * staggerSec * 1000ms
+      activeSec: 1.8,      // window each arrow can be hit (progress 0 → 1)
+      perfectPayout: 5,    // each correctly-swiped arrow: 5 × gainPerPost
+      allPerfectBonus: 8,  // all arrows correct → +8 × gainPerPost bonus on final arrow
     },
   },
 } as const;

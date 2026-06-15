@@ -1,10 +1,12 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
-import type { ElementId, ElementWave, BeatGrade } from "../../features/elements/types";
+import type { ElementId, ElementWave, BeatGrade, SwipeDir } from "../../features/elements/types";
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { BALANCE } from "../../features/economy/balance";
 import { ringScale, gradeForScale, GRADE_MULT } from "../../features/elements/beatSync";
 import { armProgress, isFlowed } from "../../features/elements/duetLoop";
+import { chargeProgress, holdGrade } from "../../features/elements/holdDrop";
+import { arrowProgress } from "../../features/elements/swipeHits";
 import { effectiveBeatSyncConfig, effectiveWaveIdleGapSec, viralMult } from "../../features/feed/mods";
 
 export type ElementsSlice = {
@@ -17,6 +19,9 @@ export type ElementsSlice = {
   spawnWave: (id: ElementId) => void;
   tapRing: (ringId: number) => void;  // beat_sync: grade = f(now - startedAt) vs 04 §13.2 windows
   tapDuetPod: () => void;             // duet_loop: pays iff armedIndex is this pod (7.4)
+  pointerDownHold: () => void;        // hold_drop: record press start time
+  pointerUpHold: () => void;          // hold_drop: grade + pay based on charge progress
+  swipeArrow: (arrowId: number, dir: SwipeDir) => void; // swipe_hits: compare dir to expected
   expireOrResolveWave: () => void;    // payout, clear, schedule nextWaveAt (+ idle gap)
 };
 
@@ -57,6 +62,24 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
           element: "duet_loop", startedAt: Date.now(),
           armedIndex: null, armedAt: null, firstArmedAt: null, completed: 0,
         },
+        lastSpawnedElement: id,
+      });
+    }
+    if (id === "hold_drop") {
+      set({
+        activeWave: { element: "hold_drop", startedAt: Date.now(), pressedAt: null },
+        lastSpawnedElement: id,
+      });
+    }
+    if (id === "swipe_hits") {
+      const DIRS: SwipeDir[] = ["up", "down", "left", "right"];
+      const count = BALANCE.elements.swipeHits.arrows;
+      const arrows = Array.from({ length: count }, (_, i) => ({
+        id: i,
+        dir: DIRS[Math.floor(Math.random() * DIRS.length)] as SwipeDir,
+      }));
+      set({
+        activeWave: { element: "swipe_hits", startedAt: Date.now(), arrows },
         lastSpawnedElement: id,
       });
     }
@@ -128,6 +151,76 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
     });
   },
 
+  pointerDownHold: () => {
+    const { activeWave } = get();
+    if (!activeWave || activeWave.element !== "hold_drop") return;
+    if (activeWave.pressedAt !== null || activeWave.grade !== undefined) return;
+    set({ activeWave: { ...activeWave, pressedAt: Date.now() } });
+  },
+
+  pointerUpHold: () => {
+    const { activeWave, tapPower, multiplier, followerConversion, combo, viralUntil, wallet } = get();
+    if (!activeWave || activeWave.element !== "hold_drop") return;
+    if (activeWave.pressedAt === null || activeWave.grade !== undefined) return;
+
+    const progress = chargeProgress(activeWave.pressedAt);
+    const grade = holdGrade(progress);
+    const payout = grade === "perfect"
+      ? BALANCE.elements.holdDrop.perfectPayout
+      : BALANCE.elements.holdDrop.weakPayout;
+
+    const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
+    const k = payout * comboMult * viralMult(viralUntil);
+    set({
+      wallet: {
+        ...wallet,
+        coins:          wallet.coins + tapPower * BALANCE.postCoinConversion * multiplier * k,
+        followers:      wallet.followers + tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k,
+        totalFollowers: wallet.totalFollowers + tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k,
+        likes:          wallet.likes + tapPower * BALANCE.postLikeConversion * multiplier * k,
+      },
+      activeWave: { ...activeWave, grade, resolvedAt: Date.now() },
+    });
+  },
+
+  swipeArrow: (arrowId, dir) => {
+    const { activeWave, tapPower, multiplier, followerConversion, combo, viralUntil, wallet } = get();
+    if (!activeWave || activeWave.element !== "swipe_hits") return;
+    const arrow = activeWave.arrows.find(a => a.id === arrowId);
+    if (!arrow || arrow.grade !== undefined) return;
+
+    const progress = arrowProgress(activeWave.startedAt, arrowId);
+    const withinWindow = progress >= 0 && progress <= 1;
+    const grade: "perfect" | "miss" = withinWindow && dir === arrow.dir ? "perfect" : "miss";
+
+    const newArrows = activeWave.arrows.map(a => a.id === arrowId ? { ...a, grade } : a);
+    const allGraded = newArrows.every(a => a.grade !== undefined);
+    const allPerfect = newArrows.every(a => a.grade === "perfect");
+
+    const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
+    const vm = viralMult(viralUntil);
+    // Per-arrow payout (perfect only). All-perfect bonus applied on the final arrow.
+    let k = grade === "perfect" ? BALANCE.elements.swipeHits.perfectPayout * comboMult * vm : 0;
+    if (allGraded && allPerfect) {
+      k += BALANCE.elements.swipeHits.allPerfectBonus * comboMult * vm;
+    }
+
+    set({
+      wallet: k > 0 ? {
+        ...wallet,
+        coins:          wallet.coins + tapPower * BALANCE.postCoinConversion * multiplier * k,
+        followers:      wallet.followers + tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k,
+        totalFollowers: wallet.totalFollowers + tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k,
+        likes:          wallet.likes + tapPower * BALANCE.postLikeConversion * multiplier * k,
+      } : wallet,
+      activeWave: {
+        ...activeWave,
+        arrows: newArrows,
+        ...(allGraded ? { resolvedAt: Date.now() } : {}),
+      },
+    });
+  },
+
   expireOrResolveWave: () => {
     const { activeWave, openSheet, phase, spectating, ownedElements, nextWaveAt, deck, deckIndex } = get();
     // 01 §8.2 / 04 §13.2: scheduler pauses while a sheet is open or a run/spectate is active.
@@ -182,6 +275,71 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
       // — no penalty, the chain just stalls (completed/firstArmedAt untouched).
       if (activeWave.armedIndex !== null && activeWave.armedAt !== null && armProgress(activeWave.armedAt, activeMod) >= 1) {
         set({ activeWave: { ...activeWave, armedIndex: null, armedAt: null } });
+      }
+      return;
+    }
+
+    if (activeWave?.element === "hold_drop") {
+      const cfg = BALANCE.elements.holdDrop;
+      // 600ms grace after grade assigned → clear wave
+      if (activeWave.grade !== undefined) {
+        if (activeWave.resolvedAt !== undefined && Date.now() - activeWave.resolvedAt > 600) {
+          set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
+        }
+        return;
+      }
+      // Auto-overcharge if held past full charge
+      if (activeWave.pressedAt !== null && chargeProgress(activeWave.pressedAt) >= 1) {
+        const { tapPower, multiplier, followerConversion, combo, viralUntil, wallet } = get();
+        const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
+        const k = cfg.weakPayout * comboMult * viralMult(viralUntil);
+        set({
+          wallet: {
+            ...wallet,
+            coins:          wallet.coins + tapPower * BALANCE.postCoinConversion * multiplier * k,
+            followers:      wallet.followers + tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k,
+            totalFollowers: wallet.totalFollowers + tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k,
+            likes:          wallet.likes + tapPower * BALANCE.postLikeConversion * multiplier * k,
+          },
+          activeWave: { ...activeWave, grade: "weak", resolvedAt: Date.now() },
+        });
+        return;
+      }
+      // Auto-expire if untouched for expiryAfterSec
+      if (activeWave.pressedAt === null && (Date.now() - activeWave.startedAt) / 1000 >= cfg.expiryAfterSec) {
+        set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
+      }
+      return;
+    }
+
+    if (activeWave?.element === "swipe_hits") {
+      // 600ms grace after all arrows graded → clear wave
+      if (activeWave.resolvedAt !== undefined) {
+        if (Date.now() - activeWave.resolvedAt > 600) {
+          set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
+        }
+        return;
+      }
+      // Auto-miss arrows whose active window has expired
+      const now = Date.now();
+      let changed = false;
+      const newArrows = activeWave.arrows.map(a => {
+        if (a.grade !== undefined) return a;
+        if (arrowProgress(activeWave.startedAt, a.id) > 1) {
+          changed = true;
+          return { ...a, grade: "miss" as const };
+        }
+        return a;
+      });
+      if (changed) {
+        const allGraded = newArrows.every(a => a.grade !== undefined);
+        set({
+          activeWave: {
+            ...activeWave,
+            arrows: newArrows,
+            ...(allGraded ? { resolvedAt: now } : {}),
+          },
+        });
       }
       return;
     }

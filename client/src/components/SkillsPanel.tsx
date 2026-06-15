@@ -1,13 +1,20 @@
 import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
-import { SKILL_CATALOG } from "../features/skills/catalog";
+import { SKILL_CATALOG, SKILL_PILLAR } from "../features/skills/catalog";
+import type { UpgradePillar } from "../features/upgrades/types";
 
-export function SkillsPanel() {
+export function SkillsPanel({ pillar }: { pillar?: UpgradePillar } = {}) {
   const skillLevels = useGameStore(s => s.skillLevels);
   const wallet = useGameStore(s => s.wallet);
   const skillCost = useGameStore(s => s.skillCost);
   const levelSkill = useGameStore(s => s.levelSkill);
+
+  const visibleSkills = pillar
+    ? SKILL_CATALOG.filter(def => SKILL_PILLAR[def.id] === pillar)
+    : SKILL_CATALOG;
+
+  if (visibleSkills.length === 0) return null;
 
   return (
     <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -19,7 +26,7 @@ export function SkillsPanel() {
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
       </div>
 
-      {SKILL_CATALOG.map((def, idx) => {
+      {visibleSkills.map((def, idx) => {
         const level = skillLevels[def.id];
         const maxed = level >= def.maxLevel;
         const locked = !maxed && def.requires?.followers !== undefined && wallet.followers < def.requires.followers;

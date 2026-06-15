@@ -2,6 +2,7 @@ import type { Currency } from "../economy/types";
 import type { ReactionId } from "../livestream/types";
 
 export type UpgradeCategory = "gear" | "software" | "repeatable";
+export type UpgradePillar = "viewer" | "posting" | "live";
 
 export type UpgradeEffect = {
   postPowerAdd?: number;
@@ -20,6 +21,7 @@ export type UpgradeEffect = {
 export type UpgradeDef = {
   id: string;
   category: UpgradeCategory;
+  pillar: UpgradePillar;
   name: string;
   description: string;            // human copy; can be templated from effect
   effect: UpgradeEffect;
