@@ -54,7 +54,7 @@ export function CloudAccountPanel() {
       return;
     }
     setResetting(true);
-    void resetProgress();
+    resetProgress();
   };
 
   return (

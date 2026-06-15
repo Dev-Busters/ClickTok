@@ -43,14 +43,18 @@ export const createCloudSlice: StateCreator<FullState, [], [], CloudSlice> = (se
       boonMultiplier: persisted.boonMultiplier,
       lastSeenAt: persisted.lastSeenAt,
       ownedUpgrades: persisted.ownedUpgrades,
+      upgradeLevels: persisted.upgradeLevels,
       skillLevels: persisted.skillLevels,
       videos: persisted.videos,
       notifications: persisted.notifications,
       lastDailyClaimAt: persisted.lastDailyClaimAt,
       metricsReached: persisted.metricsReached,
+      ownedElements: persisted.ownedElements,
+      tebTeachSeen: persisted.tebTeachSeen,
       viewsTotal: persisted.viewsTotal,
       coinsEarned: persisted.coinsEarned,
       streams: persisted.streams,
+      affordableNotifiedPillars: persisted.affordableNotifiedPillars,
     });
     get().recomputeStats();
   },

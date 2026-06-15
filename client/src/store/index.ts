@@ -55,5 +55,28 @@ if (import.meta.env.DEV) {
   (window as unknown as { gameStore: typeof useGameStore }).gameStore = useGameStore;
 }
 
+// Playtesting: a brand-new-player snapshot, built from the same slice
+// creators as the main store. Used by resetProgress() to overwrite the live
+// store's in-memory state *before* reloading, so a stray rAF-driven tick()
+// can't re-persist the old (full-resource) state to localStorage during the
+// reload's flush.
+export function createFreshPersistedState(): PersistedState {
+  const fresh = create<FullState>()((set, get, api) => ({
+    ...createChannelSlice(set, get, api),
+    ...createUpgradesSlice(set, get, api),
+    ...createSkillsSlice(set, get, api),
+    ...createCatalogSlice(set, get, api),
+    ...createRunSlice(set, get, api),
+    ...createSocialSlice(set, get, api),
+    ...createUiSlice(set, get, api),
+    ...createInboxSlice(set, get, api),
+    ...createSpectateSlice(set, get, api),
+    ...createCloudSlice(set, get, api),
+    ...createFeedSlice(set, get, api),
+    ...createElementsSlice(set, get, api),
+  }));
+  return toPersistedState(fresh.getState());
+}
+
 export type { LeaderboardEntry } from "./slices/socialSlice";
 export type { IdleReport } from "./slices/channelSlice";

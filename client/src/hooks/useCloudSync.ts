@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { useGameStore } from "../store";
+import { useGameStore, createFreshPersistedState } from "../store";
 import { supabase } from "../lib/supabase";
 import { toPersistedState } from "../store/slices/meta";
-import { pullCloudSave, pushCloudSave, deleteCloudSave } from "../features/cloud/sync";
+import { pullCloudSave, pushCloudSave } from "../features/cloud/sync";
 import type { User } from "@supabase/supabase-js";
 
 const PUSH_INTERVAL_MS = 30_000;
@@ -19,6 +19,10 @@ function setSyncedAt(ms: number) {
   localStorage.setItem(SYNCED_AT_KEY, String(ms));
 }
 
+// Set before a reload to skip the cloud pull on next init — otherwise the
+// old cloud save would just get pulled back down over the fresh local state.
+const RESET_PENDING_KEY = "clicktok-reset-pending";
+
 function applyAuthUser(user: User | null | undefined) {
   useGameStore.getState().setCloudAuth({
     userId: user?.id ?? null,
@@ -28,13 +32,22 @@ function applyAuthUser(user: User | null | undefined) {
 }
 
 // Playtesting: wipe local + cloud save so the next load behaves like a brand
-// new player, while staying signed in as the same account.
-export async function resetProgress(): Promise<void> {
-  const { cloudUserId } = useGameStore.getState();
-  if (cloudUserId) {
-    await deleteCloudSave(cloudUserId);
-  }
-  useGameStore.persist.clearStorage();
+// new player, while staying signed in as the same account. Deleting the cloud
+// row directly isn't reliable (RLS only grants this user select/upsert), so
+// instead we mark a reset as pending, clear local state, and let the next
+// init() overwrite the cloud row with the fresh default state via upsert.
+//
+// We also overwrite the *live* store with fresh defaults before reloading
+// (rather than only clearing storage). The rAF-driven game loop keeps calling
+// tick() -> set() right up until the page actually unloads, and persist
+// writes to localStorage synchronously on every set() — if we only cleared
+// storage, one of those trailing ticks could re-write the old (full-resource)
+// state back into `clicktok-save` before the reload takes effect. Loading
+// fresh defaults into the live store first means any such trailing tick just
+// re-persists near-zero values instead.
+export function resetProgress(): void {
+  sessionStorage.setItem(RESET_PENDING_KEY, "1");
+  useGameStore.getState().loadPersistedState(createFreshPersistedState());
   localStorage.removeItem(SYNCED_AT_KEY);
   window.location.reload();
 }
@@ -81,6 +94,13 @@ export function useCloudSync() {
       applyAuthUser(user);
 
       useGameStore.getState().setCloudSyncStatus("syncing");
+
+      if (sessionStorage.getItem(RESET_PENDING_KEY)) {
+        sessionStorage.removeItem(RESET_PENDING_KEY);
+        push();
+        return;
+      }
+
       const cloud = await pullCloudSave(user.id);
       if (cancelled) return;
 
