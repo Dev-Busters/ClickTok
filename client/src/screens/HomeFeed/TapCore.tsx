@@ -11,7 +11,7 @@ const RING_R = 80;
 const RING_SVG = 170;
 const RING_CIRC = 2 * Math.PI * RING_R;
 const IDLE_SEC = 6;
-const TIER_COLORS = ["var(--dim)", "var(--cyan)", "var(--red)", "var(--gold)"] as const;
+const TIER_COLORS = ["var(--cyan)", "var(--red)", "var(--gold)", "var(--gold)"] as const;
 const TIER_CALLOUTS = ["", "NICE!", "ON FIRE!", "UNSTOPPABLE!"] as const;
 
 function getTier(combo: number): number {
@@ -245,6 +245,24 @@ function GravParticle({ p, ringColor }: { p: Particle; ringColor: string }) {
   );
 }
 
+// ── Duet TEB-turn pulse ring — magenta halo when chain awaits a core tap ──────
+function DuetTebRing() {
+  return (
+    <motion.div
+      animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.06, 1] }}
+      transition={{ duration: 0.7, repeat: Infinity, ease: 'easeInOut' }}
+      style={{
+        position: 'absolute', top: 34, left: 34,
+        width: 152, height: 152,
+        borderRadius: '50%',
+        border: '3px solid var(--red)',
+        boxShadow: '0 0 18px var(--red), 0 0 6px var(--red) inset',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
 // ── Main component (self-contained — reads store directly) ────────────────────
 export function TapCore() {
   const combo = useGameStore(s => s.combo);
@@ -256,6 +274,12 @@ export function TapCore() {
   const activeMod = useGameStore(s => s.deck[s.deckIndex]?.mod ?? null);
   const tebTeachSeen = useGameStore(s => s.tebTeachSeen);
   const setTebTeachSeen = useGameStore(s => s.setTebTeachSeen);
+  const activeWave = useGameStore(s => s.activeWave);
+  const duetCfgPods = BALANCE.elements.duetLoop.pods;
+  // True when a duet_loop chain is in progress and waiting for a core tap
+  const duetTebTurn = activeWave?.element === 'duet_loop'
+    && activeWave.armedIndex === null
+    && activeWave.completed < duetCfgPods;
 
   const [tapFxs, setTapFxs] = useState<TapFx[]>([]);
   const [tierFlash, setTierFlash] = useState(false);
@@ -511,6 +535,11 @@ export function TapCore() {
           />
         </svg>
 
+        {/* 11.5: duet TEB-turn pulsing ring — signals "tap here" during call-and-response */}
+        <AnimatePresence>
+          {duetTebTurn && <DuetTebRing key="duet-teb" />}
+        </AnimatePresence>
+
         {/* Tier-up flash ring */}
         <AnimatePresence>
           {tierFlash && (
@@ -548,7 +577,7 @@ export function TapCore() {
             background: 'transparent',
             boxShadow: combo > 0
               ? `0 0 24px ${ringColor}44, inset 0 0 16px rgba(0,0,0,0.35)`
-              : `0 0 10px rgba(255,255,255,0.05), inset 0 0 12px rgba(0,0,0,0.4)`,
+              : `0 0 22px rgba(37,244,238,0.33), inset 0 0 12px rgba(0,0,0,0.4)`,
             cursor: 'pointer',
             overflow: 'hidden',
             transition: 'border-color 0.3s, box-shadow 0.3s',
@@ -566,8 +595,8 @@ export function TapCore() {
           <span style={{
             position: 'relative', zIndex: 1,
             fontFamily: 'var(--font-display)', fontSize: '28px',
-            color: tier === 0 ? 'rgba(255,255,255,0.4)' : ringColor,
-            textShadow: tier > 0 ? `0 0 14px ${ringColor}88` : 'none',
+            color: ringColor,
+            textShadow: `0 0 14px ${ringColor}`,
             lineHeight: 1, transition: 'color 0.4s, text-shadow 0.4s',
             pointerEvents: 'none', userSelect: 'none',
           }}>
@@ -608,6 +637,40 @@ export function TapCore() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* A2: Pre-tap "TAP TO START" nudge — visible only before the very first tap */}
+      <AnimatePresence>
+        {lastTapAt === 0 && (
+          <motion.div
+            key="tap-nudge"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.35, 0.6, 0.35] }}
+            exit={{ opacity: 0, transition: { duration: 0.25 } }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              pointerEvents: 'none', userSelect: 'none',
+            }}
+          >
+            <motion.span
+              animate={{ y: [0, 5, 0] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: '10px',
+                color: 'rgba(255,255,255,0.8)', lineHeight: 1, display: 'block',
+              }}
+            >
+              ▼
+            </motion.span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '9px',
+              letterSpacing: '0.2em', color: 'rgba(255,255,255,0.8)',
+            }}>
+              TAP TO START
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 8.4: VIRAL eruption — full-screen white flash on trigger */}
       <AnimatePresence>
