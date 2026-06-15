@@ -152,7 +152,7 @@ export const BALANCE = {
       rings: 3,
       shrinkSec: 1.6,              // ring travels scale 2.2 → 1.0 in this time
       staggerSec: 0.45,            // spawn offset between rings — THE rhythm
-      windowPerfect: 0.08,         // |ringScale − 1| ≤ → PERFECT  ×4 gainPerPost
+      windowPerfect: 0.12,         // |ringScale − 1| ≤ → PERFECT  ×4 gainPerPost
       windowGood: 0.20,            //                  → GOOD     ×2
       windowOk: 0.40,              //                  → OK       ×1   (worse/expired = MISS ×0)
       perfectWaveBonus: 5,         // all-3-PERFECT: +5 × gainPerPost on top
@@ -171,22 +171,28 @@ export const BALANCE = {
     // HOLD DROP (charge ring) — unlock: 300 coins, gated at viewer level (~25 followers)
     holdDrop: {
       unlock: { coins: 300, followers: 25 },
-      chargeSec: 2.0,      // ring fills fully in this many seconds
-      windowStart: 0.35,   // target window: 35%–65% charge = PERFECT
-      windowEnd: 0.65,
-      perfectPayout: 8,    // perfect release: 8 × gainPerPost
-      weakPayout: 1.5,     // over/undercharge: 1.5 × gainPerPost
-      expiryAfterSec: 5.0, // wave auto-expires if never pressed
+      chargeSec: 2.5,          // ring fills fully in this many seconds
+      crestPeriodSec: 1.6,     // golden target oscillates on this cycle
+      crestCenter: 0.48,       // oscillation center (48% of ring)
+      crestAmplitude: 0.26,    // ±26% → crest travels 0.22–0.74 of ring
+      crestHalfWidth: 0.11,    // ±11% around crest = PERFECT zone
+      overchargeWarn: 0.86,    // ring pulses red at 86% — warn before WEAK at 100%
+      perfectPayout: 10,       // dead-center perfect: 10 × gainPerPost
+      perfectPayoutMin: 5,     // edge-of-window perfect: 5 × gainPerPost
+      crestComboKick: 3,       // perfect drop adds 3 to combo (hype kick)
+      weakPayout: 1.5,         // over/undercharge: 1.5 × gainPerPost
+      expiryAfterSec: 5.0,     // wave auto-expires if never pressed
     },
 
     // SWIPE HITS (directional) — unlock: 450 coins, gated at viewer level (~25 followers)
     swipeHits: {
       unlock: { coins: 450, followers: 25 },
-      arrows: 2,           // arrows per wave
-      staggerSec: 0.6,     // DDR stagger: arrow i activates at startedAt + i * staggerSec * 1000ms
-      activeSec: 1.8,      // window each arrow can be hit (progress 0 → 1)
-      perfectPayout: 5,    // each correctly-swiped arrow: 5 × gainPerPost
-      allPerfectBonus: 8,  // all arrows correct → +8 × gainPerPost bonus on final arrow
+      traces: 2,           // traces per wave (11.4: anchored drag mechanic)
+      staggerSec: 0.6,     // trace i activates at startedAt + i * staggerSec * 1000ms
+      activeSec: 1.8,      // window each trace can be dragged (progress 0 → 1)
+      hitRadiusPx: 48,     // release must land within this many px of the TO dot
+      perfectPayout: 5,    // each on-target release: 5 × gainPerPost
+      allPerfectBonus: 8,  // all traces hit → +8 × gainPerPost bonus on final trace
     },
   },
 } as const;

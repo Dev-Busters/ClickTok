@@ -414,9 +414,12 @@ export type SpectateSlice = {
 
 ```ts
 // features/elements/types.ts (Phase 7.3+ — the clicker element framework, client-only)
-export type ElementId = "beat_sync" | "duet_loop";   // extensible — new elements = new id here
+export type ElementId = "beat_sync" | "duet_loop" | "hold_drop" | "swipe_hits"; // 10.4 adds latter two
 
 export type BeatGrade = "perfect" | "good" | "ok" | "miss";
+
+// Fractional [0,1] pod position within the element stage (11.3)
+export type PodPos = { x: number; y: number };
 
 export type ElementDef = {
   id: ElementId;
@@ -428,21 +431,38 @@ export type ElementDef = {
 // One in-flight wave (ephemeral). Discriminated per element:
 export type ElementWave =
   | { element: "beat_sync"; startedAt: number;   // ms epoch — THE shared clock; ring scale and
-      rings: { id: number; grade?: BeatGrade }[] } //  grading both derive from (now - startedAt)
+      rings: { id: number; grade?: BeatGrade }[];  //  grading both derive from (now - startedAt)
+      pos: PodPos[] }                              // 11.3: seeded scattered positions per pod
   | { element: "duet_loop"; startedAt: number;
       armedIndex: number | null;                  // pod lit and waiting for its tap
-      completed: number };                        // pods finished (0..duetCircles)
+      armedAt: number | null;                     // ms when current pod armed (timeout tracking)
+      firstArmedAt: number | null;                // ms of first arm (flow window)
+      completed: number;                          // pods finished (0..duetCircles)
+      pos: PodPos[] }                             // 11.3: seeded scattered positions per pod
+  | { element: "hold_drop"; startedAt: number;
+      pressedAt: number | null;                   // ms when press started (null = not holding)
+      grade: "perfect" | "weak" | "miss" | undefined; // set on release or expiry
+      resolvedAt: number | null;                  // ms when grade assigned (for grace period)
+      pos: PodPos }                               // 11.3: single pod position (scalar, not array)
+  | { element: "swipe_hits"; startedAt: number;
+      traces: { id: number; from: { x: number; y: number }; to: { x: number; y: number }; grade?: "perfect" | "miss" }[];
+      resolvedAt?: number };                      // 11.4: anchored drag-between-dots (trace mechanic)
 
 // store/slices/elementsSlice.ts
 export type ElementsSlice = {
   ownedElements: Partial<Record<ElementId, boolean>>; // ⚠ PERSISTED — SAVE_VERSION bump +
                                                       // migration (default {}), per `02` §4
+  elementsTeachSeen: Partial<Record<ElementId, boolean>>; // ⚠ PERSISTED v9 — 11.3
   activeWave: ElementWave | null;     // ephemeral
   nextWaveAt: number;                 // ephemeral scheduler clock (ms epoch)
   unlockElement: (id: ElementId) => boolean; // false if can't afford / follower gate unmet
   spawnWave: (id: ElementId) => void;
   tapRing: (ringId: number) => void;  // beat_sync: grade = f(now - startedAt) vs 04 §13.2 windows
   tapDuetPod: () => void;             // duet_loop: pays iff armedIndex is this pod
+  pointerDownHold: () => void;        // hold_drop: starts press timer
+  pointerUpHold: () => void;          // hold_drop: grades and pays
+  resolveTrace: (id: number, hitTarget: boolean) => void; // swipe_hits: grade one trace (11.4)
+  setElementTeachSeen: (id: ElementId) => void;    // 11.3: marks teach seen (persisted)
   expireOrResolveWave: () => void;    // payout, clear, schedule nextWaveAt (+ idle gap)
 };
 ```
@@ -581,14 +601,19 @@ export type MetricDef = {
 
 ```ts
 // store/slices/meta.ts
-export const SAVE_VERSION = 5; // current (as of Phase 9.1)
+export const SAVE_VERSION = 9; // current (as of Phase 11.3)
 // v1 → base shape; v2 → wallet/skills/videos; v3 → inbox/milestones;
 // v4 → ownedElements (7.3); v5 → upgradeLevels + tebTeachSeen (9.1)
+// v6 → metricsReached + lifetime counters (9.2); v7 → affordableNotifiedPillars (10.2)
+// v8 → metricsReached id rename follower_100→follower_200 (11.2)
+// v9 → elementsTeachSeen (11.3)
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
 //   multiplier, followerConversion, boonMultiplier, lastSeenAt,
 //   ownedUpgrades, upgradeLevels (9.1), skillLevels, videos,
-//   notifications, lastDailyClaimAt, milestonesReached, ownedElements, tebTeachSeen (9.1)
+//   notifications, lastDailyClaimAt, metricsReached, ownedElements, tebTeachSeen (9.1),
+//   viewsTotal, coinsEarned, streams (9.2), affordableNotifiedPillars (10.2),
+//   elementsTeachSeen (11.3)
 // Excluded: run* (ephemeral), social* (server-owned), ui.activeTab/openSheet (session)
 export type PersistedV1 = {
   version: 1;

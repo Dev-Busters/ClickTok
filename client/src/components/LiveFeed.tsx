@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { GIFT_ICON } from "../features/livestream/events";
+import { formatCount } from "../lib/format";
 import type { RunEvent } from "../features/livestream/types";
 
 const TIER_LABEL: Record<string, string> = {
@@ -203,6 +205,105 @@ function FeedItem({ event }: { event: RunEvent }) {
   );
 }
 
+// ── Ambient live-stage layer ───────────────────────────────────────────────────
+
+type Mote = { id: number; x: number; y: number; dx: number; label: string; color: string };
+
+const MOTE_CHOICES = [
+  { label: "+follower", color: "var(--cyan)" },
+  { label: "+coin",     color: "var(--gold)" },
+  { label: "♥",         color: "var(--red)"  },
+] as const;
+
+function LiveAmbient() {
+  const viewers = useGameStore(s => s.viewers);
+  const hype    = useGameStore(s => s.hype);
+  const [motes, setMotes] = useState<Mote[]>([]);
+  const nextId = useRef(0);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const c = MOTE_CHOICES[Math.floor(Math.random() * MOTE_CHOICES.length)];
+      const id = nextId.current++;
+      const mote: Mote = {
+        id,
+        x:  52 + Math.random() * 38,
+        y:  50 + Math.random() * 35,
+        dx: (Math.random() - 0.5) * 24,
+        label: c.label,
+        color: c.color,
+      };
+      setMotes(prev => [...prev.slice(-5), mote]);
+      setTimeout(() => setMotes(prev => prev.filter(m => m.id !== id)), 2500);
+    }, 1300);
+    return () => clearInterval(iv);
+  }, []);
+
+  return (
+    <>
+      {/* Economy motes drifting up from right / gift zone */}
+      {motes.map(m => (
+        <motion.span
+          key={m.id}
+          initial={{ opacity: 0, y: 0, x: 0 }}
+          animate={{ opacity: [0, 0.75, 0], y: -68, x: m.dx }}
+          transition={{ duration: 2.5, ease: "easeOut" }}
+          style={{
+            position:      "absolute",
+            left:          `${m.x}%`,
+            top:           `${m.y}%`,
+            fontFamily:    "var(--font-mono)",
+            fontSize:      "11px",
+            letterSpacing: "0.04em",
+            color:         m.color,
+            textShadow:    `0 0 8px ${m.color}`,
+            pointerEvents: "none",
+            whiteSpace:    "nowrap",
+            userSelect:    "none",
+          }}
+        >
+          {m.label}
+        </motion.span>
+      ))}
+
+      {/* Right-edge live stats ticker */}
+      <div style={{
+        position:      "absolute",
+        right:         6,
+        top:           "22%",
+        display:       "flex",
+        flexDirection: "column",
+        alignItems:    "center",
+        gap:           "10px",
+        opacity:       0.50,
+        pointerEvents: "none",
+        userSelect:    "none",
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)">
+            <circle cx="12" cy="8" r="3.5" />
+            <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6Z" />
+          </svg>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "8px", color: "#fff" }}>
+            {formatCount(viewers)}
+          </span>
+        </div>
+        <div style={{ width: 1, height: 10, background: "rgba(255,255,255,0.15)" }} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "7px", letterSpacing: "0.12em", color: "var(--red)" }}>
+            HYPE
+          </span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "var(--red)" }}>
+            {Math.round(hype)}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Main feed component ────────────────────────────────────────────────────────
+
 export function LiveFeed() {
   const events = useGameStore(s => s.events);
   const rideWave = useGameStore(s => s.rideWave);
@@ -267,6 +368,9 @@ export function LiveFeed() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Ambient layer: economy motes + right-edge stats ticker */}
+      <LiveAmbient />
     </div>
   );
 }

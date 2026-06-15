@@ -1,33 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useAnimationFrame } from "framer-motion";
 import { useGameStore } from "../store";
-import { arrowProgress, detectSwipeDir } from "../features/elements/swipeHits";
+import { traceProgress, isOnTarget } from "../features/elements/swipeHits";
 import { BALANCE } from "../features/economy/balance";
 import { formatCount } from "../lib/format";
-import type { ElementWave, SwipeDir } from "../features/elements/types";
+import type { ElementWave } from "../features/elements/types";
 import { pushFloatText } from "./fx/FloatingTextLayer";
+import { TeachCaption } from "./TeachCaption";
 
-const POD_SIZE = 80;
-const RING_R = 35;
+const DOT_R = 20;          // radius of FROM/TO dot (px)
+const RING_R = 28;
 const RING_CIRC = 2 * Math.PI * RING_R;
-const CENTER = POD_SIZE / 2;
-
-const DIR_ARROW: Record<SwipeDir, string> = {
-  up: "↑", down: "↓", left: "←", right: "→",
-};
+const RING_BOX = (RING_R + 6) * 2;  // SVG viewBox size around FROM dot
 
 type SwipeHitsWaveT = Extract<ElementWave, { element: "swipe_hits" }>;
 
 export function SwipeHitsWave({ wave, onAllPerfect }: { wave: SwipeHitsWaveT; onAllPerfect: () => void }) {
-  const swipeArrow = useGameStore(s => s.swipeArrow);
+  const resolveTrace      = useGameStore(s => s.resolveTrace);
+  const elementsTeachSeen = useGameStore(s => s.elementsTeachSeen);
+  const setElementTeachSeen = useGameStore(s => s.setElementTeachSeen);
 
-  // Drive every-frame so countdown rings update smoothly
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  // Every-frame tick for countdown rings
   const [, forceTick] = useState(0);
   useAnimationFrame(() => forceTick(t => (t + 1) % 1_000_000));
 
-  // Fire onAllPerfect callback when every arrow is perfect
   const firedRef = useRef(false);
-  const allPerfect = wave.arrows.every(a => a.grade === "perfect");
+  const allPerfect = wave.traces.every(t => t.grade === "perfect");
   useEffect(() => {
     if (allPerfect && !firedRef.current) {
       firedRef.current = true;
@@ -37,45 +37,88 @@ export function SwipeHitsWave({ wave, onAllPerfect }: { wave: SwipeHitsWaveT; on
   }, [allPerfect, onAllPerfect]);
 
   return (
-    <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32,
-    }}>
-      {wave.arrows.map(arrow => (
-        <SwipeArrowPod
-          key={arrow.id}
-          arrow={arrow}
+    <div
+      ref={stageRef}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+    >
+      {/* SVG overlay: dotted path lines between FROM and TO for each trace */}
+      <svg
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        preserveAspectRatio="none"
+      >
+        {wave.traces.map(trace => (
+          <PathLine key={trace.id} trace={trace} />
+        ))}
+      </svg>
+
+      {wave.traces.map(trace => (
+        <TracePod
+          key={trace.id}
+          trace={trace}
           startedAt={wave.startedAt}
-          onSwipe={(dir) => swipeArrow(arrow.id, dir)}
+          stageRef={stageRef}
+          onResolve={(hitTarget) => resolveTrace(trace.id, hitTarget)}
         />
       ))}
+
+      <TeachCaption
+        elementId="swipe_hits"
+        text="PRESS the FROM dot and drag to the TO dot"
+        seen={!!elementsTeachSeen.swipe_hits}
+        onDismiss={() => setElementTeachSeen("swipe_hits")}
+      />
     </div>
   );
 }
 
-function SwipeArrowPod({
-  arrow, startedAt, onSwipe,
+// Dotted SVG path between FROM and TO dots, using percentage positions
+function PathLine({ trace }: { trace: SwipeHitsWaveT["traces"][number] }) {
+  const resolved = trace.grade !== undefined;
+  const color = trace.grade === "perfect"
+    ? "var(--gold)"
+    : trace.grade === "miss"
+      ? "var(--red)"
+      : "var(--cyan)";
+
+  return (
+    <line
+      x1={`${trace.from.x * 100}%`}
+      y1={`${trace.from.y * 100}%`}
+      x2={`${trace.to.x * 100}%`}
+      y2={`${trace.to.y * 100}%`}
+      stroke={color}
+      strokeWidth={2}
+      strokeOpacity={resolved ? 0.4 : 0.35}
+      strokeDasharray="6 6"
+    />
+  );
+}
+
+function TracePod({
+  trace, startedAt, stageRef, onResolve,
 }: {
-  arrow: SwipeHitsWaveT["arrows"][number];
+  trace: SwipeHitsWaveT["traces"][number];
   startedAt: number;
-  onSwipe: (dir: SwipeDir) => void;
+  stageRef: React.RefObject<HTMLDivElement | null>;
+  onResolve: (hitTarget: boolean) => void;
 }) {
-  const progress = arrowProgress(startedAt, arrow.id);
+  const progress = traceProgress(startedAt, trace.id);
   const isActive = progress >= 0 && progress <= 1;
   const isPending = progress < 0;
-  const resolved = arrow.grade !== undefined;
+  const resolved = trace.grade !== undefined;
 
-  // Countdown ring: 1.0 at start → 0.0 at expiry (fills remaining time)
   const remaining = Math.max(0, 1 - progress);
   const countdownDash = remaining * RING_CIRC;
 
-  const gradeColor = arrow.grade === "perfect" ? "var(--gold)" : arrow.grade === "miss" ? "var(--red)" : undefined;
+  const gradeColor = trace.grade === "perfect" ? "var(--gold)" : trace.grade === "miss" ? "var(--red)" : undefined;
 
-  // Push grade float text on first grade assignment
+  const draggingRef = useRef(false);
+
+  // Float text on grade
   const prevGradeRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (arrow.grade && !prevGradeRef.current) {
-      if (arrow.grade === "perfect") {
+    if (trace.grade && !prevGradeRef.current) {
+      if (trace.grade === "perfect") {
         const s = useGameStore.getState();
         const comboMult = 1 + Math.min(s.combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
         const coins = s.tapPower * BALANCE.postCoinConversion * s.multiplier
@@ -85,41 +128,48 @@ function SwipeArrowPod({
         pushFloatText({ text: "MISS", kind: "miss", magnitude: 0 });
       }
     }
-    prevGradeRef.current = arrow.grade;
-  }, [arrow.grade]);
+    prevGradeRef.current = trace.grade;
+  }, [trace.grade]);
 
-  // Swipe gesture tracking via pointer capture
-  const startPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Compute TO dot's screen position from fractional coords + stage bounds
+  function getToScreen() {
+    const stage = stageRef.current?.getBoundingClientRect();
+    if (!stage) return null;
+    return {
+      x: stage.left + trace.to.x * stage.width,
+      y: stage.top  + trace.to.y * stage.height,
+    };
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-      {/* Arrow activation hint above pod */}
-      <div style={{
-        fontFamily: 'var(--font-mono)',
-        fontSize: '8px',
-        letterSpacing: '0.16em',
-        color: isActive ? 'var(--cyan)' : 'rgba(255,255,255,0.18)',
-        transition: 'color 0.15s',
-        height: 12,
-      }}>
-        {isActive && !resolved ? 'SWIPE' : ''}
-      </div>
-
-      <div style={{ position: 'relative', width: POD_SIZE, height: POD_SIZE }}>
-        {/* Countdown ring SVG (rotated so depletion starts at 12 o'clock) */}
+    <>
+      {/* FROM dot — draggable; countdown ring around it */}
+      <div
+        style={{
+          position: 'absolute',
+          left: `calc(${trace.from.x * 100}% - ${RING_BOX / 2}px)`,
+          top:  `calc(${trace.from.y * 100}% - ${RING_BOX / 2}px)`,
+          width: RING_BOX,
+          height: RING_BOX,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* Countdown ring SVG */}
         <svg
-          width={POD_SIZE} height={POD_SIZE}
+          width={RING_BOX} height={RING_BOX}
           style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)', pointerEvents: 'none' }}
         >
           <circle
-            cx={CENTER} cy={CENTER} r={RING_R}
-            fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4}
+            cx={RING_BOX / 2} cy={RING_BOX / 2} r={RING_R}
+            fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={3}
           />
           {isActive && !resolved && (
             <circle
-              cx={CENTER} cy={CENTER} r={RING_R}
+              cx={RING_BOX / 2} cy={RING_BOX / 2} r={RING_R}
               fill="none"
-              stroke="var(--cyan)" strokeWidth={4} strokeOpacity={0.6}
+              stroke="var(--cyan)" strokeWidth={3} strokeOpacity={0.7}
               strokeDasharray={`${countdownDash} ${RING_CIRC}`}
               strokeDashoffset={0}
               strokeLinecap="round"
@@ -127,64 +177,71 @@ function SwipeArrowPod({
           )}
           {resolved && (
             <circle
-              cx={CENTER} cy={CENTER} r={RING_R}
+              cx={RING_BOX / 2} cy={RING_BOX / 2} r={RING_R}
               fill="none"
-              stroke={gradeColor ?? 'var(--dim)'} strokeWidth={4} strokeOpacity={0.5}
+              stroke={gradeColor ?? 'var(--dim)'} strokeWidth={3} strokeOpacity={0.5}
               strokeDasharray={`${RING_CIRC} 0`}
             />
           )}
         </svg>
 
-        {/* Pod button */}
+        {/* FROM dot button */}
         <motion.button
           onPointerDown={(e) => {
             e.stopPropagation();
             if (resolved || !isActive) return;
             e.currentTarget.setPointerCapture(e.pointerId);
-            startPosRef.current = { x: e.clientX, y: e.clientY };
+            draggingRef.current = true;
           }}
           onPointerUp={(e) => {
             e.stopPropagation();
-            if (!startPosRef.current || resolved) return;
-            const dx = e.clientX - startPosRef.current.x;
-            const dy = e.clientY - startPosRef.current.y;
-            const dir = detectSwipeDir(dx, dy);
-            if (dir) onSwipe(dir);
-            startPosRef.current = null;
+            if (!draggingRef.current || resolved) return;
+            draggingRef.current = false;
+            const to = getToScreen();
+            if (!to) return;
+            const hit = isOnTarget(
+              { x: e.clientX, y: e.clientY },
+              to,
+              BALANCE.elements.swipeHits.hitRadiusPx,
+            );
+            onResolve(hit);
+          }}
+          onPointerCancel={(e) => {
+            e.stopPropagation();
+            draggingRef.current = false;
           }}
           animate={
             resolved ? { scale: 1, opacity: 1 }
-            : isActive ? { scale: [1, 1.04, 1], opacity: 1 }
-            : isPending ? { opacity: 0.3 }
-            : { opacity: 0.5 }
+            : isActive ? { scale: [1, 1.06, 1], opacity: 1 }
+            : isPending ? { opacity: 0.25 }
+            : { opacity: 0.45 }
           }
           transition={
             isActive && !resolved
-              ? { duration: 0.6, repeat: Infinity, ease: "easeInOut" }
-              : { duration: 0.2 }
+              ? { duration: 0.7, repeat: Infinity, ease: "easeInOut" }
+              : { duration: 0.15 }
           }
           style={{
-            position: 'absolute', inset: 6,
+            position: 'relative',
+            width: DOT_R * 2,
+            height: DOT_R * 2,
             borderRadius: '50%',
+            padding: 0,
             background: resolved
-              ? (arrow.grade === "perfect" ? 'rgba(255,200,0,0.1)' : 'rgba(255,0,0,0.06)')
+              ? (trace.grade === "perfect" ? 'rgba(255,200,0,0.15)' : 'rgba(255,0,0,0.1)')
               : isActive
-                ? 'rgba(0,255,255,0.06)'
-                : 'rgba(0,0,0,0.35)',
+                ? 'rgba(0,255,255,0.10)'
+                : 'rgba(0,0,0,0.4)',
             border: `2px solid ${
               resolved ? (gradeColor ?? 'var(--dim)')
               : isActive ? 'var(--cyan)'
               : 'rgba(255,255,255,0.15)'
             }`,
-            boxShadow: resolved && arrow.grade === "perfect"
-              ? '0 0 16px var(--gold)'
-              : isActive && !resolved
-                ? '0 0 8px var(--cyan)'
-                : undefined,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: isActive && !resolved ? 'pointer' : 'default',
-            padding: 0,
-            transition: 'border-color 0.15s, background 0.15s',
+            boxShadow: isActive && !resolved ? '0 0 10px var(--cyan)' : undefined,
+            cursor: isActive && !resolved ? 'crosshair' : 'default',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <AnimatePresence mode="wait">
@@ -192,38 +249,82 @@ function SwipeArrowPod({
               <motion.span
                 key="grade"
                 initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: [1.35, 1], opacity: 1 }}
+                animate={{ scale: [1.4, 1], opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.28 }}
+                transition={{ duration: 0.25 }}
                 style={{
-                  fontSize: '20px',
-                  color: gradeColor ?? 'var(--dim)',
-                  textShadow: arrow.grade === 'perfect' ? '0 0 12px var(--gold)' : undefined,
+                  fontSize: '14px',
+                  color: gradeColor,
+                  textShadow: trace.grade === 'perfect' ? '0 0 10px var(--gold)' : undefined,
                   pointerEvents: 'none',
                 }}
               >
-                {arrow.grade === "perfect" ? "✓" : "✗"}
+                {trace.grade === "perfect" ? "✓" : "✗"}
               </motion.span>
             ) : (
               <motion.span
-                key="arrow"
-                initial={{ opacity: 0, scale: 0.6 }}
-                animate={{ opacity: isActive ? 1 : 0.25, scale: 1 }}
-                transition={{ duration: 0.2 }}
+                key="from-label"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: isActive ? 1 : 0.2 }}
                 style={{
-                  fontSize: '28px',
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.08em',
                   color: isActive ? 'var(--cyan)' : 'var(--dim)',
-                  textShadow: isActive ? '0 0 10px var(--cyan)' : undefined,
                   pointerEvents: 'none',
-                  lineHeight: 1,
                 }}
               >
-                {DIR_ARROW[arrow.dir]}
+                {trace.id + 1}
               </motion.span>
             )}
           </AnimatePresence>
         </motion.button>
       </div>
-    </div>
+
+      {/* TO dot — visual target only, no interaction */}
+      <motion.div
+        animate={
+          resolved
+            ? { scale: 1, opacity: 1 }
+            : isActive
+              ? { scale: [0.95, 1.05, 0.95], opacity: 1 }
+              : { opacity: isPending ? 0.2 : 0.4 }
+        }
+        transition={
+          isActive && !resolved
+            ? { duration: 1.1, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.15 }
+        }
+        style={{
+          position: 'absolute',
+          left: `calc(${trace.to.x * 100}% - ${DOT_R}px)`,
+          top:  `calc(${trace.to.y * 100}% - ${DOT_R}px)`,
+          width: DOT_R * 2,
+          height: DOT_R * 2,
+          borderRadius: '50%',
+          border: `2px dashed ${
+            resolved ? (gradeColor ?? 'var(--dim)') : isActive ? 'var(--gold)' : 'rgba(255,255,255,0.2)'
+          }`,
+          background: resolved && trace.grade === "perfect"
+            ? 'rgba(255,200,0,0.15)'
+            : 'rgba(0,0,0,0.2)',
+          boxShadow: isActive && !resolved ? '0 0 8px var(--gold)' : undefined,
+          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span style={{
+          fontSize: '8px',
+          fontFamily: 'var(--font-mono)',
+          color: isActive ? 'var(--gold)' : 'var(--dim)',
+          pointerEvents: 'none',
+          opacity: resolved ? 0 : 1,
+        }}>
+          TO
+        </span>
+      </motion.div>
+    </>
   );
 }

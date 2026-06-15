@@ -38,7 +38,7 @@ function statCurrent(stat: MetricStatId, ctx: StatCtx): number {
   }
 }
 
-export function CreatorInsights({ onBack }: { onBack: () => void }) {
+export function CreatorInsights({ onBack, inline }: { onBack?: () => void; inline?: boolean }) {
   const metricsReached  = useGameStore(s => s.metricsReached);
   const viewsTotal      = useGameStore(s => s.viewsTotal);
   const totalFollowers  = useGameStore(s => s.wallet.totalFollowers);
@@ -52,33 +52,45 @@ export function CreatorInsights({ onBack }: { onBack: () => void }) {
   const firstUnmetIdx = METRIC_CATALOG.findIndex(m => !metricsReached.includes(m.id));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '384px', margin: '0 auto', paddingBottom: '32px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '384px', margin: '0 auto', paddingBottom: inline ? '0' : '32px' }}>
 
-      {/* Back + header */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '16px 16px 10px', gap: '12px' }}>
-        <button
-          onClick={onBack}
-          aria-label="Back"
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--dim)', lineHeight: 0 }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--text)', letterSpacing: '0.07em' }}>
-            CREATOR INSIGHTS
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.08em', marginTop: '1px' }}>
-            lifetime metrics
+      {/* Header — full with back button when standalone, section label when inline */}
+      {inline ? (
+        <div style={{ padding: '0 16px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px' }}>📈</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '13px', color: 'var(--text)', letterSpacing: '0.08em' }}>
+              CREATOR INSIGHTS
+            </span>
           </div>
         </div>
-      </div>
-
-      {/* Hairline */}
-      <div style={{ padding: '0 16px', marginBottom: '12px' }}>
-        <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
-      </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '16px 16px 10px', gap: '12px' }}>
+            <button
+              onClick={onBack}
+              aria-label="Back"
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--dim)', lineHeight: 0 }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--text)', letterSpacing: '0.07em' }}>
+                CREATOR INSIGHTS
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.08em', marginTop: '1px' }}>
+                lifetime metrics
+              </div>
+            </div>
+          </div>
+          {/* Hairline */}
+          <div style={{ padding: '0 16px', marginBottom: '12px' }}>
+            <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
+          </div>
+        </>
+      )}
 
       {/* Metric ladder */}
       <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>

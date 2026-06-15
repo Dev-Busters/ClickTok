@@ -1,20 +1,20 @@
 import { BALANCE } from "../economy/balance";
-import type { SwipeDir } from "./types";
 
-// 04 §13.2 (10.4): DDR-style arrow timing. Arrow i activates staggerSec*i seconds
-// after the wave spawns; its active window runs until progress = 1.
+// 11.4: trace timing — trace i activates staggerSec*i seconds after spawn.
 // progress < 0 → not yet active; 0–1 → hit window; > 1 → expired.
-export function arrowProgress(startedAt: number, arrowId: number): number {
+export function traceProgress(startedAt: number, traceId: number): number {
   const { staggerSec, activeSec } = BALANCE.elements.swipeHits;
-  const activateAt = startedAt + arrowId * staggerSec * 1000;
+  const activateAt = startedAt + traceId * staggerSec * 1000;
   return (Date.now() - activateAt) / (activeSec * 1000);
 }
 
-// Detect swipe direction from pointer delta. Returns null if the swipe is too
-// small to be intentional (< minDist pixels).
-export function detectSwipeDir(dx: number, dy: number, minDist = 15): SwipeDir | null {
-  if (Math.abs(dx) < minDist && Math.abs(dy) < minDist) return null;
-  return Math.abs(dx) >= Math.abs(dy)
-    ? dx > 0 ? "right" : "left"
-    : dy > 0 ? "down" : "up";
+// Returns true if the release point is within hitRadiusPx of the TO dot's screen position.
+export function isOnTarget(
+  release: { x: number; y: number },
+  toScreen: { x: number; y: number },
+  radiusPx: number,
+): boolean {
+  const dx = release.x - toScreen.x;
+  const dy = release.y - toScreen.y;
+  return Math.sqrt(dx * dx + dy * dy) <= radiusPx;
 }

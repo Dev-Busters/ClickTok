@@ -5,6 +5,7 @@ import { ringScale, GRADE_COLOR, GRADE_MULT } from "../features/elements/beatSyn
 import type { BeatGrade, ElementWave } from "../features/elements/types";
 import type { FeedModId } from "../party/types";
 import { pushFloatText } from "./fx/FloatingTextLayer";
+import { TeachCaption } from "./TeachCaption";
 
 const POD_SIZE = 76;
 const SHARD_ANGLES = [-50, 0, 50].map(d => (d * Math.PI) / 180);
@@ -13,6 +14,8 @@ type BeatSyncWaveT = Extract<ElementWave, { element: "beat_sync" }>;
 
 export function BeatSyncWave({ wave, onAllPerfect }: { wave: BeatSyncWaveT; onAllPerfect: () => void }) {
   const tapRing = useGameStore(s => s.tapRing);
+  const elementsTeachSeen   = useGameStore(s => s.elementsTeachSeen);
+  const setElementTeachSeen = useGameStore(s => s.setElementTeachSeen);
   // 04 §13.5: the active video's mod (if any) modifies beat_sync's shrink/grade windows.
   const activeMod = useGameStore(s => s.deck[s.deckIndex]?.mod ?? null);
   // Shared wave clock (01 §8.2 / 06 §3): re-render every frame so each ring's
@@ -33,24 +36,43 @@ export function BeatSyncWave({ wave, onAllPerfect }: { wave: BeatSyncWaveT; onAl
   }, [allPerfect, allGraded, onAllPerfect]);
 
   return (
-    <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40,
-    }}>
-      {wave.rings.map(ring => (
-        <BeatPod
-          key={ring.id}
-          startedAt={wave.startedAt}
-          ring={ring}
-          activeMod={activeMod}
-          onTap={() => tapRing(ring.id)}
-        />
-      ))}
+    <div style={{ position: 'absolute', inset: 0 }}>
+      {/* 11.3: pods scattered at seeded positions (07 §C0) */}
+      {wave.rings.map((ring, i) => {
+        const pos = wave.pos[i] ?? { x: 0.5, y: 0.5 };
+        return (
+          <div
+            key={ring.id}
+            style={{
+              position: 'absolute',
+              left: `calc(${pos.x * 100}% - ${POD_SIZE / 2}px)`,
+              top:  `calc(${pos.y * 100}% - ${POD_SIZE / 2}px)`,
+            }}
+          >
+            <BeatPod
+              orderNum={i + 1}
+              startedAt={wave.startedAt}
+              ring={ring}
+              activeMod={activeMod}
+              onTap={() => tapRing(ring.id)}
+            />
+          </div>
+        );
+      })}
+
+      {/* 11.3: one-time teach caption (07 §C0) */}
+      <TeachCaption
+        elementId="beat_sync"
+        text="TAP THE RING · closer to center = more coins"
+        seen={!!elementsTeachSeen.beat_sync}
+        onDismiss={() => setElementTeachSeen("beat_sync")}
+      />
     </div>
   );
 }
 
-function BeatPod({ startedAt, ring, activeMod, onTap }: {
+function BeatPod({ orderNum, startedAt, ring, activeMod, onTap }: {
+  orderNum: number;
   startedAt: number;
   ring: { id: number; grade?: BeatGrade };
   activeMod: FeedModId | null;
@@ -63,7 +85,7 @@ function BeatPod({ startedAt, ring, activeMod, onTap }: {
   const prevGradeRef = useRef<BeatGrade | undefined>(undefined);
   useEffect(() => {
     if (ring.grade && !prevGradeRef.current) {
-      const kind = ring.grade; // 'perfect' | 'good' | 'ok' | 'miss'
+      const kind = ring.grade;
       pushFloatText({ text: ring.grade.toUpperCase(), kind, magnitude: GRADE_MULT[ring.grade] });
     }
     prevGradeRef.current = ring.grade;
@@ -86,7 +108,7 @@ function BeatPod({ startedAt, ring, activeMod, onTap }: {
         padding: 0,
       }}
     >
-      {/* Approach ring — scale & timing drive the grade in elementsSlice.tapRing */}
+      {/* Approach ring */}
       {ringVisible && (
         <div style={{
           position: 'absolute',
@@ -121,7 +143,21 @@ function BeatPod({ startedAt, ring, activeMod, onTap }: {
         ))}
       </AnimatePresence>
 
-      {/* TAP hint — shows on unresolved pods before approach ring arrives */}
+      {/* 11.3: order number (07 §C0) — bold, tucked into top-left of pod */}
+      {!resolved && (
+        <span style={{
+          position: 'absolute', top: 4, left: 7,
+          fontFamily: 'var(--font-display)',
+          fontSize: '13px', fontWeight: 700,
+          color: 'rgba(255,255,255,0.55)',
+          pointerEvents: 'none',
+          lineHeight: 1,
+        }}>
+          {orderNum}
+        </span>
+      )}
+
+      {/* TAP hint */}
       {!resolved && !ringVisible && (
         <span style={{
           fontFamily: 'var(--font-mono)',

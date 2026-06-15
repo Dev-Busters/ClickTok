@@ -182,22 +182,29 @@ Trends + leaderboard (and the future multiplayer surface).
 milestone unlocks, daily reward, later: raids/gifts from other players). Daily reward claim button
 at top (Phase 3.2).
 
-## 6. Profile (`screens/Profile/`) — channel management
+## 6. Profile (`screens/Profile/`) — channel analytics hub
 
-TikTok profile layout, repurposed as the meta/management hub.
+*(Updated 07 §E — Phase 11.8. No buy UI here; upgrades live in Creator Studio.)*
 
-- **Profile header:** circular avatar (generated from handle), `@handle`, an editable-looking bio
-  line ("becoming the algorithm"). A stat row TikTok-style:
-  `Following · Followers · Likes` — plus our extra currencies **Coins 🪙** and **Diamonds 💎**.
-  All via `formatCount`.
-- **Tabs/sections** (pill or segmented control): **Gear**, **Software**, **Skills** (and **Videos**
-  if catalog is built). TikTok profiles have a grid tab row — mirror that affordance.
-  - **Gear / Software:** the reworked `UpgradeShop` split by category (`04` §4). Owned items show as
-    acquired; locked items show their `requires`. Costs in coins (💎 for elite).
-  - **Skills:** the five creator skills with level, next-level cost, and effect summary (`04` §5).
-    Level-up button disabled if unaffordable/maxed/gated.
-- Keep the current upgrade-row visual language (index number, name, description, cost) — it's good;
-  just regroup and add lock/owned states.
+TikTok profile layout, repurposed as a **read-only analytics hub**. Top to bottom:
+
+- **`ProfileHeader`:** circular avatar (generated from handle), `@handle`, bio line ("becoming the
+  algorithm").
+  - **Primary stat row** (TikTok-faithful): `Following · Followers · Likes`.
+  - **Secondary lifetime row:** `Views · Total Followers · Streams` (slightly smaller, dimmer).
+  - **Currency pills:** Coins 🪙 · Diamonds 💎.
+  - **Passive income pill** (shown only when > 0): `+N/s 🪙` and/or `+N/s 👤` in a small rounded
+    pill. Hidden until the player has passive income.
+- **CREATOR STUDIO ›** entry row (gated to VIEWER unlock; badge if any pillar has affordable items).
+  Clicking opens the Creator Studio sheet. *No buy UI below this point.*
+- **Creator Insights** (inlined, no back button): the metric ladder (`screens/CreatorInsights/`)
+  rendered in-page with a section label instead of a standalone header.
+- **Creator Breakdown:** per-pillar (VIEWER / POSTING / LIVE) card — unlocked/locked badge, READY
+  badge if `affordablePillars.includes(pillar)`, and skill-level chips for all skills in that pillar.
+  Locked pillars render at reduced opacity.
+- **Element Portfolio:** 2×2 grid of all 4 elements (BEAT SYNC / DUET LOOP / HOLD DROP / SWIPE
+  HITS). Each card shows icon + name + OWNED (cyan) or LOCKED (dim). Locked cards at 40% opacity.
+- **`CloudAccountPanel`** at the bottom (account sync / reset — unchanged).
 
 ## 7. Live (`screens/Live/`) — the run (full-screen overlay)
 

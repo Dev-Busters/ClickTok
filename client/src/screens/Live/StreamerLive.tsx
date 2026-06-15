@@ -213,6 +213,27 @@ export function StreamerLive() {
         <ProgressBar value={hype} color={hypeColor(hype)} label="HYPE" segments={10} />
       </div>
 
+      {/* Stream time progress bar */}
+      {phase === "live" && params && (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 16px 0" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "7px", letterSpacing: "0.14em", color: "var(--dim)", flexShrink: 0 }}>
+            STREAM TIME
+          </span>
+          <div style={{ flex: 1, height: "2px", background: "rgba(255,255,255,0.10)", borderRadius: "1px", overflow: "hidden" }}>
+            <div style={{
+              height: "100%",
+              width: `${Math.min(100, (clockSec / params.durationSec) * 100)}%`,
+              background: "var(--cyan)",
+              borderRadius: "1px",
+              transition: "width 0.5s linear",
+            }} />
+          </div>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "7px", color: "var(--dim)", flexShrink: 0 }}>
+            {Math.max(0, Math.ceil((params.durationSec - clockSec) / 60))}m
+          </span>
+        </div>
+      )}
+
       {/* Stage + live feed */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <VideoCanvas

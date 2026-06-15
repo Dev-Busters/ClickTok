@@ -5,7 +5,7 @@ import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -76,7 +76,13 @@ export type PersistedV8 = Omit<PersistedV7, "version"> & {
   version: 8;
 };
 
-export type PersistedState = PersistedV8;
+// 11.3: per-element first-time teach-caption seen flags (07 §C0).
+export type PersistedV9 = Omit<PersistedV8, "version"> & {
+  version: 9;
+  elementsTeachSeen: Partial<Record<string, boolean>>;
+};
+
+export type PersistedState = PersistedV9;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -107,6 +113,7 @@ export function toPersistedState(state: FullState): PersistedState {
     coinsEarned: state.coinsEarned,
     streams: state.streams,
     affordableNotifiedPillars: state.affordableNotifiedPillars,
+    elementsTeachSeen: state.elementsTeachSeen,
   };
 }
 
@@ -135,7 +142,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -235,6 +242,16 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       // (id follower_100 → follower_200) — preserve the unlock for saves
       // that already crossed the old threshold.
       metricsReached: v7.metricsReached.map(id => id === "follower_100" ? "follower_200" : id),
+    };
+  }
+
+  if (version < 9) {
+    const v8 = state as PersistedV8;
+    state = {
+      ...v8,
+      version: 9,
+      // 11.3: per-element teach-caption flags — no element has been taught yet.
+      elementsTeachSeen: {},
     };
   }
 

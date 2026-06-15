@@ -27,7 +27,7 @@ const PALETTE = ["#ff1f4b", "#25f4ee", "#e8e4d8", "#c9a84c"] as const;
 type BlobDef = {
   color: string;
   size: number;
-  left: number;  // px offset from seed (placed via left: calc)
+  left: number;
   top: number;
   driftX: number;
   driftY: number;
@@ -36,20 +36,29 @@ type BlobDef = {
 };
 
 type LineDef = {
-  cx: number;  // % of container
+  cx: number;
   cy: number;
   angle: number;
   length: number;
   color: string;
 };
 
+type RingDef = {
+  left: number;
+  top: number;
+  size: number;
+  color: string;
+  period: number;
+};
+
 function buildScene(rand: () => number) {
-  const blobs: BlobDef[] = Array.from({ length: 3 }, () => {
-    const size = 90 + rand() * 200;
+  // 5 blobs: first 3 large ambient, last 2 small accent
+  const blobs: BlobDef[] = Array.from({ length: 5 }, (_, i) => {
+    const size = i < 3 ? 90 + rand() * 200 : 40 + rand() * 70;
     return {
       color:   PALETTE[Math.floor(rand() * PALETTE.length)],
       size,
-      left:    10 + rand() * 80,   // % of container
+      left:    10 + rand() * 80,
       top:     5  + rand() * 85,
       driftX:  (rand() - 0.5) * 70,
       driftY:  (rand() - 0.5) * 70,
@@ -66,7 +75,16 @@ function buildScene(rand: () => number) {
     color:  PALETTE[Math.floor(rand() * PALETTE.length)],
   }));
 
-  return { blobs, lines };
+  // Pulsing energy rings — react to intensity in the component
+  const rings: RingDef[] = Array.from({ length: 2 }, () => ({
+    left:   20 + rand() * 60,
+    top:    20 + rand() * 55,
+    size:   60 + rand() * 120,
+    color:  PALETTE[Math.floor(rand() * PALETTE.length)],
+    period: 3 + rand() * 4,
+  }));
+
+  return { blobs, lines, rings };
 }
 
 /**
@@ -85,7 +103,7 @@ export function VideoCanvas({
   intensity?: number;
   dim?: boolean;
 }) {
-  const { blobs, lines } = useMemo(
+  const { blobs, lines, rings } = useMemo(
     () => buildScene(mkRng(`${seed}\x00${topic}`)),
     [seed, topic],
   );
@@ -102,9 +120,7 @@ export function VideoCanvas({
         pointerEvents: "none",
       }}
     >
-      {/* Layered drifting gradient blobs.
-          motion.div handles only the x/y animation; inner div owns background so
-          Framer Motion can't intercept the color as an animation target. */}
+      {/* Layered drifting gradient blobs */}
       {blobs.map((b, i) => (
         <motion.div
           key={i}
@@ -124,15 +140,42 @@ export function VideoCanvas({
           }}
         >
           <div style={{
-            width:        b.size,
-            height:       b.size,
-            borderRadius: "50%",
+            width:           b.size,
+            height:          b.size,
+            borderRadius:    "50%",
             backgroundColor: b.color,
-            filter:       `blur(${Math.round(b.size * 0.28)}px)`,
-            opacity:      b.opacity * (0.5 + intensity * 0.5),
-            mixBlendMode: "screen" as const,
+            filter:          `blur(${Math.round(b.size * 0.28)}px)`,
+            opacity:         b.opacity * (0.5 + intensity * 0.5),
+            mixBlendMode:    "screen" as const,
           }} />
         </motion.div>
+      ))}
+
+      {/* Pulsing energy rings — react to intensity */}
+      {rings.map((r, i) => (
+        <motion.div
+          key={`ring${i}`}
+          style={{
+            position:     "absolute",
+            left:         `calc(${r.left}% - ${r.size / 2}px)`,
+            top:          `calc(${r.top}% - ${r.size / 2}px)`,
+            width:        r.size,
+            height:       r.size,
+            borderRadius: "50%",
+            border:       `1px solid ${r.color}`,
+            willChange:   "opacity, transform",
+          }}
+          animate={{
+            opacity: [0, 0.18 * speed, 0],
+            scale:   [0.75, 1.3, 0.75],
+          }}
+          transition={{
+            duration:   r.period / speed,
+            repeat:     Infinity,
+            ease:       "easeInOut",
+            delay:      i * 1.9,
+          }}
+        />
       ))}
 
       {/* Thin geometric lines — CRT-style accents */}
@@ -153,7 +196,18 @@ export function VideoCanvas({
         />
       ))}
 
-      {/* Big faint topic name */}
+      {/* CRT scanline overlay — 1px lines every 4px, intensifies with hype/viral */}
+      <div
+        style={{
+          position:        "absolute",
+          inset:           0,
+          backgroundImage: "repeating-linear-gradient(0deg, rgba(0,0,0,0.045) 0px, rgba(0,0,0,0.045) 1px, transparent 1px, transparent 4px)",
+          opacity:         0.6 + intensity * 0.4,
+          pointerEvents:   "none",
+        }}
+      />
+
+      {/* Big faint topic name — bumped to 0.10 opacity with glow so it reads */}
       <div
         style={{
           position:       "absolute",
@@ -167,9 +221,10 @@ export function VideoCanvas({
           style={{
             fontFamily:    "var(--font-display)",
             fontSize:      "clamp(44px, 13vw, 76px)",
-            color:         "rgba(255,255,255,0.05)",
+            color:         "rgba(255,255,255,0.10)",
             letterSpacing: "0.12em",
             textTransform: "uppercase",
+            textShadow:    "0 0 32px rgba(255,255,255,0.09)",
             userSelect:    "none",
             whiteSpace:    "nowrap",
           }}

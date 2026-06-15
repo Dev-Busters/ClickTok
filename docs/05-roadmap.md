@@ -1615,7 +1615,7 @@ parts it points at; do not re-derive design or invent numbers.
   > `postFollowerConversion` or late-gear costs, which are outside this task's lever list and
   > are left for a later pacing pass.
 
-- [ ] **11.3 — Element legibility foundation: play-field + positions + order numbers + teach
+- [x] **11.3 — Element legibility foundation: play-field + positions + order numbers + teach
   (`07 §C0`).** Add a play-field rect inside `ElementStage` (clear of TEB + right rail) and a
   helper that picks N non-overlapping, `startedAt`-seeded positions; store positions **in wave
   state** (`elements/types.ts` + mirror `03 §6.5`), set in `elementsSlice.spawnWave`. Render a bold
@@ -1624,7 +1624,7 @@ parts it points at; do not re-derive design or invent numbers.
   **DoD:** beat/duet waves spawn in varied non-overlapping spots with `1/2/3` numbers; first wave
   of each element shows its teach caption once (persists across reload); typecheck; preview.
 
-- [ ] **11.4 — SWIPE HITS → TRACE redesign (`07 §C1`).** Replace the broken direction-swipe.
+- [x] **11.4 — SWIPE HITS → TRACE redesign (`07 §C1`).** Replace the broken direction-swipe.
   Change the `swipe_hits` wave from `arrows:[{dir}]` to `traces:[{id,from,to,grade?}]`
   (`elements/types.ts` + `03 §6.5`); rework `elements/swipeHits.ts` (`detectSwipeDir` →
   `isOnTarget`), `elementsSlice` spawn/resolve, and rebuild `SwipeHitsWave.tsx` to render a start
@@ -1633,7 +1633,7 @@ parts it points at; do not re-derive design or invent numbers.
   **DoD:** wave spawns two on-screen dots + path; drag start→end pays out; off-target = MISS w/
   feedback; vertical drags don't page the feed; typecheck; preview.
 
-- [ ] **11.5 — BEAT SYNC + DUET LOOP intuitiveness (`07 §C2`, `§C3`).** Beat Sync: use 11.3
+- [x] **11.5 — BEAT SYNC + DUET LOOP intuitiveness (`07 §C2`, `§C3`).** Beat Sync: use 11.3
   positions/numbers; consider `windowPerfect 0.08 → 0.12`. Duet Loop: visually differentiate pods
   from Beat Sync (distinct skin/icon/color), number them, **alternate the pulse between TEB and the
   next pod**, and show an explicit "↓ TAP TEB" cue when the chain awaits a core tap (surface
@@ -1641,16 +1641,21 @@ parts it points at; do not re-derive design or invent numbers.
   **DoD:** beat waves scatter+numbered; a duet wave is unmistakably different from a beat wave,
   numbered, pulses TEB↔pod, and a cold player can complete it without prior knowledge; typecheck;
   preview.
+  _Done: `windowPerfect` relaxed 0.08→0.12; duet pods now squared rounded-rects in red/magenta
+  (vs beat's cyan circles), show ↔ glyph when unarmed, beam gradient reversed to show TEB→pod
+  flow; `DuetLoopWave` shows pulsing "TAP TEB ↓" cue when armedIndex is null; `TapCore` gets
+  a `DuetTebRing` magenta halo when it's TEB's turn._
 
-- [ ] **11.6 — HOLD DROP: fix input + better application (`07 §C4`).** Confirm press→hold→release
+- [x] **11.6 — HOLD DROP: fix input + better application (`07 §C4`).** Confirm press→hold→release
   grades/pays in preview (resolve any TEB/pager pointer collision). Replace the static 35–65% band
   with an expressive timing (moving/narrowing sweet-spot or charge-through-then-release-at-crest);
   payout burst scales with closeness; add a hype/combo kick on a perfect drop; telegraph overcharge
   (ring pulses red before WEAK). New balance as needed under `balance.ts:172`.
   **DoD:** hold reliably grades/pays; overcharge is telegraphed; perfect drop reads as a payoff;
   window is no longer a fixed band; typecheck; preview.
+  > note: crest oscillates at 1.6s period (±26% amplitude), crestHalfWidth=0.11; payout scales 5–10× by closeness; perfect kick +3 combo; overcharge warns at 86% with pulsing red ring; added onPointerCancel + touch-action:none for reliable capture; "RELEASE!" label in red when charge >86%.
 
-- [ ] **11.7 — Fill the blank backdrops (`07 §D`).** Densify `VideoCanvas` (scanline/grid overlay
+- [x] **11.7 — Fill the blank backdrops (`07 §D`).** Densify `VideoCanvas` (scanline/grid overlay
   + more/reactive blobs or energy rings; topic text `0.05 → 0.10` + glow). Make the idle Element
   Stage a gentle beat visualizer. Live stage: drifting `+follower`/`+coin` motes from the collect
   zone + a thin right-edge live-stats ticker; optional faint stream frame + STREAM TIME bar
@@ -1658,7 +1663,7 @@ parts it points at; do not re-derive design or invent numbers.
   **DoD:** before/after preview of a FYP video and a livestream — center no longer reads empty,
   topic legible, idle band animates, live stage has ambient motes/ticker; no fps regression.
 
-- [ ] **11.8 — Profile → channel analytics (`07 §E`).** Remove `UpgradeShop` + `SkillsPanel` from
+- [x] **11.8 — Profile → channel analytics (`07 §E`).** Remove `UpgradeShop` + `SkillsPanel` from
   `Profile/index.tsx` (keep the Creator Studio link). Expand `ProfileHeader` stats (primary
   Following/Followers/Likes + lifetime Views/Total Followers/Streams + passive-income pill); fold
   `CreatorInsights` in-page; add a per-pillar Creator Breakdown (reuse the 10.2 affordable-pillar
@@ -1666,6 +1671,57 @@ parts it points at; do not re-derive design or invent numbers.
   `06-ui-screens.md` Profile section.
   **DoD:** no buy UI on Profile; expanded stats render; Insights reads as part of the page;
   breakdown + portfolio gate correctly; Studio reachable; typecheck; preview.
+
+---
+
+## PHASE 12 — Onboarding & progressive unlocks (design LOCKED 2026-06-15; full spec in `docs/08-onboarding-and-progressive-unlocks.md`)
+
+Goal: fix the *opening minutes* — make the TEB obviously tappable, reveal the UI **one feature at a
+time** (not all at once), and make the top "Duet Flow" feed-modifier banner legible. Source: 4th
+playtest from a fresh save. Read `08`'s relevant section before each task; do not re-derive design or
+invent balance numbers. Do these in order (12.2 reshapes the unlock catalog that 12.1/12.3 read).
+
+- [x] **12.1 — TEB: vivid resting color + "tap to start" nudge (`08 §A`).** In
+  `screens/HomeFeed/TapCore.tsx`: change the tier-0 color off `var(--dim)` to a vivid brand color
+  (recommended ramp `["var(--cyan)","var(--red)","var(--gold)","var(--gold)"]`, exact hues tunable),
+  brighten the tier-0 glyph (`:598`) and resting border/glow (`:574–585`) so the button glows at
+  combo 0. Add a **very subtle** looping pre-tap cue (pulsing down-chevron + `TAP TO START`, mono
+  ~9px, low opacity) shown while `lastTapAt === 0`, auto-hidden on first tap (reuse the `SwipeUpHint`
+  feel). Keep the post-first-tap "THE ENGAGEMENT BUTTON" teach.
+  **Refs:** `08 §A`. **DoD:** fresh save → TEB is eye-catching + a subtle "tap to start" cue shows,
+  cue disappears on first tap, color still ramps with combo; typecheck; before/after screenshot.
+
+- [ ] **12.2 — Progressive unlock ladder (`08 §B`). ⚠ BREAKING SAVE CHANGE.** Split the single
+  `feed_pager` flag into granular flags (`fyp_video`, `engagement_rail`, `feed_scroll`,
+  `element_stage`) and add `bottom_nav`; rename `viewer`→`studio`. Replace `METRIC_CATALOG`
+  (`features/metrics/catalog.ts`) with the `08 §B` ordered table (early gates = `views`/taps, mid =
+  the §11-tuned `follower` gates, late = streams/milestones). Update `unlocks.ts`
+  (`FEATURE_LABELS`, trim `FEATURE_TO_PILLAR`), `HomeFeed/index.tsx` (split the `feedPagerUnlocked`
+  block; non-`feed_scroll` path renders one static card), `Shell.tsx` (gate `<BottomNav />` behind
+  `bottom_nav`), `BottomNav.tsx`, and gate the Creator Studio **Elements** section behind
+  `element_stage`. `posting`/`discover`/`live` are **staggered** as three separate direct unlocks
+  (not cascaded) per the §B table; because `posting` (the `+` button) now precedes `live`, gate the
+  **GO LIVE action inside `CreateSheet`** by `live` too (locked until follower-200). Make each
+  newly-unlocked HUD element animate in and fire a `pushCelebration`
+  (extend `checkMetrics`, `inboxSlice.ts:173`, to celebrate **every** feature unlock). Bump
+  `SAVE_VERSION` 9→10 with a v9→v10 migrate that **re-derives `metricsReached` from persisted stats
+  without granting rewards** (no reward dump; existing unlocks preserved).
+  **Refs:** `08 §B`, `03` §9, `04 §14.3`, `02` §4. **DoD:** fresh save reveals one feature at a time
+  in the spec order, each with a reveal anim + celebration, bottom nav fades in (not at t=0), no step
+  dumps the whole HUD; an old save loads with all earned features intact and **no** reward dump;
+  typecheck; preview across the first several unlocks; `04 §14.3` updated.
+
+- [ ] **12.3 — Feed-modifier ("Duet Flow") banner legibility (`08 §C`).** In
+  `screens/HomeFeed/index.tsx` `ModBanner` + `features/feed/mods.ts`: only render a modifier banner
+  the player can use — gate by `appliesTo` vs `ownedElements` (beat_sync/duet_loop require ownership;
+  core always; scheduler requires ≥1 element owned). Reframe the banner as a passive "THIS VIDEO /
+  PERK" buff (clear non-interactive label). Add a one-time `modTeachSeen` caption (reuse
+  `TeachCaption`, persist with the 12.2 save bump). Rename the colliding modifier display
+  `DUET FLOW`→`LOOP BOOST` (keep id `duet_flow`; element stays DUET LOOP). Add a persistent
+  name+how-to chip atop `ElementStage` while a wave is active (name from `ELEMENT_CATALOG`).
+  **Refs:** `08 §C`, `06` (FYP section). **DoD:** with Duet Loop unowned, no loop-boost banner ever
+  shows; with an element owned its banner reads as a passive perk (one-time teach on first show);
+  no name collision; active waves show a persistent identity chip; typecheck; preview before/after.
 
 ---
 
