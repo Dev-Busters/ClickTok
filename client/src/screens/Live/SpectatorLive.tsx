@@ -150,7 +150,7 @@ export function SpectatorLive() {
 
       {/* Hype meter */}
       <div style={{ padding: "20px 16px 0" }}>
-        <ProgressBar value={hype} color={hypeColor(hype)} label="HYPE" />
+        <ProgressBar value={hype} color={hypeColor(hype)} label="HYPE" segments={10} />
       </div>
 
       {/* Stage + spectator feed */}

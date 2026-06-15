@@ -3,13 +3,17 @@ import type { FullState } from "../index";
 import type { InboxNotification, NotificationType } from "../../features/inbox/types";
 import { computeDailyReward, isNewCalendarDay } from "../../features/inbox/daily";
 import { METRIC_CATALOG } from "../../features/metrics/catalog";
-import { isFeatureUnlocked } from "../../features/metrics/unlocks";
+import { isFeatureUnlocked, featureLabel } from "../../features/metrics/unlocks";
 import type { MetricStatId } from "../../features/metrics/types";
 import { UPGRADE_CATALOG } from "../../features/upgrades/catalog";
 import type { UpgradePillar } from "../../features/upgrades/types";
 import { SKILL_CATALOG, SKILL_PILLAR } from "../../features/skills/catalog";
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { formatCount } from "../../lib/format";
+import { pushCelebration } from "../../components/fx/CelebrationLayer";
+
+const PILLAR_UNLOCKS = new Set<string>(["viewer", "posting", "live"]);
+const ELEMENT_IDS = new Set<string>(ELEMENT_CATALOG.map(d => d.id));
 
 const MAX_NOTIFICATIONS = 50;
 
@@ -165,6 +169,23 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
         title: metricNotifTitle(m.stat, m.threshold),
         body: rewardParts.join(" · "),
       });
+
+      // 10.5: celebration popup on pillar / element unlocks
+      if (m.unlocks && PILLAR_UNLOCKS.has(m.unlocks)) {
+        pushCelebration({
+          icon: "🎬",
+          label: `${featureLabel(m.unlocks)} UNLOCKED`,
+          sublabel: "CREATOR STUDIO",
+          color: "var(--gold)",
+        });
+      } else if (m.unlocks && ELEMENT_IDS.has(m.unlocks)) {
+        pushCelebration({
+          icon: "🔓",
+          label: `${featureLabel(m.unlocks)} UNLOCKED`,
+          sublabel: "NEW ELEMENT",
+          color: "var(--gold)",
+        });
+      }
     }
   },
 
@@ -193,6 +214,13 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
         type: "milestone",
         title: `New upgrade ready — ${label}`,
         body: `Open Creator Studio → ${label} to level up.`,
+      });
+      // 10.5: quick affordable-alert celebration
+      pushCelebration({
+        icon: "⚡",
+        label: `${label} UPGRADE READY`,
+        sublabel: "CREATOR STUDIO",
+        color: "var(--cyan)",
       });
     }
   },

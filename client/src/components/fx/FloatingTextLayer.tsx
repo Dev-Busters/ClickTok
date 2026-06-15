@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type FloatKind =
@@ -28,11 +28,13 @@ interface FloatItem {
   color?: string;
   x: number;     // px from screen center (lane + jitter)
   tilt: number;  // degrees
-  driftX: number; // px of horizontal drift during rise
+  driftX: number; // px of horizontal scatter during rise
+  riseY: number;  // px of vertical rise (arc height)
 }
 
 // ── Module-level event bus ─────────────────────────────────────────────────────
-const LANE_OFFSETS = [-70, -25, 25, 70] as const;
+// 6 lanes for a denser cascade without items overlapping mid-flight.
+const LANE_OFFSETS = [-95, -57, -19, 19, 57, 95] as const;
 let _laneIdx = 0;
 let _itemId = 0;
 
@@ -41,11 +43,12 @@ const _listeners = new Set<AddFn>();
 
 export function pushFloatText(opts: PushFloatOpts): void {
   const isCenter = opts.kind === "callout" || opts.kind === "flow";
-  const laneX = isCenter ? 0 : LANE_OFFSETS[_laneIdx++ % 4];
-  // ±10px jitter, −8°…+8° tilt, slight horizontal drift
-  const jitter = (Math.random() - 0.5) * 20;
-  const tilt = (Math.random() - 0.5) * 16;
-  const driftX = (Math.random() - 0.5) * 40;
+  const laneX = isCenter ? 0 : LANE_OFFSETS[_laneIdx++ % LANE_OFFSETS.length];
+  // jitter + tilt + wide scatter drift for an arc-and-scatter rise
+  const jitter = (Math.random() - 0.5) * 28;
+  const tilt = (Math.random() - 0.5) * 24;
+  const driftX = (Math.random() - 0.5) * 140;
+  const riseY = 120 + Math.random() * 50;
 
   const item: FloatItem = {
     id: _itemId++,
@@ -56,11 +59,23 @@ export function pushFloatText(opts: PushFloatOpts): void {
     x: laneX + jitter,
     tilt,
     driftX,
+    riseY,
   };
   _listeners.forEach(fn => fn(item));
 }
 
 // ── Style helpers ──────────────────────────────────────────────────────────────
+// Tier 0: small/plain · Tier 1: bold accent · Tier 2: big payoff · Tier 3: mega/jackpot
+function getTier(kind: FloatKind, magnitude: number): 0 | 1 | 2 | 3 {
+  if (kind === "callout" || kind === "flow") return 2;
+  if (magnitude >= 25) return 3;
+  if (magnitude >= 10) return 2;
+  if (magnitude >= 3) return 1;
+  return 0;
+}
+
+const TIER_SIZE = [18, 26, 35, 46] as const;
+
 function getColor(kind: FloatKind, magnitude: number, override?: string): string {
   if (override) return override;
   if (kind === "perfect") return "var(--gold)";
@@ -69,39 +84,45 @@ function getColor(kind: FloatKind, magnitude: number, override?: string): string
   if (kind === "miss") return "var(--red)";
   if (kind === "callout" || kind === "flow") return "var(--gold)";
   // coin: magnitude tier color
-  if (magnitude >= 3) return "var(--gold)";
+  const tier = getTier(kind, magnitude);
+  if (tier >= 2) return "var(--gold)";
+  if (tier === 1) return "var(--cyan)";
   return "rgba(255,255,255,0.92)";
 }
 
 function getFontSize(kind: FloatKind, magnitude: number): number {
-  if (kind === "callout" || kind === "flow") return 26;
-  if (magnitude >= 10) return 30;
-  if (magnitude >= 3) return 22;
-  return 16;
+  if (kind === "callout" || kind === "flow") return 32;
+  return TIER_SIZE[getTier(kind, magnitude)];
 }
 
 function getTextShadow(color: string, kind: FloatKind, magnitude: number): string | undefined {
+  const tier = getTier(kind, magnitude);
   if (kind === "callout" || kind === "flow")
-    return `0 0 18px ${color}, 0 2px 8px rgba(0,0,0,0.9)`;
-  if (magnitude >= 10)
-    return `0 0 14px ${color}cc, 0 1px 0 rgba(0,0,0,0.85)`;
-  if (magnitude >= 3 || kind === "perfect" || kind === "good")
-    return `0 0 8px ${color}99, 1px 1px 0 rgba(0,0,0,0.7)`;
+    return `0 0 22px ${color}, 0 0 8px ${color}, 0 2px 8px rgba(0,0,0,0.9)`;
+  if (tier === 3)
+    return `0 0 24px ${color}, 0 0 10px #fff, 0 2px 0 rgba(0,0,0,0.9)`;
+  if (tier === 2)
+    return `0 0 16px ${color}cc, 0 1px 0 rgba(0,0,0,0.85)`;
+  if (tier === 1 || kind === "perfect" || kind === "good")
+    return `0 0 9px ${color}99, 1px 1px 0 rgba(0,0,0,0.7)`;
   return undefined;
 }
 
 // ── FloatNode ─────────────────────────────────────────────────────────────────
 function FloatNode({ item, onDone }: { item: FloatItem; onDone: () => void }) {
-  const isTier3 = item.magnitude >= 10;
+  const tier = getTier(item.kind, item.magnitude);
   const isCallout = item.kind === "callout" || item.kind === "flow";
   const color = getColor(item.kind, item.magnitude, item.color);
   const fontSize = getFontSize(item.kind, item.magnitude);
   const textShadow = getTextShadow(color, item.kind, item.magnitude);
-  // Tier-3 gets "!" appended unless the callout already ends with "!"
+  // Tier-2 gets "!"; tier-3 gets "!!" — unless the text already ends with "!"
   const displayText =
-    isTier3 && !item.text.endsWith("!") ? item.text + "!" : item.text;
+    tier >= 3 && !item.text.endsWith("!") ? item.text + "!!"
+    : tier === 2 && !item.text.endsWith("!") ? item.text + "!"
+    : item.text;
 
-  const dur = isCallout ? 1.35 : 1.15;
+  const dur = isCallout ? 1.4 : tier >= 2 ? 1.3 : 1.15;
+  const initialScale = tier >= 3 ? 1.5 : tier === 2 ? 1.25 : 1;
 
   return (
     <motion.div
@@ -117,17 +138,23 @@ function FloatNode({ item, onDone }: { item: FloatItem; onDone: () => void }) {
         pointerEvents: "none",
         userSelect: "none",
       }}
-      initial={{ y: 0, opacity: 1, rotate: item.tilt, scale: isTier3 ? 1.3 : 1 }}
-      animate={{ y: -130, x: item.driftX, opacity: [1, 1, 0], scale: 1 }}
+      initial={{ y: 0, x: 0, opacity: 1, rotate: item.tilt, scale: initialScale }}
+      animate={{
+        y: [0, -item.riseY * 0.45, -item.riseY],
+        x: [0, item.driftX * 0.3, item.driftX],
+        rotate: [item.tilt, item.tilt * 1.4, item.tilt * 0.3],
+        opacity: [1, 1, 0],
+        scale: 1,
+      }}
       exit={{}}
       transition={{
-        y: { duration: dur, ease: "easeOut" },
-        x: { duration: dur, ease: "easeOut" },
+        y: { duration: dur, ease: "easeOut", times: [0, 0.45, 1] },
+        x: { duration: dur, ease: "easeOut", times: [0, 0.45, 1] },
+        rotate: { duration: dur, ease: "easeOut", times: [0, 0.45, 1] },
         opacity: { duration: dur, times: [0, 0.55, 1] },
-        scale: isTier3
-          ? { type: "spring", stiffness: 620, damping: 18 }
+        scale: tier >= 2
+          ? { type: "spring", stiffness: 560, damping: 17 }
           : { duration: 0.05 },
-        rotate: { duration: 0 },
       }}
       onAnimationComplete={onDone}
     >
@@ -136,15 +163,14 @@ function FloatNode({ item, onDone }: { item: FloatItem; onDone: () => void }) {
           whiteSpace: "nowrap",
           fontFamily: "var(--font-display)",
           fontSize,
-          fontWeight: isTier3 || isCallout ? 700 : 600,
+          fontWeight: tier >= 2 || isCallout ? 800 : tier === 1 ? 700 : 600,
           color,
           textShadow,
           WebkitTextStroke:
-            isTier3
-              ? "1.5px rgba(0,0,0,0.85)"
-              : item.magnitude >= 3
-                ? "0.5px rgba(0,0,0,0.6)"
-                : undefined,
+            tier >= 3 ? "2px rgba(0,0,0,0.9)"
+            : tier === 2 ? "1.5px rgba(0,0,0,0.85)"
+            : tier === 1 ? "0.75px rgba(0,0,0,0.6)"
+            : undefined,
           letterSpacing: isCallout ? "0.08em" : undefined,
         }}
       >
@@ -155,12 +181,14 @@ function FloatNode({ item, onDone }: { item: FloatItem; onDone: () => void }) {
 }
 
 // ── FloatingTextLayer — mount once on Home ────────────────────────────────────
+const MAX_ITEMS = 18;
+
 export function FloatingTextLayer() {
   const [items, setItems] = useState<FloatItem[]>([]);
 
   useEffect(() => {
     const add: AddFn = (item) =>
-      setItems(prev => [...prev.slice(-(12 - 1)), item]);
+      setItems(prev => [...prev.slice(-(MAX_ITEMS - 1)), item]);
     _listeners.add(add);
     return () => {
       _listeners.delete(add);

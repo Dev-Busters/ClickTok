@@ -1523,7 +1523,7 @@ Pegfinity-grade legibility and juice.
   > party) passes.
   > Did NOT start 10.5.
 
-- [ ] **10.5 — Whole-game polish pass (Pegfinity-grade juice).**
+- [x] **10.5 — Whole-game polish pass (Pegfinity-grade juice).**
   Pop-numbers v2 (`FloatingTextLayer.tsx`): bigger, bolder, color-coded by source/magnitude,
   denser cascade with arc + scatter. Celebration popups: radial-ray burst + icon + label on
   element unlocks / pillar unlocks / affordable alerts. Cohesive CRT/arcade meters (combo ring,
@@ -1531,6 +1531,31 @@ Pegfinity-grade legibility and juice.
   Live — legibility + juice.
   **DoD:** before/after preview of FYP combo cascade + unlock celebration; no fps regression
   (transforms/opacity only); typecheck.
+  > note: Pop-numbers v2 — 6 lanes (was 4), wider jitter/tilt/drift, new 4-tier size/color/glow
+  > system (`getTier`: white→cyan→gold→gold+stroke "mega"), keyframe arc+scatter trajectories
+  > (rise+drift+rotate via Framer keyframe arrays, transform/opacity only), tier≥2 gets "!"/"!!"
+  > suffix + spring pop-in, MAX_ITEMS 12→18. "Color-coded by source" interpreted via the
+  > existing kind/magnitude system (no unused per-currency `source` field exists in the
+  > codebase) — tap/coin floats already differ from callout/flow floats, now amplified by tier.
+  > New `CelebrationLayer.tsx` (module-bus pattern matching `FloatingTextLayer`): radial-ray
+  > conic-gradient burst + bouncing icon + chroma label + sublabel, mounted once in
+  > `Shell.tsx`. Wired triggers: `ElementUnlockSheet.handleUnlock` (🔓 element unlock),
+  > `inboxSlice.checkMetrics` (🎬 pillar unlock vs 🔓 element unlock, keyed off
+  > `metric.unlocks`), `inboxSlice.checkAffordableUpgrades` (⚡ affordable-upgrade alert).
+  > Cohesive meters: enhanced shared `ProgressBar.tsx` with fill glow (`box-shadow`) + CRT
+  > scanline overlay + optional `segments` tick-dividers — used by Live hype meters
+  > (`StreamerLive`/`SpectatorLive`, `segments={10}`) and Discover's `TrendList` heat bars
+  > (automatic, same component). `AlgorithmBar` (Discover) already had bespoke arcade
+  > styling (glow + FED/BLESSED ticks) and was left as-is — judged already cohesive.
+  > Per-screen sweep: Home (pop-numbers v2 cascade) and Live (segmented glow hype meter)
+  > directly polished; Discover inherits the ProgressBar glow via TrendList; Creator Studio,
+  > Inbox, Profile gain the new celebration popups as their "juice" pass (no other elements on
+  > those screens needed CRT-meter treatment). All animation uses transform/opacity/box-shadow
+  > only — no layout-thrashing properties. Verified in browser preview: pop-numbers v2 cascade
+  > ("+24"/"+25" tier-1 cyan, "NICE!" tier-2 gold callout with stroke+glow, arc/scatter motion)
+  > and the celebration popup (radial-ray burst + ⚡/🔓 icon + label + sublabel, triggered via
+  > real `checkAffordableUpgrades` call through the live store) both render correctly.
+  > `pnpm typecheck` (client + party) passes.
 
 ---
 

@@ -13,6 +13,7 @@ import { CreateSheet } from "../screens/Create";
 import { CreatorStudio } from "../screens/CreatorStudio";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
+import { CelebrationLayer } from "../components/fx/CelebrationLayer";
 import { AnimatePresence } from "framer-motion";
 
 const Live = lazy(() => import("../screens/Live").then(m => ({ default: m.Live })));
@@ -91,6 +92,9 @@ export function Shell() {
       {idleReport && (
         <WelcomeBackSheet report={idleReport} onDismiss={() => setIdleReport(null)} />
       )}
+
+      {/* 10.5: celebration popups — element/pillar unlocks, affordable alerts */}
+      <CelebrationLayer />
 
       {/* 7.6: royalty toast — appears on any tab when someone engages your video */}
       {royaltyToast && (

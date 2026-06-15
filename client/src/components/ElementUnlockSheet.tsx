@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
+import { pushCelebration } from "./fx/CelebrationLayer";
 import type { ElementDef } from "../features/elements/types";
 
 export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose: () => void }) {
@@ -12,7 +13,15 @@ export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose:
   const canUnlock = followersMet && coinsMet;
 
   const handleUnlock = () => {
-    if (unlockElement(def.id)) onClose();
+    if (unlockElement(def.id)) {
+      pushCelebration({
+        icon: "🔓",
+        label: `${def.name} UNLOCKED`,
+        sublabel: "NEW ELEMENT",
+        color: "var(--gold)",
+      });
+      onClose();
+    }
   };
 
   return (
