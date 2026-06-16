@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../../store";
-import { computeRunParams } from "../../features/livestream/computeRunParams";
+import { computeRunParamsBreakdown, type RunParamsBreakdown } from "../../features/livestream/computeRunParams";
 import { getTrendHeat } from "../../features/social/trends";
 import { formatCount } from "../../lib/format";
 import { isFeatureUnlocked } from "../../features/metrics/unlocks";
+import { REACTION_CATALOG, REACTION_ICON } from "../../features/livestream/reactions";
 
 export function CreateSheet({ onClose }: { onClose: () => void }) {
   const wallet = useGameStore(s => s.wallet);
@@ -22,7 +23,7 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
 
   const topic = activeTrend ?? "trending";
   const trendHeat = getTrendHeat(trendsAvailable, topic);
-  const params = computeRunParams(
+  const breakdown = computeRunParamsBreakdown(
     { followers: wallet.followers, followerConversion, skillLevels, ownedUpgrades },
     topic,
     trendHeat,
@@ -112,10 +113,7 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
           opacity: liveUnlocked ? 1 : 0.45,
         }}>
           {liveUnlocked ? (
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--text)', lineHeight: 1.4, textAlign: 'center' }}>
-              Go live on <span style={{ color: 'var(--gold)' }}>#{topic}</span> at
-              <strong style={{ color: 'var(--cyan)' }}> ~{formatCount(params.startViewers)}</strong> viewers
-            </div>
+            <LoadoutPanel topic={topic} breakdown={breakdown} />
           ) : (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.14em', textAlign: 'center' }}>
               REACH 200 FOLLOWERS TO UNLOCK
@@ -159,6 +157,84 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
           CLOSE
         </motion.button>
       </motion.div>
+    </div>
+  );
+}
+
+// 13.2 (09 §B): the meta→run bridge made visible — every number attributed to its
+// source (followers / skill / gear / trend) so gear/skill purchases read as "this
+// makes runs better." Sourced from computeRunParamsBreakdown — never duplicates
+// computeRunParams' math, so it can't drift from the actual run start.
+function LoadoutPanel({ topic, breakdown }: { topic: string; breakdown: RunParamsBreakdown }) {
+  const { params, viewers, giftRate, hypeDecay } = breakdown;
+
+  const viewerParts: string[] = [`base ${formatCount(viewers.base)}`];
+  if (viewers.fromFollowers > 0.5) viewerParts.push(`+${formatCount(viewers.fromFollowers)} followers`);
+  if (viewers.fromGear > 0.5) viewerParts.push(`+${formatCount(viewers.fromGear)} gear`);
+  if (viewers.charismaLevel > 0) viewerParts.push(`×${viewers.charismaMult.toFixed(2)} Charisma L${viewers.charismaLevel}`);
+  if (viewers.gearMult !== 1) viewerParts.push(`×${viewers.gearMult.toFixed(2)} gear`);
+  if (viewers.trendMult !== 1) viewerParts.push(`×${viewers.trendMult.toFixed(2)} #${topic}`);
+
+  const giftParts: string[] = [];
+  if (giftRate.monetizationLevel > 0) giftParts.push(`×${giftRate.monetizationMult.toFixed(2)} Monetization L${giftRate.monetizationLevel}`);
+  if (giftRate.gearMult !== 1) giftParts.push(`×${giftRate.gearMult.toFixed(2)} gear`);
+
+  const decayParts: string[] = [];
+  if (hypeDecay.stagecraftLevel > 0) decayParts.push(`−${Math.round(hypeDecay.stagecraftReduction * 100)}% Stagecraft L${hypeDecay.stagecraftLevel}`);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <LoadoutRow
+        label="STARTING VIEWERS"
+        value={`~${formatCount(params.startViewers)}`}
+        detail={viewerParts.join(' · ')}
+      />
+      <LoadoutRow
+        label="GIFT RATE"
+        value={`${params.giftRate.toFixed(2)}/s`}
+        detail={giftParts.length > 0 ? giftParts.join(' · ') : 'base only'}
+      />
+      <LoadoutRow
+        label="HYPE DECAY"
+        value={`${params.hypeDecayPerSec.toFixed(2)}/s`}
+        detail={decayParts.length > 0 ? decayParts.join(' · ') : 'base only'}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.14em' }}>
+          REACTIONS READY
+        </div>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {params.reactions.map(id => (
+            <div key={id} style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              padding: '4px 8px', borderRadius: 999,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+              fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--text)', letterSpacing: '0.06em',
+            }}>
+              <span>{REACTION_ICON[id]}</span>
+              <span>{REACTION_CATALOG[id].name.toUpperCase()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoadoutRow({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.14em' }}>
+          {label}
+        </span>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--cyan)' }}>
+          {value}
+        </span>
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.02em' }}>
+        {detail}
+      </div>
     </div>
   );
 }

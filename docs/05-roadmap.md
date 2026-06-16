@@ -1768,7 +1768,7 @@ values that already exist. Independent of Phase 12 (do either order). Read `09`'
   > "+2 coins/sec passive income"; repeat-buy / already-owned cases correctly show nothing.
   > `pnpm typecheck` (client + party) clean; zero console errors.
 
-- [ ] **13.2 — Pre-run loadout panel (`09 §B`).** In `screens/Create/index.tsx`, replace the
+- [x] **13.2 — Pre-run loadout panel (`09 §B`).** In `screens/Create/index.tsx`, replace the
   one-line `~N viewers` GO LIVE summary with a compact loadout panel (when `liveUnlocked`) showing
   STARTING VIEWERS (base / +followers / +Charisma / ×trend), GIFT RATE & HYPE DECAY (Monetization /
   Stagecraft named), and REACTIONS READY (`params.reactions`). Surface the named sub-terms from
@@ -1777,6 +1777,21 @@ values that already exist. Independent of Phase 12 (do either order). Read `09`'
   `startRun`, not here).
   **Refs:** `09 §B`, `04 §6`. **DoD:** loadout numbers match the actual run start, each attributed
   to its source, update live when gear/skills change, no drift from the run; typecheck; preview.
+  > note: `computeRunParams.ts` refactored around a private `computeBreakdown()` that both
+  > `computeRunParams` (unchanged signature/behavior — every other caller, `simSpectate.ts`/
+  > `HomeFeed/index.tsx`/`runSlice.ts`, needed zero changes) and the new
+  > `computeRunParamsBreakdown` call — same single calculation, so the panel cannot drift from the
+  > actual run. New `RunParamsBreakdown` type exposes named sub-terms (`viewers.{base,
+  > fromFollowers, fromGear, charismaLevel, charismaMult, gearMult, trendMult}`,
+  > `giftRate.{base, monetizationLevel, monetizationMult, gearMult}`,
+  > `hypeDecay.{base, stagecraftLevel, stagecraftReduction}`). `Create/index.tsx`'s new
+  > `LoadoutPanel` renders STARTING VIEWERS / GIFT RATE / HYPE DECAY rows (each headline number +
+  > a small attributed-parts line, omitting zero-contribution terms) and a REACTIONS READY chip row
+  > (`REACTION_CATALOG`/`REACTION_ICON`). Verified in preview: fresh loadout showed
+  > "base 10 · +7 followers · ×1.10 Charisma L2 · ×1.37 #pets" → ~26 viewers; leveling Charisma to
+  > L5 live-updated to "×1.25 Charisma L5" → ~32 viewers; pressing GO LIVE produced
+  > `runSlice.params.startViewers === 32`, an exact match with the panel — zero drift confirmed.
+  > typecheck (client + party) clean.
 
 - [ ] **13.3 — Post-run contribution breakdown (`09 §C`).** Add a "WHAT YOU BROUGHT" section to the
   results overlay (`screens/Live/StreamerLive.tsx:295–356`): list active gear/skills + their
