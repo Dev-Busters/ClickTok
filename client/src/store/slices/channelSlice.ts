@@ -25,6 +25,11 @@ export type ChannelSlice = {
   tebTeachSeen: boolean;
   setTebTeachSeen: () => void;
 
+  // 13.1 (09 §A2) — ephemeral: bumped on a stat-changing purchase so TapCore
+  // can give the TEB a brief pulse. Not persisted.
+  statPulseAt: number;
+  pulseStat: () => void;
+
   // Phase 9.2 — lifetime metric counters
   viewsTotal: number;   // lifetime engageTap taps
   coinsEarned: number;  // lifetime coins earned via active tapping
@@ -54,6 +59,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   followerConversion: 1,
   boonMultiplier: 1,
   tebTeachSeen: false,
+  statPulseAt: 0,
   viewsTotal: 0,
   coinsEarned: 0,
   streams: 0,
@@ -62,6 +68,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
 
   setHandle: (handle) => set({ handle }),
   setTebTeachSeen: () => set({ tebTeachSeen: true }),
+  pulseStat: () => set({ statPulseAt: Date.now() }),
 
   tap: () => {
     const { tapPower, multiplier, followerConversion, wallet } = get();

@@ -6,6 +6,8 @@ export interface PushCelebrationOpts {
   icon: string;
   label: string;
   sublabel?: string;
+  /** 13.1 (09 §A3): optional stat/effect line shown below sublabel, e.g. "+3 post power". */
+  detail?: string;
   /** Ray burst + glow color. Defaults to gold. */
   color?: string;
 }
@@ -119,6 +121,16 @@ function CelebrationNode({ item, onDone }: { item: CelebrationItem; onDone: () =
             textAlign: "center",
           }}>
             {item.sublabel}
+          </div>
+        )}
+        {item.detail && (
+          <div style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: 12,
+            color: "rgba(255,255,255,0.7)",
+            textAlign: "center",
+          }}>
+            {item.detail}
           </div>
         )}
       </motion.div>

@@ -275,6 +275,7 @@ export function TapCore() {
   const tebTeachSeen = useGameStore(s => s.tebTeachSeen);
   const setTebTeachSeen = useGameStore(s => s.setTebTeachSeen);
   const activeWave = useGameStore(s => s.activeWave);
+  const statPulseAt = useGameStore(s => s.statPulseAt);
   const duetCfgPods = BALANCE.elements.duetLoop.pods;
   // True when a duet_loop chain is in progress and waiting for a core tap
   const duetTebTurn = activeWave?.element === 'duet_loop'
@@ -283,6 +284,7 @@ export function TapCore() {
 
   const [tapFxs, setTapFxs] = useState<TapFx[]>([]);
   const [tierFlash, setTierFlash] = useState(false);
+  const [statFlash, setStatFlash] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
   const [eruption, setEruption] = useState(false);
   const [ringDrain, setRingDrain] = useState(false);
@@ -338,6 +340,15 @@ export function TapCore() {
     }
     prevTier.current = tier;
   }, [tier]);
+
+  // 13.1 (09 §A2): a repeatable/skill purchase bumped statPulseAt — give the
+  // TEB a brief pulse so "I'm stronger now" reads even from inside the Studio sheet.
+  useEffect(() => {
+    if (statPulseAt === 0) return;
+    setStatFlash(true);
+    const t = setTimeout(() => setStatFlash(false), 600);
+    return () => clearTimeout(t);
+  }, [statPulseAt]);
 
   // Idle attract: check every second whether lastTapAt is stale
   useEffect(() => {
@@ -554,6 +565,25 @@ export function TapCore() {
                 width: 140, height: 140, marginTop: -70, marginLeft: -70,
                 borderRadius: '50%', border: `3px solid ${ringColor}`,
                 boxShadow: `0 0 20px ${ringColor}`, pointerEvents: 'none',
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* 13.1 (09 §A2): stat-boost pulse — a purchase just moved a derived stat */}
+        <AnimatePresence>
+          {statFlash && (
+            <motion.div
+              key="statflash"
+              initial={{ scale: 0.95, opacity: 0.85 }}
+              animate={{ scale: 1.35, opacity: 0 }}
+              exit={{}}
+              transition={{ duration: 0.55, ease: 'easeOut' }}
+              style={{
+                position: 'absolute', top: '50%', left: '50%',
+                width: 150, height: 150, marginTop: -75, marginLeft: -75,
+                borderRadius: '50%', border: '2px solid var(--cyan)',
+                boxShadow: '0 0 16px var(--cyan)', pointerEvents: 'none',
               }}
             />
           )}

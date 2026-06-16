@@ -1735,7 +1735,7 @@ consolidated design-skill review (`docs/clicktok_incremental_design_skill.md`, P
 add **no** persisted state, **no** `SAVE_VERSION` bump, and **no** economy numbers — they surface
 values that already exist. Independent of Phase 12 (do either order). Read `09`'s section per task.
 
-- [ ] **13.1 — Purchase before→after stat feedback (`09 §A`).** Snapshot the four derived stats
+- [x] **13.1 — Purchase before→after stat feedback (`09 §A`).** Snapshot the four derived stats
   (`tapPower`/`multiplier`/`followerConversion`/`passiveCoinsPerSec`) around `buyUpgrade`
   (`upgradesSlice.ts:30`) / `levelSkill` (`skillsSlice.ts:31`); on a repeatable upgrade or skill
   buy, flash a **non-blocking** inline stat delta on that row (e.g. `coins/tap 7 → 10  +43% 🔥`,
@@ -1745,6 +1745,28 @@ values that already exist. Independent of Phase 12 (do either order). Read `09`'
   **Refs:** `09 §A`. **DoD:** repeatable/skill buys flash a readable delta + TEB pulse, next tap
   pays visibly more, no-op stats hidden, no interrupting modal; milestone buys name their stat;
   typecheck; preview.
+  > note: new `features/economy/statFeedback.ts` (`effectStatKind`, `computeStatFlash`) derives a
+  > single headline stat per purchase from `UpgradeEffect`/skill id, per `09 §A2`'s explicit
+  > effect→label map (postPowerAdd→coins/tap, followerConversionAdd→followers/tap,
+  > passiveCoinsAdd→coins/sec, multiplierMult→multiplier) — only ONE stat shown per buy (matches
+  > `09 §A4`'s "headline stat" framing), not a fan-out of every changed derived value. Extracted
+  > `SkillRow` from `SkillsPanel` (was an inline `.map()`) so each row owns its own flash state;
+  > `RepeatableRow` (UpgradeShop.tsx) gets the same before/after-snapshot pattern. stagecraft/
+  > monetization/network skills show no flash (they only affect run params, not the 4 channel
+  > stats — correctly silent per §A4, covered instead by 09 §B/§C). Added `channelSlice.statPulseAt`
+  > (ephemeral, not persisted) + `pulseStat()`; `TapCore.tsx` watches it and fires a brief cyan ring
+  > pulse (mirrors the existing tier-flash pattern) — fires even while the Studio sheet covers Home,
+  > so it's visible the moment the player returns. One-time gear/software buys
+  > (`UpgradeCategorySection.handleBuy`) and element unlocks (`ElementUnlockSheet.handleUnlock`)
+  > push through `CelebrationLayer`, which gained a new optional `detail` line (gear/software reuse
+  > `def.description` verbatim rather than re-deriving a label — already human-authored and covers
+  > effects outside the 4 core stats, e.g. trend_radar's reaction unlock); elements pass `def.tagline`.
+  > Verified live (dev server restart was needed mid-session after an HMR wedge from an unrelated
+  > edit — confirmed via a fresh reload, not a code issue): repeatable buy (Engagement Boost) flashed
+  > "coins/tap 7 → 8 +14% 🔥" and bumped `statPulseAt`; Charisma skill buy flashed the same pattern
+  > (tapPower 14→15); one-time Tripod purchase showed "TRIPOD EQUIPPED" / "NEW GEAR" /
+  > "+2 coins/sec passive income"; repeat-buy / already-owned cases correctly show nothing.
+  > `pnpm typecheck` (client + party) clean; zero console errors.
 
 - [ ] **13.2 — Pre-run loadout panel (`09 §B`).** In `screens/Create/index.tsx`, replace the
   one-line `~N viewers` GO LIVE summary with a compact loadout panel (when `liveUnlocked`) showing

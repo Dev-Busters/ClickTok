@@ -1,15 +1,20 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 import { SKILL_CATALOG, SKILL_PILLAR } from "../features/skills/catalog";
 import type { UpgradePillar } from "../features/upgrades/types";
+import type { SkillId } from "../features/skills/types";
+import { computeStatFlash, type StatFlash, type StatKind } from "../features/economy/statFeedback";
+
+// 09 §A2: only charisma/editing move one of the 4 channel stats — the other
+// 3 skills are run-stat-only (covered by 09 §B/§C instead), so no inline flash.
+const SKILL_STAT_KIND: Partial<Record<SkillId, StatKind>> = {
+  charisma: "postPower",
+  editing: "followerConversion",
+};
 
 export function SkillsPanel({ pillar }: { pillar?: UpgradePillar } = {}) {
-  const skillLevels = useGameStore(s => s.skillLevels);
-  const wallet = useGameStore(s => s.wallet);
-  const skillCost = useGameStore(s => s.skillCost);
-  const levelSkill = useGameStore(s => s.levelSkill);
-
   const visibleSkills = pillar
     ? SKILL_CATALOG.filter(def => SKILL_PILLAR[def.id] === pillar)
     : SKILL_CATALOG;
@@ -26,20 +31,50 @@ export function SkillsPanel({ pillar }: { pillar?: UpgradePillar } = {}) {
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
       </div>
 
-      {visibleSkills.map((def, idx) => {
-        const level = skillLevels[def.id];
-        const maxed = level >= def.maxLevel;
-        const locked = !maxed && def.requires?.followers !== undefined && wallet.followers < def.requires.followers;
-        const cost = skillCost(def.id);
-        const canAfford = !maxed && !locked && wallet.coins >= cost;
-        const buyable = canAfford;
-        const dimmed = maxed || locked;
+      {visibleSkills.map((def, idx) => (
+        <SkillRow key={def.id} def={def} idx={idx} />
+      ))}
+    </div>
+  );
+}
 
-        return (
+function SkillRow({ def, idx }: { def: typeof SKILL_CATALOG[number]; idx: number }) {
+  const skillLevels = useGameStore(s => s.skillLevels);
+  const wallet = useGameStore(s => s.wallet);
+  const skillCost = useGameStore(s => s.skillCost);
+  const levelSkill = useGameStore(s => s.levelSkill);
+  const pulseStat = useGameStore(s => s.pulseStat);
+  const [flash, setFlash] = useState<StatFlash | null>(null);
+
+  const level = skillLevels[def.id];
+  const maxed = level >= def.maxLevel;
+  const locked = !maxed && def.requires?.followers !== undefined && wallet.followers < def.requires.followers;
+  const cost = skillCost(def.id);
+  const canAfford = !maxed && !locked && wallet.coins >= cost;
+  const buyable = canAfford;
+  const dimmed = maxed || locked;
+
+  // 09 §A1–A2: same before/after snapshot pattern as RepeatableRow.
+  const handleBuy = () => {
+    if (!buyable) return;
+    const kind = SKILL_STAT_KIND[def.id];
+    const before = useGameStore.getState();
+    const ok = levelSkill(def.id);
+    if (ok && kind) {
+      const after = useGameStore.getState();
+      const delta = computeStatFlash(kind, before, after);
+      if (delta) {
+        setFlash(delta);
+        pulseStat();
+        setTimeout(() => setFlash(null), 1500);
+      }
+    }
+  };
+
+  return (
           <motion.button
-            key={def.id}
             whileTap={buyable ? { scale: 0.985 } : undefined}
-            onClick={() => buyable && levelSkill(def.id)}
+            onClick={handleBuy}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -98,6 +133,25 @@ export function SkillsPanel({ pillar }: { pillar?: UpgradePillar } = {}) {
               }}>
                 {def.description}
               </div>
+              <AnimatePresence>
+                {flash && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '10px',
+                      letterSpacing: '0.04em',
+                      color: 'var(--cyan)',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {flash.label} {formatCount(flash.before)} → {formatCount(flash.after)}{' '}
+                    <span style={{ color: 'var(--gold)' }}>+{Math.round(flash.pct)}% 🔥</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               {locked && (
                 <div style={{
                   fontFamily: 'var(--font-mono)',
@@ -154,8 +208,5 @@ export function SkillsPanel({ pillar }: { pillar?: UpgradePillar } = {}) {
               )}
             </div>
           </motion.button>
-        );
-      })}
-    </div>
   );
 }

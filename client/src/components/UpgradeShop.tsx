@@ -1,9 +1,12 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 import { UPGRADE_CATALOG } from "../features/upgrades/catalog";
 import type { UpgradeDef, UpgradePillar } from "../features/upgrades/types";
 import { isFeatureUnlocked } from "../features/metrics/unlocks";
+import { effectStatKind, computeStatFlash, type StatFlash } from "../features/economy/statFeedback";
+import { pushCelebration } from "./fx/CelebrationLayer";
 
 function requirementLabel(def: UpgradeDef): string | null {
   const req = def.requires;
@@ -63,11 +66,31 @@ function RepeatableRow({ def }: { def: UpgradeDef }) {
   const wallet = useGameStore(s => s.wallet);
   const levelUpgrade = useGameStore(s => s.levelUpgrade);
   const upgradeCost = useGameStore(s => s.upgradeCost);
+  const pulseStat = useGameStore(s => s.pulseStat);
+  const [flash, setFlash] = useState<StatFlash | null>(null);
 
   const cost = upgradeCost(def.id);
   const isMaxed = def.maxLevel !== undefined && level >= def.maxLevel;
   const canAfford = !isMaxed && wallet.coins >= cost;
   const buyable = canAfford && !isMaxed;
+
+  // 09 §A1–A2: snapshot the 4 derived stats before/after, flash the headline
+  // delta on this row + pulse the TEB. No modal — keeps rapid-buy rhythm.
+  const handleBuy = () => {
+    if (!buyable) return;
+    const kind = effectStatKind(def.effect);
+    const before = useGameStore.getState();
+    const ok = levelUpgrade(def.id);
+    if (ok && kind) {
+      const after = useGameStore.getState();
+      const delta = computeStatFlash(kind, before, after);
+      if (delta) {
+        setFlash(delta);
+        pulseStat();
+        setTimeout(() => setFlash(null), 1500);
+      }
+    }
+  };
 
   return (
     <div style={{
@@ -111,6 +134,25 @@ function RepeatableRow({ def }: { def: UpgradeDef }) {
         }}>
           {def.description}
         </div>
+        <AnimatePresence>
+          {flash && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '10px',
+                letterSpacing: '0.04em',
+                color: 'var(--cyan)',
+                marginTop: '2px',
+              }}
+            >
+              {flash.label} {formatCount(flash.before)} → {formatCount(flash.after)}{' '}
+              <span style={{ color: 'var(--gold)' }}>+{Math.round(flash.pct)}% 🔥</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Cost + button */}
@@ -154,7 +196,7 @@ function RepeatableRow({ def }: { def: UpgradeDef }) {
             )}
             <motion.button
               whileTap={buyable ? { scale: 0.95 } : undefined}
-              onClick={() => buyable && levelUpgrade(def.id)}
+              onClick={handleBuy}
               style={{
                 marginTop: '2px',
                 padding: '4px 10px',
@@ -206,11 +248,26 @@ function UpgradeCategorySection({ category, title, pillar }: { category: "gear" 
         const buyable = unlocked && !owned && canAfford;
         const dimmed = owned || !unlocked;
 
+        // 09 §A3: one-time gear/software buys are "milestone" buys — a small
+        // celebration naming the stat/effect, reusing the existing copy.
+        const handleBuy = () => {
+          if (!buyable) return;
+          if (buyUpgrade(def.id)) {
+            pushCelebration({
+              icon: category === "gear" ? "🎥" : "💾",
+              label: `${def.name.toUpperCase()} EQUIPPED`,
+              sublabel: category === "gear" ? "NEW GEAR" : "NEW SOFTWARE",
+              detail: def.description,
+              color: "var(--cyan)",
+            });
+          }
+        };
+
         return (
           <motion.button
             key={def.id}
             whileTap={buyable ? { scale: 0.985 } : undefined}
-            onClick={() => buyable && buyUpgrade(def.id)}
+            onClick={handleBuy}
             style={{
               display: 'flex',
               alignItems: 'center',

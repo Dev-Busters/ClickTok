@@ -18,6 +18,7 @@ export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose:
         icon: "🔓",
         label: `${def.name} UNLOCKED`,
         sublabel: "NEW ELEMENT",
+        detail: def.tagline,
         color: "var(--gold)",
       });
       onClose();
