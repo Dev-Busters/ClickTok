@@ -12,6 +12,8 @@ import { formatCount } from "../../lib/format";
 import { BALANCE } from "../../features/economy/balance";
 import { streamerSendRef } from "../../party/socketRefs";
 import { hypeColor, formatTimer } from "./shared";
+import { computeRunParamsBreakdown } from "../../features/livestream/computeRunParams";
+import { buildContributions } from "../../features/livestream/runContribution";
 
 const GRADE_COLOR: Record<string, string> = {
   S: 'var(--gold)',
@@ -64,6 +66,75 @@ function ShoutoutButton({ handle, streamerTotalFollowers }: { handle: string; st
   );
 }
 
+// ——— What you brought (13.3 / 09 §C) ————————————————————————————————————————
+
+function WhatYouBroughtSection({
+  grade, contributions, viewersGap, realViewers, onOpenStudio,
+}: {
+  grade: string;
+  contributions: { name: string; effect: string }[];
+  viewersGap: number;
+  realViewers: number;
+  onOpenStudio: () => void;
+}) {
+  const isFlop = grade === "FLOP";
+  const headline = isFlop
+    ? "More gear & skills → higher starting viewers next time."
+    : viewersGap > 0
+      ? `You started with ${formatCount(realViewers)} viewers — your gear & skills added +${formatCount(viewersGap)} over a bare channel.`
+      : `You started with ${formatCount(realViewers)} viewers — a bare channel starts there too. Gear up to pull ahead.`;
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", gap: "8px",
+      width: "100%", maxWidth: "280px",
+      padding: "14px 16px",
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid var(--dim)",
+      borderRadius: "4px",
+      textAlign: "left",
+    }}>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "var(--dim)", letterSpacing: "0.18em" }}>
+        WHAT YOU BROUGHT
+      </div>
+      {contributions.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+          {contributions.map(c => (
+            <div key={c.name} style={{ display: "flex", justifyContent: "space-between", gap: "10px", fontFamily: "var(--font-mono)", fontSize: "11px" }}>
+              <span style={{ color: "var(--text)" }}>{c.name}</span>
+              <span style={{ color: "var(--cyan)", textAlign: "right" }}>{c.effect}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--dim)" }}>
+          A bare channel — no gear or skills active yet.
+        </div>
+      )}
+      <div style={{ fontFamily: "var(--font-ui)", fontSize: "12px", color: "rgba(255,255,255,0.75)", lineHeight: 1.4, marginTop: "2px" }}>
+        {headline}
+      </div>
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={onOpenStudio}
+        style={{
+          marginTop: "4px",
+          padding: "10px",
+          fontFamily: "var(--font-mono)",
+          fontSize: "10px",
+          letterSpacing: "0.1em",
+          color: "var(--gold)",
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid var(--gold)",
+          cursor: "pointer",
+        }}
+      >
+        INVEST IN GEAR TO EARN MORE NEXT TIME →
+      </motion.button>
+    </div>
+  );
+}
+
 // ——— Streamer Live screen (unchanged from pre-4.2) ————————————————————————————
 
 export function StreamerLive() {
@@ -83,13 +154,31 @@ export function StreamerLive() {
   const boonChoices = useGameStore(s => s.boonChoices);
   const realGiftLog = useGameStore(s => s.realGiftLog);
   const wallet = useGameStore(s => s.wallet);
+  const followerConversion = useGameStore(s => s.followerConversion);
+  const skillLevels = useGameStore(s => s.skillLevels);
+  const ownedUpgrades = useGameStore(s => s.ownedUpgrades);
   const endRun = useGameStore(s => s.endRun);
   const applyBoon = useGameStore(s => s.applyBoon);
   const returnToChannel = useGameStore(s => s.returnToChannel);
   const setTab = useGameStore(s => s.setTab);
+  const setSheet = useGameStore(s => s.setSheet);
 
   // 04 §12.3: display total = sim + realViewerWeight × realViewers.
   const displayViewers = Math.round(viewers + BALANCE.social.realViewerWeight * realViewers);
+
+  // 13.3 (09 §C2): real vs. bare-account comparison — trendHeat pinned to 0 for both
+  // so the gap reads as "your channel," not "your trend luck."
+  const topic = params?.topic ?? "trending";
+  const realBreakdown = computeRunParamsBreakdown(
+    { followers: wallet.followers, followerConversion, skillLevels, ownedUpgrades },
+    topic, 0,
+  );
+  const bareBreakdown = computeRunParamsBreakdown(
+    { followers: wallet.followers, followerConversion: 1, skillLevels: { charisma: 0, editing: 0, stagecraft: 0, monetization: 0, network: 0 }, ownedUpgrades: {} },
+    topic, 0,
+  );
+  const viewersGap = realBreakdown.params.startViewers - bareBreakdown.params.startViewers;
+  const contributions = buildContributions(ownedUpgrades, skillLevels, realBreakdown);
   // Top gifter from realGiftLog for the post-run shoutout.
   const topGifter = (() => {
     if (!realGiftLog.length) return null;
@@ -357,6 +446,23 @@ export function StreamerLive() {
               </div>
             </div>
           )}
+          {lastResult && (
+            <WhatYouBroughtSection
+              grade={lastResult.grade}
+              contributions={contributions}
+              viewersGap={viewersGap}
+              realViewers={realBreakdown.params.startViewers}
+              onOpenStudio={() => {
+                // CreatorStudio only renders on the tab-content branch of Shell, not
+                // over the live/results screen — return to channel first, like "BACK
+                // TO CHANNEL" does, then open the sheet.
+                returnToChannel();
+                setTab("home");
+                setSheet("creatorStudio");
+              }}
+            />
+          )}
+
           {boonChoices && (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", maxWidth: "280px" }}>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: "9px", color: "var(--dim)", letterSpacing: "0.18em" }}>

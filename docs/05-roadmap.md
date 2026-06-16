@@ -1793,7 +1793,7 @@ values that already exist. Independent of Phase 12 (do either order). Read `09`'
   > `runSlice.params.startViewers === 32`, an exact match with the panel — zero drift confirmed.
   > typecheck (client + party) clean.
 
-- [ ] **13.3 — Post-run contribution breakdown (`09 §C`).** Add a "WHAT YOU BROUGHT" section to the
+- [x] **13.3 — Post-run contribution breakdown (`09 §C`).** Add a "WHAT YOU BROUGHT" section to the
   results overlay (`screens/Live/StreamerLive.tsx:295–356`): list active gear/skills + their
   headline effect (from `UPGRADE_CATALOG`/`SKILL_CATALOG`), plus one honest comparison line —
   `computeRunParams` with real meta vs. a bare meta (same followers/topic) → "+N starting viewers
@@ -1802,6 +1802,27 @@ values that already exist. Independent of Phase 12 (do either order). Read `09`'
   **Refs:** `09 §C`, `04 §6`, `04 §10`. **DoD:** results show active gear/skills + effects + the
   honest "+N viewers vs bare account" line + a Studio CTA; flops read encouragingly; numbers are
   derived; typecheck; preview end-to-end.
+  > note: new `features/livestream/runContribution.ts` (`buildContributions`) lists owned gear/
+  > software whose `effect` touches a run-stat field (`runStartViewersAdd/Mult`, `runGiftRateMult`,
+  > `runTrollResistAdd`, `unlocksReaction`) plus charisma/monetization/stagecraft skill levels —
+  > postPower-only/follower-conversion-only items (covered by 13.1 instead) are correctly omitted.
+  > Effect labels for skills are read straight off `computeRunParamsBreakdown` (13.2's sibling, e.g.
+  > `×1.25 starting viewers` for Charisma) so they can't drift from the 13.2 panel or the real run.
+  > The honest "+N over a bare channel" line computes the breakdown twice — real meta vs. a bare
+  > meta (`followerConversion:1`, all skills 0, `ownedUpgrades:{}`, same followers/topic) — with
+  > `trendHeat` pinned to 0 for both so the gap reflects channel investment, not trend luck.
+  > `StreamerLive.tsx`'s "INVEST IN GEAR" CTA found that `CreatorStudio` only renders on Shell's
+  > tab-content branch (`app/Shell.tsx:97`), which is skipped while `phase==='live'|'results'` —
+  > fixed by having the CTA call `returnToChannel()` + `setTab('home')` + `setSheet('creatorStudio')`
+  > (the same sequence "BACK TO CHANNEL" already uses, plus the sheet open) rather than restructuring
+  > Shell's render tree. C4 flop softening: the section's headline swaps to "More gear & skills →
+  > higher starting viewers next time." instead of the bare-channel comparison; the gear/skill list
+  > still shows. Verified live: ended a run → "WHAT YOU BROUGHT" listed "USB Mic +10% troll
+  > resistance" / "Charisma L5 ×1.25 starting viewers" + "You started with 25 viewers — your gear &
+  > skills added +5 over a bare channel"; clicking the CTA landed on Home with Creator Studio open
+  > (`phase` idle, `activeTab` home, `openSheet` creatorStudio); forcing `lastResult.grade` to
+  > `"FLOP"` swapped the headline to the forward-looking copy with the same gear/skill list intact.
+  > Zero console errors. `pnpm typecheck` (client + party) clean.
 
 ---
 
