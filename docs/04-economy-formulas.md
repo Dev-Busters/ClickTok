@@ -618,23 +618,28 @@ Early-curve checkpoints (11.2, `postCoinConversion: 1.0` → ~1 🪙/tap cold):
 - `loyal_followers` / `auto_engage_bot` L1 costs (40 🪙 / 75 🪙) land within the same early
   window once EB L1's +1 postPower raises the per-tap rate above 1 🪙.
 
-### 14.3 Metric ladder — thresholds, rewards, unlocks
+### 14.3 Metric ladder — thresholds, rewards, unlocks (08 §B, SAVE_VERSION 10)
 
-| stat | threshold | reward | unlocks |
-|---|---|---|---|
-| Views (taps) | 25 | +25 🪙 | — (teaches the loop) |
-| Views | 100 | +60 🪙 | **Creator Tools / Upgrades** |
-| Followers | 10 | +30 🪙 | — |
-| Followers | 50 | +5 💎 | **Diamonds display** |
-| Followers | 200 | +120 🪙 | **GO LIVE** (pill + Create/Live tab; "posting" pillar in code) |
-| Streams | 1 | +5 💎 | **Inbox + daily reward** |
-| Followers | 500 | +10 💎 | **Discover / trends** |
-| Followers | 1,000 | +15 💎 | **Feed pager + engagement rail + element stage** |
-| Followers | 5,000 | +25 💎 | **Duet Loop** (already follower-gated) |
+| id | stat | threshold | reward | unlocks (feature flag) |
+|---|---|---|---|---|
+| `views_10`      | Views (taps) | 10  | +15 🪙  | `fyp_video` — active card fills backdrop |
+| `views_25`      | Views        | 25  | +25 🪙  | `engagement_rail` — LIKE / COMMENT / SHARE / FOLLOW rail |
+| `views_45`      | Views        | 45  | +35 🪙  | `bottom_nav` — bottom nav row fades in |
+| `views_80`      | Views        | 80  | +50 🪙  | `studio` — 🎬 Creator Studio button |
+| `views_140`     | Views        | 140 | +70 🪙  | `feed_scroll` — swipe up/down between videos |
+| `follower_50`   | Followers    | 50  | +5 💎   | `diamonds` — 💎 currency pill |
+| `follower_90`   | Followers    | 90  | +80 🪙  | `posting` — `+` Create button in nav |
+| `follower_120`  | Followers    | 120 | +100 🪙 | `element_stage` — FYP challenge band + Elements in Studio |
+| `follower_160`  | Followers    | 160 | +5 💎   | `discover` — Discover tab |
+| `follower_200`  | Followers    | 200 | +120 🪙 | `live` — GO LIVE pill + Create/Live action |
+| `streams_1`     | Streams      | 1   | +5 💎   | `inbox` — Inbox tab + daily reward |
+| `follower_1000` | Followers    | 1,000 | +15 💎 | *(reward only)* |
+| `follower_5000` | Followers    | 5,000 | +25 💎 | *(reward only)* |
 
 Reward is granted once, atomically, in `checkMetrics()` (Phase 9.2). See §11 for tuning
 guidance — repeatable upgrades should make first metric crossings land within a few minutes
-of active play.
+of active play. The Create sheet's GO LIVE action is gated by `live` even after `posting`
+unlocks the `+` button (08 §B — staggered creator path).
 
 ### 13.9 Tuning guidance (was 13.6 — renumbered when §13.7–13.8 landed)
 - Elements should make active feed time worth ~1.5–2× bare tapping, and runs must STILL dominate

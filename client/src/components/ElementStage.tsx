@@ -5,6 +5,16 @@ import { BeatSyncWave } from "./BeatSyncWave";
 import { DuetLoopWave } from "./DuetLoopWave";
 import { HoldDropWave } from "./HoldDropWave";
 import { SwipeHitsWave } from "./SwipeHitsWave";
+import { ELEMENT_CATALOG } from "../features/elements/catalog";
+import type { ElementId } from "../features/elements/types";
+
+// 12.3 (08 §C5): 3-4 word how-to per element for the persistent identity chip.
+const ELEMENT_HOWTO: Record<ElementId, string> = {
+  beat_sync:  "tap rings · perfect = max",
+  duet_loop:  "core, then pod",
+  hold_drop:  "hold & release",
+  swipe_hits: "swipe the arrows",
+};
 
 const BAR_HEIGHTS = [0.35, 0.55, 0.70, 0.45, 0.80, 0.50, 0.65, 0.40];
 const BAR_COLORS  = ["var(--cyan)", "var(--red)", "var(--gold)"];
@@ -83,6 +93,31 @@ export function ElementStage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Identity chip — element name + how-to while wave is active ─── */}
+      {activeWave && (() => {
+        const def = ELEMENT_CATALOG.find(d => d.id === activeWave.element);
+        return (
+          <div style={{
+            position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '2px 9px', borderRadius: 999,
+            background: 'rgba(0,0,0,0.42)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 25,
+          }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.65)' }}>
+              {def?.name ?? activeWave.element}
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>—</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.06em' }}>
+              {ELEMENT_HOWTO[activeWave.element as ElementId] ?? ""}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* ── Active wave ───────────────────────────────────────────────── */}
       {activeWave?.element === "beat_sync" && (

@@ -7,7 +7,7 @@ import type { ElementId } from "../features/elements/types";
 // then calls onDismiss() which persists the seen flag via setElementTeachSeen().
 
 type Props = {
-  elementId: ElementId;
+  elementId?: ElementId; // optional — mod-perk teach doesn't bind to an element
   text: string;
   seen: boolean;         // already seen in a prior session → skip immediately
   onDismiss: () => void; // called once to mark it seen in persistent store

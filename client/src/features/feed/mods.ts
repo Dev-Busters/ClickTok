@@ -35,7 +35,7 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
   duet_flow: {
     id: "duet_flow",
     icon: "🔁",
-    name: "DUET FLOW",
+    name: "LOOP BOOST",
     effectLine: "Duet Loop: +2s flow window, +1s arm timeout",
     appliesTo: "duet_loop",
   },
@@ -56,6 +56,19 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
 };
 
 export const MOD_IDS: FeedModId[] = Object.keys(MOD_CATALOG) as FeedModId[];
+
+// C1 (08 §C1): true when the current card's mod is relevant to what the player owns.
+export function isModRelevant(
+  mod: FeedModId,
+  ownedElements: Partial<Record<string, boolean>>,
+): boolean {
+  const { appliesTo } = MOD_CATALOG[mod];
+  if (appliesTo === "beat_sync") return !!ownedElements["beat_sync"];
+  if (appliesTo === "duet_loop") return !!ownedElements["duet_loop"];
+  if (appliesTo === "core") return true;
+  // "scheduler" — waves only spawn when at least one element is owned
+  return Object.values(ownedElements).some(v => !!v);
+}
 
 // ── Effective-config helpers (04 §13.5) — `mod` is the card on screen, or null
 // (offscreen / no deck yet). "Locked elements ignore their mods" falls out

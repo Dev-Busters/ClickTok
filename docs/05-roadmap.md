@@ -175,10 +175,12 @@ Goal: flesh out the incremental engine and the meta→run stat bridge (data only
   > cosmetic `0` purely for TikTok-faithful layout per `06` §6. Replaces the old plain `@handle` top
   > bar on Profile.
 
-- [~] **1.5 — Catalog/passive videos. DEFERRED — DO NOT BUILD FOR MVP.** (Decision 2026-06-09:
-  cut to reduce loop complexity; passive income is covered by `passiveCoinsPerSec` from gear.)
-  Revisit only after Phase 3 if desired. Spec retained for the future: `catalogSlice` + catalog
-  yield (`03` §4, `04` §3), a "Your videos" grid on Profile/Home. **Skip this task.**
+- [~] **1.5 — Catalog/passive videos. DEFERRED (2026-06-09) → REOPENED (2026-06-16).** Originally
+  cut to reduce loop complexity. **Operator reversed this 2026-06-16** (per the design-skill review,
+  `docs/clicktok_incremental_design_skill.md` Part 5): the video catalog makes the FYP feel like
+  *your* channel. It now lives in **PHASE 14** (full version: My Videos list + passive income +
+  view-buffs + multiplayer view-loop), not here. Original future-spec pointers retained:
+  `catalogSlice` + catalog yield (`03` §4, `04` §3), a "Your videos" grid on Profile/Home.
 
 ---
 
@@ -1691,7 +1693,7 @@ invent balance numbers. Do these in order (12.2 reshapes the unlock catalog that
   **Refs:** `08 §A`. **DoD:** fresh save → TEB is eye-catching + a subtle "tap to start" cue shows,
   cue disappears on first tap, color still ramps with combo; typecheck; before/after screenshot.
 
-- [ ] **12.2 — Progressive unlock ladder (`08 §B`). ⚠ BREAKING SAVE CHANGE.** Split the single
+- [x] **12.2 — Progressive unlock ladder (`08 §B`). ⚠ BREAKING SAVE CHANGE.** Split the single
   `feed_pager` flag into granular flags (`fyp_video`, `engagement_rail`, `feed_scroll`,
   `element_stage`) and add `bottom_nav`; rename `viewer`→`studio`. Replace `METRIC_CATALOG`
   (`features/metrics/catalog.ts`) with the `08 §B` ordered table (early gates = `views`/taps, mid =
@@ -1711,7 +1713,7 @@ invent balance numbers. Do these in order (12.2 reshapes the unlock catalog that
   dumps the whole HUD; an old save loads with all earned features intact and **no** reward dump;
   typecheck; preview across the first several unlocks; `04 §14.3` updated.
 
-- [ ] **12.3 — Feed-modifier ("Duet Flow") banner legibility (`08 §C`).** In
+- [x] **12.3 — Feed-modifier ("Duet Flow") banner legibility (`08 §C`).** In
   `screens/HomeFeed/index.tsx` `ModBanner` + `features/feed/mods.ts`: only render a modifier banner
   the player can use — gate by `appliesTo` vs `ownedElements` (beat_sync/duet_loop require ownership;
   core always; scheduler requires ≥1 element owned). Reframe the banner as a passive "THIS VIDEO /
@@ -1722,6 +1724,130 @@ invent balance numbers. Do these in order (12.2 reshapes the unlock catalog that
   **Refs:** `08 §C`, `06` (FYP section). **DoD:** with Duet Loop unowned, no loop-boost banner ever
   shows; with an element owned its banner reads as a passive perk (one-time teach on first show);
   no name collision; active waves show a persistent identity chip; typecheck; preview before/after.
+
+---
+
+## PHASE 13 — Feedback loops (design LOCKED 2026-06-16; full spec in `docs/09-feedback-loops.md`)
+
+Goal: make progression *felt*, not just computed — show the player what each purchase did, what
+their meta progression buys them before a run, and how their channel made a run better. Source: the
+consolidated design-skill review (`docs/clicktok_incremental_design_skill.md`, Parts 2 & 4). These
+add **no** persisted state, **no** `SAVE_VERSION` bump, and **no** economy numbers — they surface
+values that already exist. Independent of Phase 12 (do either order). Read `09`'s section per task.
+
+- [ ] **13.1 — Purchase before→after stat feedback (`09 §A`).** Snapshot the four derived stats
+  (`tapPower`/`multiplier`/`followerConversion`/`passiveCoinsPerSec`) around `buyUpgrade`
+  (`upgradesSlice.ts:30`) / `levelSkill` (`skillsSlice.ts:31`); on a repeatable upgrade or skill
+  buy, flash a **non-blocking** inline stat delta on that row (e.g. `coins/tap 7 → 10  +43% 🔥`,
+  fades ~1.5s) + a brief TEB pulse — **no modal** (it breaks rapid buying). For first-gear /
+  first-element (one-time) buys, extend the existing `CelebrationLayer`/element-unlock popup copy to
+  name the stat (`+3 post power`). Never show an unchanged stat. Map effect→label per `09 §A`.
+  **Refs:** `09 §A`. **DoD:** repeatable/skill buys flash a readable delta + TEB pulse, next tap
+  pays visibly more, no-op stats hidden, no interrupting modal; milestone buys name their stat;
+  typecheck; preview.
+
+- [ ] **13.2 — Pre-run loadout panel (`09 §B`).** In `screens/Create/index.tsx`, replace the
+  one-line `~N viewers` GO LIVE summary with a compact loadout panel (when `liveUnlocked`) showing
+  STARTING VIEWERS (base / +followers / +Charisma / ×trend), GIFT RATE & HYPE DECAY (Monetization /
+  Stagecraft named), and REACTIONS READY (`params.reactions`). Surface the named sub-terms from
+  `computeRunParams` (add a `computeRunParamsBreakdown` sibling or extend the return) **without**
+  duplicating the math and keeping `computeRunParams` pure. Do NOT show modifiers (rolled at
+  `startRun`, not here).
+  **Refs:** `09 §B`, `04 §6`. **DoD:** loadout numbers match the actual run start, each attributed
+  to its source, update live when gear/skills change, no drift from the run; typecheck; preview.
+
+- [ ] **13.3 — Post-run contribution breakdown (`09 §C`).** Add a "WHAT YOU BROUGHT" section to the
+  results overlay (`screens/Live/StreamerLive.tsx:295–356`): list active gear/skills + their
+  headline effect (from `UPGRADE_CATALOG`/`SKILL_CATALOG`), plus one honest comparison line —
+  `computeRunParams` with real meta vs. a bare meta (same followers/topic) → "+N starting viewers
+  from your channel" — and a CTA into Creator Studio. Soften flop framing (forward-looking, not
+  punishing). No invented per-coin attribution.
+  **Refs:** `09 §C`, `04 §6`, `04 §10`. **DoD:** results show active gear/skills + effects + the
+  honest "+N viewers vs bare account" line + a Studio CTA; flops read encouragingly; numbers are
+  derived; typecheck; preview end-to-end.
+
+---
+
+## PHASE 14 — Feel & telemetry (design LOCKED 2026-06-16; full spec in `docs/10-feel-and-telemetry.md`)
+
+Goal: make the moment-to-moment game feel alive (no dead zones, readable modifiers, instant element
+try, gear that looks earned) and instrument it so we can measure pacing. Source: design-skill review
+(`docs/clicktok_incremental_design_skill.md`). Mostly independent, low-risk; §A adds an ephemeral
+meter + one sim-checked bonus, the rest add no persisted state / no `SAVE_VERSION` bump. Read `10`'s
+section per task; balance via `client/scripts/simBalance.ts`.
+
+- [ ] **14.1 — Momentum beat: no dead zones (`10 §A`).** Add an *ephemeral* Momentum meter near the
+  TEB that fills with active engagement (TEB taps + rail reactions) and decays while idle (reuse
+  `IDLE_SEC`); on fill, pay a coin-burst bonus + bold callout + TEB flourish, then reset. Tune knobs
+  (`BALANCE.feed.momentum*`) so it triggers ~every 30–45s of active play and never AFK. Keep cohesive
+  with combo/VIRAL visual language. Verify it stays secondary to runs (`04 §11`) via the sim harness.
+  **Refs:** `10 §A`, `04 §11`. **DoD:** active tapping pays a visible bonus ~every 30–45s, idling
+  pays nothing, runs still dominate income (sim passes), no persisted state; typecheck; preview.
+
+- [ ] **14.2 — Modifier strategy hints (`10 §B`).** Add a `strategy: string` to `RunModifier`
+  (`features/livestream/types.ts`) and `ModDef` (`features/feed/mods.ts`); author a playstyle hint
+  per modifier. Show run-modifier hints on the Live screen chips (`StreamerLive.tsx`); **fold the
+  feed-mod hint into the Phase 12 §C banner rework** (don't touch the banner twice).
+  **Refs:** `10 §B`. **DoD:** every run/feed modifier shows a strategy hint where displayed; feed-mod
+  hint lives in the §12 §C banner; typecheck; preview.
+
+- [ ] **14.3 — Element "TRY NOW" (`10 §C`).** In `ElementUnlockSheet.tsx`, on successful
+  `unlockElement` offer a TRY NOW path: close the sheet, ensure Home, and immediately
+  `spawnWave(def.id)` (close first — the scheduler pauses while a sheet is open). Keep plain CLOSE.
+  **Refs:** `10 §C`. **DoD:** TRY NOW lands on Home and spawns the bought element's wave within ~1s,
+  grades/pays normally; typecheck; preview.
+
+- [ ] **14.4 — Gear visuals on the TEB (`10 §D`).** Add a persistent owned-gear cue to the TEB
+  (read `ownedUpgrades` × `UPGRADE_CATALOG` gear), independent of the combo-tier skins —
+  transform/opacity/box-shadow only; no clash with the §12 §A resting color; cosmetic.
+  **Refs:** `10 §D`. **DoD:** owning gear visibly changes the TEB, scales with gear count, no fps
+  regression; typecheck; before/after screenshot.
+
+- [ ] **14.5 — Client telemetry (`10 §E`).** Add `client/src/lib/telemetry.ts` (no-op without a
+  PostHog key) and instrument `session_start/end`, `milestone_reached` (`inboxSlice.checkMetrics`),
+  `upgrade_purchased` (`upgradesSlice`/`skillsSlice`), `element_unlocked`/`element_used`,
+  `run_started`/`run_ended`. Small, PII-free payloads (handle only).
+  **Refs:** `10 §E`, `clicktok_incremental_design_skill.md` Part 7. **DoD:** with a key set, a
+  fresh-save run emits the events; with no key it's a silent no-op; typecheck; verified in PostHog
+  live view (or logged stub).
+
+---
+
+## PHASE 15 — Video catalog (design LOCKED 2026-06-16; full spec in `docs/11-video-catalog.md`)
+
+Goal: reopen the deferred catalog (task 1.5) IN FULL — posting creates a persistent asset that earns
+decaying passive income and carries a buff other players get for viewing it, tying the channel into
+the multiplayer feed. Source: design-skill review Part 5. **Introduces persisted state + a
+`SAVE_VERSION` bump + new economy numbers + multiplayer wiring** — do the tasks in order; size each
+≤ a 6.x task. Read `11`'s section per task; balance via the sim harness; keep runs primary (`04 §11`)
+and the game playable solo at every step.
+
+- [ ] **15.1 — Catalog core: persistent posts + passive yield (`11 §A`).** On `publishVideo`
+  (`feedSlice.ts:187`) also store a `VideoPost` in `catalogSlice` (currently a stub); implement
+  `catalogYieldPerSec()` per `04 §3` (ramp-then-decay per post, cap 50 newest) and fold it into
+  `passiveCoinsPerSec` (`04 §2`). Persist `videos` (partialize), bump `SAVE_VERSION` (→ 11 after
+  Phase 12) with a `videos: []` migration. New `BALANCE.catalog` knobs (yield coeff/peak/decay),
+  sim-verified against `04 §11`.
+  **Refs:** `11 §A`, `03 §4`, `04 §2/§3/§11`, `02 §4`. **DoD:** posting creates a persistent post;
+  yield ramps-then-decays and feeds passive income; 50-cap holds; old save migrates; sim passes;
+  typecheck; preview (post → passive ticks → reload survives).
+
+- [ ] **15.2 — "My Videos" on Profile (`11 §B`).** Add a My Videos section to the Profile analytics
+  page: per-post topic/caption, age, live `coinsPerSec` with trending↑/fading↓, lifetime earned, +
+  a channel passive total. Reuse `ProfileHeader`/`formatCount` language. Display-only.
+  **Refs:** `11 §B`, `06` (Profile). **DoD:** My Videos lists posts with live per-video yield +
+  trend state + total; clean empty state; typecheck; preview.
+
+- [ ] **15.3 — View-buffs + multiplayer view-loop (`11 §C`).** Attach a temporary buff to each posted
+  video (`BALANCE.catalog` knobs, mirror the field in BOTH `client/src/party/types.ts` and
+  `party/src/lobby.ts`); apply it when a card becomes the active FYP video (ephemeral tap-gain
+  multiplier + buff pill/countdown, reuse the `viralUntil` pattern); surface the poster's
+  engagement/royalty when others view (reuse `royaltyToast`); keep buffs working solo (pooled/NPC
+  videos) with the socket down. Fire `video_posted`/`video_viewed`/`video_buff_applied` if 14.5 is in.
+  **Refs:** `11 §C`, `04 §12` (royalties), `02 §6`. **DoD:** posts carry buffs; viewing grants a
+  surfaced temporary boost w/ countdown; two windows: B viewing A's pooled video gets the buff + A
+  sees engagement; solo still grants buffs with socket down; types mirrored both files; typecheck;
+  two-window + solo preview.
 
 ---
 

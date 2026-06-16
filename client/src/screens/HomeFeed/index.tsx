@@ -8,7 +8,8 @@ import { formatCount } from "../../lib/format";
 import { VideoCanvas } from "../../components/VideoCanvas";
 import { ElementStage } from "../../components/ElementStage";
 import { generateNpcDeck, formatCaption } from "../../features/feed/npcVideos";
-import { MOD_CATALOG, viralMult } from "../../features/feed/mods";
+import { MOD_CATALOG, isModRelevant, viralMult } from "../../features/feed/mods";
+import { TeachCaption } from "../../components/TeachCaption";
 import { TapCore } from "./TapCore";
 import { FloatingTextLayer, pushFloatText } from "../../components/fx/FloatingTextLayer";
 import {
@@ -20,7 +21,7 @@ import {
   type UnlockStatCtx,
 } from "../../features/metrics/unlocks";
 import type { MetricDef } from "../../features/metrics/types";
-import type { VideoCard, ReactionKind } from "../../party/types";
+import type { VideoCard, ReactionKind, FeedModId } from "../../party/types";
 
 // 06 §3 Phase 8: canned comment one-liner pool — cosmetic only, moderation-safe.
 const COMMENT_LINES = [
@@ -65,11 +66,14 @@ export function HomeFeed() {
   const streams       = useGameStore(s => s.streams);
   const coinsEarned   = useGameStore(s => s.coinsEarned);
 
-  // 10.2: derive unlock flags from metricsReached via 3-pillar ladder
-  const goLiveUnlocked    = isFeatureUnlocked("live",       metricsReached);
-  const diamondsUnlocked  = isFeatureUnlocked("diamonds",   metricsReached);
-  const feedPagerUnlocked = isFeatureUnlocked("feed_pager", metricsReached);
-  const viewerUnlocked    = isFeatureUnlocked("viewer",     metricsReached);
+  // 12.2 (08 §B): granular unlock flags — one feature per metric crossing.
+  const fypVideoUnlocked       = isFeatureUnlocked("fyp_video",       metricsReached);
+  const engagementRailUnlocked = isFeatureUnlocked("engagement_rail", metricsReached);
+  const feedScrollUnlocked     = isFeatureUnlocked("feed_scroll",     metricsReached);
+  const elementStageUnlocked   = isFeatureUnlocked("element_stage",   metricsReached);
+  const studioUnlocked         = isFeatureUnlocked("studio",          metricsReached);
+  const goLiveUnlocked         = isFeatureUnlocked("live",            metricsReached);
+  const diamondsUnlocked       = isFeatureUnlocked("diamonds",        metricsReached);
   const affordablePillars = useGameStore(s => s.affordablePillars);
   const hasAffordableBadge = affordablePillars.length > 0;
 
@@ -187,8 +191,16 @@ export function HomeFeed() {
       style={{ position: 'relative', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}
     >
 
-      {/* ── Background layer: full pager when feed_pager unlocked, static canvas before ── */}
-      {feedPagerUnlocked ? (
+      {/* ── Background layer ─────────────────────────────────────────────── */}
+      {/* No FYP: anonymous static canvas                                   */}
+      {/* fyp_video: active card canvas + overlay + info (no swipe yet)    */}
+      {/* feed_scroll: drag-to-page pager wraps the card                   */}
+      {!fypVideoUnlocked ? (
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <VideoCanvas seed="fyp" topic="trending" intensity={canvasIntensity} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.48)', pointerEvents: 'none' }} />
+        </div>
+      ) : feedScrollUnlocked ? (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
           <AnimatePresence initial={false} custom={swipeDir}>
             <motion.div
@@ -219,13 +231,15 @@ export function HomeFeed() {
         </div>
       ) : (
         <div style={{ position: 'absolute', inset: 0 }}>
-          <VideoCanvas seed="fyp" topic="trending" intensity={canvasIntensity} />
+          <VideoCanvas seed={activeCard?.handle ?? "fyp"} topic={activeCard?.topic ?? "trending"} intensity={canvasIntensity} />
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.48)', pointerEvents: 'none' }} />
+          {activeCard && <ModBanner mod={activeCard.mod} />}
+          <VideoInfoOverlay card={activeCard} />
         </div>
       )}
 
-      {/* ── Idle swipe-up hint (feed_pager only) ────────────────────────── */}
-      {feedPagerUnlocked && (
+      {/* ── Idle swipe-up hint (feed_scroll only) ───────────────────────── */}
+      {feedScrollUnlocked && (
         <AnimatePresence>
           {showSwipeHint && <SwipeUpHint />}
         </AnimatePresence>
@@ -257,13 +271,20 @@ export function HomeFeed() {
         {/* Currency pills */}
         <div style={{ display: 'flex', gap: 6 }}>
           <CurrencyPill value={wallet.coins} icon="🪙" color="var(--gold)" />
-          {diamondsUnlocked && <CurrencyPill value={wallet.diamonds} icon="💎" color="var(--cyan)" />}
+          {diamondsUnlocked && (
+            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
+              <CurrencyPill value={wallet.diamonds} icon="💎" color="var(--cyan)" />
+            </motion.div>
+          )}
         </div>
 
-        {/* Creator Studio HUD button (viewer unlock) */}
-        {viewerUnlocked && (
+        {/* Creator Studio HUD button (studio unlock) */}
+        {studioUnlocked && (
           <motion.button
             onPointerDown={e => { e.stopPropagation(); setSheet('creatorStudio'); }}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.35 }}
             whileTap={{ scale: 0.9 }}
             style={{
               position: 'relative',
@@ -292,8 +313,12 @@ export function HomeFeed() {
         )}
       </div>
 
-      {/* ── Element stage (feed_pager only) ─────────────────────────────── */}
-      {feedPagerUnlocked && <ElementStage />}
+      {/* ── Element stage (element_stage unlock) ────────────────────────── */}
+      {elementStageUnlocked && (
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <ElementStage />
+        </motion.div>
+      )}
 
       {/* ── TAP CORE v2 — dead center ─────────────────────────────────────── */}
       <TapCore />
@@ -301,10 +326,13 @@ export function HomeFeed() {
       {/* ── Arcade FX layer ───────────────────────────────────────────────── */}
       <FloatingTextLayer />
 
-      {/* ── Engagement rail (feed_pager only) ───────────────────────────── */}
-      {feedPagerUnlocked && (
-        <div
+      {/* ── Engagement rail (engagement_rail unlock) ────────────────────── */}
+      {engagementRailUnlocked && (
+        <motion.div
           onPointerDown={e => e.stopPropagation()}
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
           style={{
             position: 'absolute', right: 10, bottom: 120,
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
@@ -360,11 +388,11 @@ export function HomeFeed() {
               </svg>
             }
           />
-        </div>
+        </motion.div>
       )}
 
-      {/* ── Canned comment one-liner (feed_pager only) ──────────────────── */}
-      {feedPagerUnlocked && (
+      {/* ── Canned comment one-liner (engagement_rail only) ─────────────── */}
+      {engagementRailUnlocked && (
         <AnimatePresence>
           {commentLine && (
             <motion.div
@@ -391,9 +419,14 @@ export function HomeFeed() {
         </AnimatePresence>
       )}
 
-      {/* ── GO LIVE pill (go_live unlock only) ──────────────────────────── */}
+      {/* ── GO LIVE pill (live unlock) ──────────────────────────────────── */}
       {goLiveUnlocked && (
-        <div style={{ position: 'absolute', left: 12, bottom: 14, pointerEvents: 'none', zIndex: 2 }}>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+          style={{ position: 'absolute', left: 12, bottom: 14, pointerEvents: 'none', zIndex: 2 }}
+        >
           <motion.button
             onPointerDown={e => { e.stopPropagation(); setSheet('create'); }}
             whileHover={{ scale: 1.05, boxShadow: '0 0 22px rgba(255,31,75,0.5)' }}
@@ -417,7 +450,7 @@ export function HomeFeed() {
               ~{formatCount(projectedViewers)} viewers
             </span>
           </motion.button>
-        </div>
+        </motion.div>
       )}
 
       {/* ── Next metric tracker chip (from first crossing onward) ────────── */}
@@ -430,34 +463,59 @@ export function HomeFeed() {
 
 // ── Pager sub-components (06 §3 task 7.5) ───────────────────────────────────
 
-function ModBanner({ mod }: { mod: VideoCard["mod"] }) {
+// 12.3 (08 §C1–C3): gate by owned-element relevance; reframe as passive video perk;
+// show one-time teach on first relevant show.
+function ModBanner({ mod }: { mod: FeedModId }) {
+  const ownedElements  = useGameStore(s => s.ownedElements);
+  const modTeachSeen   = useGameStore(s => s.modTeachSeen);
+  const setModTeachSeen = useGameStore(s => s.setModTeachSeen);
+
+  if (!isModRelevant(mod, ownedElements)) return null;
+
   const def = MOD_CATALOG[mod];
   return (
-    <div style={{
-      position: 'absolute', top: 56, left: 0, right: 0, height: 32,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      pointerEvents: 'none',
-    }}>
+    <>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        maxWidth: 320,
-        padding: '5px 10px',
-        borderRadius: 999,
-        background: 'rgba(0,0,0,0.5)',
-        border: '1px solid rgba(255,255,255,0.12)',
+        position: 'absolute', top: 56, left: 0, right: 0, height: 32,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
       }}>
-        <span style={{ fontSize: 13, lineHeight: 1 }}>{def.icon}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--cyan)', whiteSpace: 'nowrap' }}>
-          {def.name}
-        </span>
-        <span style={{
-          fontFamily: 'var(--font-ui)', fontSize: 10, color: 'rgba(255,255,255,0.75)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          maxWidth: 340,
+          padding: '5px 10px',
+          borderRadius: 999,
+          background: 'rgba(0,0,0,0.5)',
+          border: '1px solid rgba(255,255,255,0.12)',
         }}>
-          {def.effectLine}
-        </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 7, letterSpacing: '0.13em',
+            color: 'rgba(255,255,255,0.38)',
+            background: 'rgba(255,255,255,0.07)',
+            padding: '1px 5px', borderRadius: 3,
+            flexShrink: 0,
+          }}>
+            VIDEO PERK
+          </span>
+          <span style={{ fontSize: 13, lineHeight: 1, flexShrink: 0 }}>{def.icon}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--cyan)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {def.name}
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-ui)', fontSize: 10, color: 'rgba(255,255,255,0.75)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {def.effectLine}
+          </span>
+        </div>
       </div>
-    </div>
+      {/* One-time teach — "what is a video perk?" */}
+      <TeachCaption
+        text="Each video carries a perk that boosts your taps & mini-games while it's on screen."
+        seen={modTeachSeen}
+        onDismiss={setModTeachSeen}
+      />
+    </>
   );
 }
 

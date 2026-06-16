@@ -16,6 +16,9 @@ export type ElementsSlice = {
   // 11.3: per-element first-time teach caption seen flag — PERSISTED (v9)
   elementsTeachSeen: Partial<Record<ElementId, boolean>>;
   setElementTeachSeen: (id: ElementId) => void;
+  // 12.3 (08 §C3): one-time mod-perk banner teach seen flag — PERSISTED (v11)
+  modTeachSeen: boolean;
+  setModTeachSeen: () => void;
 
   activeWave: ElementWave | null;     // ephemeral
   nextWaveAt: number;                 // ephemeral scheduler clock (ms epoch)
@@ -33,6 +36,7 @@ export type ElementsSlice = {
 export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice> = (set, get) => ({
   ownedElements: {},
   elementsTeachSeen: {},
+  modTeachSeen: false,
   activeWave: null,
   nextWaveAt: 0,
   lastSpawnedElement: null,
@@ -41,6 +45,8 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
     const { elementsTeachSeen } = get();
     set({ elementsTeachSeen: { ...elementsTeachSeen, [id]: true } });
   },
+
+  setModTeachSeen: () => set({ modTeachSeen: true }),
 
   unlockElement: (id) => {
     const def = ELEMENT_CATALOG.find(d => d.id === id);

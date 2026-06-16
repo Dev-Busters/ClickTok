@@ -1,28 +1,23 @@
 import { METRIC_CATALOG } from "./catalog";
 import type { MetricDef, MetricStatId } from "./types";
 
-// Features that cascade from a pillar: if the pillar is reached, the feature is also unlocked.
-// This lets old readers (isFeatureUnlocked("go_live", ...)) still work after the pillar rework.
-const FEATURE_TO_PILLAR: Record<string, "viewer" | "posting" | "live"> = {
-  viewer:     "viewer",
-  upgrades:   "viewer",
-  diamonds:   "viewer",
-  feed_pager: "viewer",
-  inbox:      "viewer",
-  posting:    "posting",
-  live:       "live",
-  go_live:    "live",
-  discover:   "live",
+// Cascade safety-net: lets old readers (e.g. isFeatureUnlocked("viewer", ...),
+// isFeatureUnlocked("go_live", ...)) still work after the 08 §B flag rename.
+// Each value is the canonical flag that has a direct metric unlock.
+const FEATURE_TO_PILLAR: Record<string, string> = {
+  viewer:  "studio",  // old "viewer" pillar → new "studio" flag
+  upgrades: "studio", // Creator Tools sub-feature
+  go_live: "live",    // alias for go_live → live
 };
 
 // Derives from metricsReached — no extra persisted set needed (01 §10.3).
 export function isFeatureUnlocked(featureId: string, metricsReached: string[]): boolean {
-  // Direct metric unlock
+  // Direct metric unlock (canonical path)
   if (METRIC_CATALOG.some(m => m.unlocks === featureId && metricsReached.includes(m.id))) return true;
-  // Pillar cascade safety net
-  const pillar = FEATURE_TO_PILLAR[featureId];
-  if (pillar) {
-    return METRIC_CATALOG.some(m => m.unlocks === pillar && metricsReached.includes(m.id));
+  // Alias cascade: e.g. "viewer" → "studio", "go_live" → "live"
+  const canonical = FEATURE_TO_PILLAR[featureId];
+  if (canonical) {
+    return METRIC_CATALOG.some(m => m.unlocks === canonical && metricsReached.includes(m.id));
   }
   return false;
 }
@@ -54,16 +49,22 @@ export function metricCurrentValue(metric: MetricDef, ctx: UnlockStatCtx): numbe
 }
 
 const FEATURE_LABELS: Record<string, string> = {
-  viewer:     "CREATOR STUDIO",
-  upgrades:   "CREATOR TOOLS",
-  posting:    "POSTING",
-  live:       "GO LIVE",
-  go_live:    "GO LIVE",
-  diamonds:   "DIAMONDS",
-  inbox:      "INBOX",
-  discover:   "DISCOVER",
-  feed_pager: "FEED SCROLL",
-  duet_loop:  "DUET LOOP",
+  studio:          "CREATOR STUDIO",
+  viewer:          "CREATOR STUDIO",
+  upgrades:        "CREATOR TOOLS",
+  posting:         "POSTING",
+  live:            "GO LIVE",
+  go_live:         "GO LIVE",
+  diamonds:        "DIAMONDS",
+  inbox:           "INBOX",
+  discover:        "DISCOVER",
+  feed_scroll:     "FEED SCROLL",
+  feed_pager:      "FEED SCROLL",
+  fyp_video:       "FYP VIDEO",
+  engagement_rail: "ENGAGEMENT RAIL",
+  bottom_nav:      "NAVIGATION",
+  element_stage:   "ELEMENTS",
+  duet_loop:       "DUET LOOP",
 };
 export function featureLabel(featureId: string): string {
   return FEATURE_LABELS[featureId] ?? featureId.toUpperCase().replace("_", " ");

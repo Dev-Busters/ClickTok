@@ -4,6 +4,7 @@ import { useGameStore } from "../../store";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
 import { getTrendHeat } from "../../features/social/trends";
 import { formatCount } from "../../lib/format";
+import { isFeatureUnlocked } from "../../features/metrics/unlocks";
 
 export function CreateSheet({ onClose }: { onClose: () => void }) {
   const wallet = useGameStore(s => s.wallet);
@@ -16,6 +17,8 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
   const setTab = useGameStore(s => s.setTab);
   const publishVideo = useGameStore(s => s.publishVideo);
   const publishReadyAt = useGameStore(s => s.publishReadyAt);
+  const metricsReached = useGameStore(s => s.metricsReached);
+  const liveUnlocked = isFeatureUnlocked("live", metricsReached);
 
   const topic = activeTrend ?? "trending";
   const trendHeat = getTrendHeat(trendsAvailable, topic);
@@ -104,27 +107,34 @@ export function CreateSheet({ onClose }: { onClose: () => void }) {
           flexDirection: 'column',
           gap: '10px',
           padding: '14px 16px',
-          border: '1px solid rgba(255,31,75,0.18)',
-          background: 'rgba(255,31,75,0.04)',
+          border: `1px solid ${liveUnlocked ? 'rgba(255,31,75,0.18)' : 'rgba(255,255,255,0.06)'}`,
+          background: liveUnlocked ? 'rgba(255,31,75,0.04)' : 'rgba(255,255,255,0.02)',
+          opacity: liveUnlocked ? 1 : 0.45,
         }}>
-          <div style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--text)', lineHeight: 1.4, textAlign: 'center' }}>
-            Go live on <span style={{ color: 'var(--gold)' }}>#{topic}</span> at
-            <strong style={{ color: 'var(--cyan)' }}> ~{formatCount(params.startViewers)}</strong> viewers
-          </div>
+          {liveUnlocked ? (
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--text)', lineHeight: 1.4, textAlign: 'center' }}>
+              Go live on <span style={{ color: 'var(--gold)' }}>#{topic}</span> at
+              <strong style={{ color: 'var(--cyan)' }}> ~{formatCount(params.startViewers)}</strong> viewers
+            </div>
+          ) : (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.14em', textAlign: 'center' }}>
+              REACH 200 FOLLOWERS TO UNLOCK
+            </div>
+          )}
 
           <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleGoLive}
+            whileTap={liveUnlocked ? { scale: 0.97 } : undefined}
+            onClick={liveUnlocked ? handleGoLive : undefined}
             style={{
               width: '100%',
               padding: '16px',
               fontFamily: 'var(--font-display)',
               fontSize: '22px',
               letterSpacing: '0.14em',
-              color: '#fff',
-              background: 'var(--red)',
-              border: 'none',
-              cursor: 'pointer',
+              color: liveUnlocked ? '#fff' : 'var(--dim)',
+              background: liveUnlocked ? 'var(--red)' : 'rgba(255,255,255,0.04)',
+              border: liveUnlocked ? 'none' : '1px solid rgba(255,255,255,0.08)',
+              cursor: liveUnlocked ? 'pointer' : 'default',
             }}
           >
             GO LIVE

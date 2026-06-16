@@ -14,7 +14,8 @@ import { CreatorStudio } from "../screens/CreatorStudio";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
 import { CelebrationLayer } from "../components/fx/CelebrationLayer";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { isFeatureUnlocked } from "../features/metrics/unlocks";
 
 const Live = lazy(() => import("../screens/Live").then(m => ({ default: m.Live })));
 
@@ -25,6 +26,8 @@ export function Shell() {
   const openSheet = useGameStore(s => s.openSheet);
   const setSheet = useGameStore(s => s.setSheet);
   const phase = useGameStore(s => s.phase);
+  const metricsReached = useGameStore(s => s.metricsReached);
+  const navUnlocked = isFeatureUnlocked("bottom_nav", metricsReached);
   const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
   const spectating = useGameStore(s => s.spectating);
   const pendingDrop = useGameStore(s => s.pendingDrop);
@@ -75,7 +78,16 @@ export function Shell() {
             {activeTab === 'profile' && <Profile />}
           </div>
 
-          <BottomNav />
+          {navUnlocked && (
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              style={{ flexShrink: 0 }}
+            >
+              <BottomNav />
+            </motion.div>
+          )}
 
           {openSheet === 'create' && (
             <CreateSheet onClose={() => setSheet(null)} />

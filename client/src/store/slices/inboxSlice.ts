@@ -12,7 +12,6 @@ import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { formatCount } from "../../lib/format";
 import { pushCelebration } from "../../components/fx/CelebrationLayer";
 
-const PILLAR_UNLOCKS = new Set<string>(["viewer", "posting", "live"]);
 const ELEMENT_IDS = new Set<string>(ELEMENT_CATALOG.map(d => d.id));
 
 const MAX_NOTIFICATIONS = 50;
@@ -170,21 +169,23 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
         body: rewardParts.join(" · "),
       });
 
-      // 10.5: celebration popup on pillar / element unlocks
-      if (m.unlocks && PILLAR_UNLOCKS.has(m.unlocks)) {
-        pushCelebration({
-          icon: "🎬",
-          label: `${featureLabel(m.unlocks)} UNLOCKED`,
-          sublabel: "CREATOR STUDIO",
-          color: "var(--gold)",
-        });
-      } else if (m.unlocks && ELEMENT_IDS.has(m.unlocks)) {
-        pushCelebration({
-          icon: "🔓",
-          label: `${featureLabel(m.unlocks)} UNLOCKED`,
-          sublabel: "NEW ELEMENT",
-          color: "var(--gold)",
-        });
+      // 12.2 (08 §B): celebration popup on every feature unlock.
+      if (m.unlocks) {
+        if (ELEMENT_IDS.has(m.unlocks)) {
+          pushCelebration({
+            icon: "🔓",
+            label: `${featureLabel(m.unlocks)} UNLOCKED`,
+            sublabel: "NEW ELEMENT",
+            color: "var(--gold)",
+          });
+        } else {
+          pushCelebration({
+            icon: "✨",
+            label: `${featureLabel(m.unlocks)} UNLOCKED`,
+            sublabel: "NEW FEATURE",
+            color: "var(--cyan)",
+          });
+        }
       }
     }
   },
@@ -209,7 +210,7 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
     set({ affordableNotifiedPillars: [...affordableNotifiedPillars, ...toNotify] });
 
     for (const pillar of toNotify) {
-      const label = pillar === "viewer" ? "VIEWER" : pillar === "posting" ? "POSTING" : "LIVE";
+      const label = pillar === "viewer" ? "STUDIO" : pillar === "posting" ? "POSTING" : "LIVE";
       get().pushNotification({
         type: "milestone",
         title: `New upgrade ready — ${label}`,

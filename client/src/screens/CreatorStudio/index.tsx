@@ -155,13 +155,19 @@ export function CreatorStudio({ onClose }: { onClose: () => void }) {
 // ── VIEWER section: clicker upgrades + element unlocks ───────────────────────
 
 function ViewerSection() {
+  const metricsReached = useGameStore(s => s.metricsReached);
+  const elementStageUnlocked = isFeatureUnlocked("element_stage", metricsReached);
   return (
     <>
       <UpgradeShop pillar="viewer" />
       <SectionDivider />
       <SkillsPanel pillar="viewer" />
-      <SectionDivider />
-      <ElementUnlockSection />
+      {elementStageUnlocked && (
+        <>
+          <SectionDivider />
+          <ElementUnlockSection />
+        </>
+      )}
     </>
   );
 }

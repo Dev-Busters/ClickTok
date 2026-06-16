@@ -5,7 +5,7 @@ import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 11;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -82,7 +82,19 @@ export type PersistedV9 = Omit<PersistedV8, "version"> & {
   elementsTeachSeen: Partial<Record<string, boolean>>;
 };
 
-export type PersistedState = PersistedV9;
+// 12.2 (08 §B): metric ids changed — metricsReached is re-derived from persisted stats
+// without granting rewards; no new fields added.
+export type PersistedV10 = Omit<PersistedV9, "version"> & {
+  version: 10;
+};
+
+// 12.3 (08 §C3): adds the one-time mod-perk teach caption seen flag.
+export type PersistedV11 = Omit<PersistedV10, "version"> & {
+  version: 11;
+  modTeachSeen: boolean;
+};
+
+export type PersistedState = PersistedV11;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -114,6 +126,7 @@ export function toPersistedState(state: FullState): PersistedState {
     streams: state.streams,
     affordableNotifiedPillars: state.affordableNotifiedPillars,
     elementsTeachSeen: state.elementsTeachSeen,
+    modTeachSeen: state.modTeachSeen,
   };
 }
 
@@ -142,7 +155,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -252,6 +265,45 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       version: 9,
       // 11.3: per-element teach-caption flags — no element has been taught yet.
       elementsTeachSeen: {},
+    };
+  }
+
+  if (version < 10) {
+    const v9 = state as PersistedV9;
+    // 12.2 (08 §B): metric ids replaced entirely. Re-derive metricsReached from
+    // persisted stats using the new catalog thresholds — no rewards granted.
+    const vt = v9.viewsTotal ?? 0;
+    const fo = v9.wallet?.totalFollowers ?? 0;
+    const st = v9.streams ?? 0;
+    type NewEntry = { id: string; stat: "views" | "followers" | "streams"; threshold: number };
+    const newMetrics: NewEntry[] = [
+      { id: "views_10",      stat: "views",     threshold: 10 },
+      { id: "views_25",      stat: "views",     threshold: 25 },
+      { id: "views_45",      stat: "views",     threshold: 45 },
+      { id: "views_80",      stat: "views",     threshold: 80 },
+      { id: "views_140",     stat: "views",     threshold: 140 },
+      { id: "follower_50",   stat: "followers", threshold: 50 },
+      { id: "follower_90",   stat: "followers", threshold: 90 },
+      { id: "follower_120",  stat: "followers", threshold: 120 },
+      { id: "follower_160",  stat: "followers", threshold: 160 },
+      { id: "follower_200",  stat: "followers", threshold: 200 },
+      { id: "streams_1",     stat: "streams",   threshold: 1 },
+      { id: "follower_1000", stat: "followers", threshold: 1000 },
+      { id: "follower_5000", stat: "followers", threshold: 5000 },
+    ];
+    const metricsReached = newMetrics
+      .filter(m => (m.stat === "views" ? vt : m.stat === "followers" ? fo : st) >= m.threshold)
+      .map(m => m.id);
+    state = { ...v9, version: 10, metricsReached };
+  }
+
+  if (version < 11) {
+    const v10 = state as PersistedV10;
+    state = {
+      ...v10,
+      version: 11,
+      // 12.3: mod-perk teach not yet seen on existing saves.
+      modTeachSeen: false,
     };
   }
 
