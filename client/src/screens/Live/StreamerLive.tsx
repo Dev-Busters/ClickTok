@@ -273,25 +273,32 @@ export function StreamerLive() {
         </span>
       </div>
 
-      {/* Run modifier chips (2.7) */}
+      {/* Run modifier chips (2.7) + strategy hints (14.2 / 10 §B) */}
       {params.modifiers.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "6px", padding: "8px 16px 0" }}>
+        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: "10px", padding: "8px 16px 0" }}>
           {params.modifiers.map(mod => (
-            <div
-              key={mod.id}
-              title={mod.description}
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "9px",
-                letterSpacing: "0.1em",
-                color: "var(--gold)",
-                border: "1px solid var(--gold)",
-                borderRadius: "999px",
-                padding: "3px 10px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {mod.name.toUpperCase()}
+            <div key={mod.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", maxWidth: 160 }}>
+              <div
+                title={mod.description}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "9px",
+                  letterSpacing: "0.1em",
+                  color: "var(--gold)",
+                  border: "1px solid var(--gold)",
+                  borderRadius: "999px",
+                  padding: "3px 10px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {mod.name.toUpperCase()}
+              </div>
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: "8px", letterSpacing: "0.02em",
+                color: "var(--dim)", textAlign: "center", lineHeight: 1.3,
+              }}>
+                {mod.strategy}
+              </span>
             </div>
           ))}
         </div>

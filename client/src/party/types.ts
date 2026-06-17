@@ -141,4 +141,6 @@ export type VideoCard = {
                              //   `engage`; SERVER defaults zeros on legacy pool cards (8.6);
                              //   client defaults zeros on cards from a pre-8.6 server
   npc?: boolean;             // server-generated filler (no royalties)
+  // 15.3 (11 §C): temporary tap-coin boost the viewer gets while this card is active.
+  buff?: { mult: number; durationSec: number };
 };

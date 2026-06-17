@@ -5,6 +5,9 @@ import { useGameStore } from "../../store";
 import { isFeatureUnlocked } from "../../features/metrics/unlocks";
 import { SKILL_CATALOG, SKILL_PILLAR } from "../../features/skills/catalog";
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
+import { formatCount } from "../../lib/format";
+import { formatCaption } from "../../features/feed/npcVideos";
+import type { VideoPost } from "../../features/channel/types";
 import type { UpgradePillar } from "../../features/upgrades/types";
 import type { ElementId } from "../../features/elements/types";
 
@@ -174,6 +177,10 @@ export function Profile() {
 
       <Divider />
 
+      <MyVideosSection />
+
+      <Divider />
+
       <CloudAccountPanel />
     </div>
   );
@@ -194,6 +201,154 @@ function SectionLabel({ icon, label }: { icon: string; label: string }) {
       <span style={{ fontFamily: 'var(--font-display)', fontSize: '13px', color: 'var(--text)', letterSpacing: '0.08em' }}>
         {label}
       </span>
+    </div>
+  );
+}
+
+// ── 15.2 (11 §B) — My Videos section ─────────────────────────────────────────
+
+function formatAge(createdAt: number): string {
+  const sec = (Date.now() - createdAt) / 1000;
+  if (sec < 60) return `${Math.floor(sec)}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  return `${Math.floor(sec / 86400)}d ago`;
+}
+
+// Analytical integral of the yield curve from 0 to `age` (04 §3 ramp-then-decay).
+function estimateLifetimeEarned(v: VideoPost, nowMs: number): number {
+  const age = (nowMs - v.createdAt) / 1000;
+  if (age <= 0) return 0;
+  const peak = v.peakAtSec;
+  const base = v.coinsPerSec;
+  const peak6 = peak * 6;
+
+  // Ramp phase: ∫₀^min(age,peak) (a/peak × base) da = base/peak × rampEnd²/2
+  const rampEnd = Math.min(age, peak);
+  const rampEarned = (base / peak) * (rampEnd * rampEnd / 2);
+  if (age <= peak) return rampEarned;
+
+  // Decay phase: factor hits 0.1 at age = peak + 0.9×peak×6 = 6.4×peak
+  const crossover = peak + peak6 * 0.9;
+  const decayEnd = Math.min(age, crossover);
+  const D = decayEnd - peak;
+  // ∫₀^D (1 - t/peak6) × base dt = base × (D - D²/(2×peak6))
+  const decayEarned = base * (D - (D * D) / (2 * peak6));
+  if (age <= crossover) return rampEarned + decayEarned;
+
+  // Floor phase: ∫_{crossover}^{age} 0.1×base dt
+  const fullDecayD = crossover - peak;
+  const fullDecayEarned = base * (fullDecayD - (fullDecayD * fullDecayD) / (2 * peak6));
+  const floorEarned = base * 0.1 * (age - crossover);
+  return rampEarned + fullDecayEarned + floorEarned;
+}
+
+// Current effective yield for a single video at the given nowMs.
+function videoYieldNow(v: VideoPost, nowMs: number): number {
+  const age = (nowMs - v.createdAt) / 1000;
+  if (age <= 0) return 0;
+  const peak = v.peakAtSec;
+  const factor = age <= peak
+    ? age / peak
+    : Math.max(0.1, 1 - (age - peak) / (peak * 6));
+  return v.coinsPerSec * factor;
+}
+
+function MyVideosSection() {
+  const videos = useGameStore(s => s.videos);
+  const catalogYieldPerSec = useGameStore(s => s.catalogYieldPerSec);
+  const nowMs = Date.now();
+  const totalPassive = catalogYieldPerSec(nowMs).coins;
+
+  return (
+    <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <SectionLabel icon="📹" label="MY VIDEOS" />
+        {totalPassive > 0 && (
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--gold)',
+            letterSpacing: '0.06em',
+          }}>
+            +{formatCount(totalPassive)}/s 🪙
+          </span>
+        )}
+      </div>
+
+      {videos.length === 0 ? (
+        <div style={{
+          padding: '18px 14px',
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '10px',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.08em' }}>
+            NO VIDEOS YET
+          </div>
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: '11px', color: 'var(--dim)', marginTop: '4px' }}>
+            Post a video to start earning passive coins
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[...videos].reverse().map(v => {
+            const yield_ = videoYieldNow(v, nowMs);
+            const age = (nowMs - v.createdAt) / 1000;
+            const isTrending = age < v.peakAtSec;
+            const lifeEarned = estimateLifetimeEarned(v, nowMs);
+            const caption = v.captionId ? formatCaption(v.captionId, v.topic) : `#${v.topic}`;
+            return (
+              <div key={v.id} style={{
+                padding: '10px 12px',
+                background: 'rgba(255,255,255,0.025)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: '8px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: 'var(--font-ui)', fontSize: '11px', color: 'var(--text)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {caption}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', marginTop: '3px', letterSpacing: '0.05em' }}>
+                      #{v.topic} · {formatAge(v.createdAt)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.06em',
+                      color: isTrending ? 'var(--cyan)' : 'var(--dim)',
+                    }}>
+                      {yield_ > 0 ? `+${formatCount(yield_)}/s` : '–'}
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.05em',
+                      color: isTrending ? 'var(--cyan)' : 'var(--dim)',
+                      marginTop: '2px',
+                    }}>
+                      {isTrending ? 'TRENDING ↑' : 'FADING ↓'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  marginTop: '6px',
+                  fontFamily: 'var(--font-mono)', fontSize: '9px',
+                  color: 'rgba(245,166,35,0.6)', letterSpacing: '0.04em',
+                }}>
+                  ~{formatCount(lifeEarned)} 🪙 earned lifetime
+                  {v.buff && (
+                    <span style={{ marginLeft: '8px', color: 'rgba(37,244,238,0.5)' }}>
+                      · {Math.round((v.buff.mult - 1) * 100)}% tap buff
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

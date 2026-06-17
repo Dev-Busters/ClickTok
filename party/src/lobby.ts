@@ -80,6 +80,8 @@ type VideoCard = {
   tapCount: number;
   reactions: { likes: number; comments: number; shares: number }; // (8.5) rail counters
   npc?: boolean;
+  // 15.3 (11 §C): temporary tap-coin boost the viewer gets while this card is active.
+  buff?: { mult: number; durationSec: number };
 };
 
 // Mirrored from client/src/features/social/trends.ts (04 §6: heat 0..1).
@@ -199,6 +201,9 @@ function seedNpcReactions(): VideoCard["reactions"] {
   return { likes, comments, shares };
 }
 
+// 15.3 (11 §C): buff constants mirrored from BALANCE.catalog on the client.
+const BUFF = { mult: 1.15, durationSec: 30 };
+
 function generateNpcVideoCards(count: number): VideoCard[] {
   const handles = shuffle(FEATURED_HANDLES);
   const topics = shuffle(TREND_POOL);
@@ -213,6 +218,7 @@ function generateNpcVideoCards(count: number): VideoCard[] {
     tapCount: Math.floor(Math.random() * 250),
     reactions: seedNpcReactions(),
     npc: true,
+    buff: BUFF,
   }));
 }
 
@@ -504,6 +510,8 @@ export default class LobbyServer implements Party.Server {
             postedAt: now,
             tapCount: 0,
             reactions: { likes: 0, comments: 0, shares: 0 },
+            // 15.3 (11 §C): every video carries a short tap-coin buff for the viewer.
+            buff: BUFF,
           };
 
           this.feedPool.unshift(card);

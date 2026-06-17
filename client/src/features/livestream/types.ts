@@ -35,7 +35,9 @@ export type RunChoice = { label: string; apply: string /* effect key, see 04 */ 
 export type RunModifierId =
   | "algorithm_boost" | "tough_crowd" | "trending_sound" | "shadowban_risk" | "viral_moment";
 
-export type RunModifier = { id: RunModifierId; name: string; description: string };
+// 14.2 (10 §B): strategy is a one-line playstyle hint — how to play around the modifier,
+// not just what it does (that's `description`).
+export type RunModifier = { id: RunModifierId; name: string; description: string; strategy: string };
 
 export type RunStartParams = {
   topic: string;

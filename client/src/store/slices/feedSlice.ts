@@ -1,10 +1,12 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import type { VideoCard, ReactionKind, LobbyClientMessage } from "../../party/types";
+import type { VideoPost } from "../../features/channel/types";
 import { BALANCE } from "../../features/economy/balance";
 import { coreCoinMult, effectiveWaveIdleGapSec, viralMult, MOD_IDS } from "../../features/feed/mods";
 import { CAPTION_IDS } from "../../features/feed/npcVideos";
 import { lobbySendRef } from "../../party/socketRefs";
+import { track } from "../../lib/telemetry";
 
 const REACTION_KINDS: ReactionKind[] = ["like", "comment", "share", "follow"];
 const REACTION_COUNTER_KEY: Partial<Record<ReactionKind, keyof VideoCard["reactions"]>> = {
@@ -22,6 +24,14 @@ export type FeedSlice = {
   combo: number;        // consecutive-tap counter (float during decay)
   lastTapAt: number;   // ms epoch — drives combo decay check
   viralUntil: number;  // (8.4) ms epoch — combo frozen + all payouts ×viralGainMult until this
+  // 15.3 (11 §C): view-buff — temporary coin-tap multiplier when a buffed card becomes active.
+  viewBuffUntil: number; // ms epoch; > now ⇒ buff active
+  viewBuffMult: number;  // coin multiplier from the active card's buff (e.g. 1.15)
+  // 14.1 (10 §A): Momentum — ephemeral no-dead-zones meter, never persisted.
+  momentum: number;             // 0..momentumCap; fills w/ TEB taps + rail reactions, drains idle
+  lastMomentumEngageAt: number; // ms epoch of last momentum-feeding action — idle decay gate
+  momentumFiredAt: number;      // ms epoch ping — TapCore watches this to fire the flourish
+  lastMomentumBonusCoins: number; // coins paid by the most recent Momentum bonus (for float text)
   // 7.5+ fields (stubs until the pager exists)
   deck: VideoCard[];
   deckIndex: number;
@@ -33,6 +43,7 @@ export type FeedSlice = {
 
   engageTap: () => void;       // THE clicker: gainPerPost × comboMult (04 §13.1)
   decayCombo: (dt: number) => void;  // called by channelSlice.tick each frame
+  decayMomentum: (dt: number) => void; // (14.1) called by channelSlice.tick each frame
   setDeck: (cards: VideoCard[]) => void;
   advance: (dir: 1 | -1) => void;    // swipe: flushes engage batch, resets combo
   flushEngage: () => void;           // (7.6) send engage for current card + reset; called on unmount
@@ -47,6 +58,12 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   combo: 0,
   lastTapAt: 0,
   viralUntil: 0,
+  viewBuffUntil: 0,
+  viewBuffMult: 1,
+  momentum: 0,
+  lastMomentumEngageAt: 0,
+  momentumFiredAt: 0,
+  lastMomentumBonusCoins: 0,
   deck: [],
   deckIndex: 0,
   tapsThisCard: 0,
@@ -55,7 +72,7 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   reactedByVideo: {},
 
   engageTap: () => {
-    const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, activeWave, deck, deckIndex, tapsThisCard, viewsTotal, coinsEarned } = get();
+    const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, viewBuffUntil, viewBuffMult, activeWave, deck, deckIndex, tapsThisCard, viewsTotal, coinsEarned } = get();
     const now = Date.now();
     const cap = BALANCE.feed.comboCap;
     const wasViral = viralUntil > now;
@@ -68,7 +85,9 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     // 04 §13.5: `core_surge` multiplies TAP CORE coin payout while its card is on screen.
     const activeMod = deck[deckIndex]?.mod ?? null;
     const modMult = coreCoinMult(activeMod);
-    const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * k * modMult;
+    // 15.3 (11 §C): view-buff — temporary +X% coins per tap when a buffed card is active.
+    const bMult = viewBuffUntil > now ? viewBuffMult : 1;
+    const coinsGain = tapPower * BALANCE.postCoinConversion * multiplier * k * modMult * bMult;
     const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * k;
     const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * k;
 
@@ -100,6 +119,25 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
       coinsEarned: coinsEarned + coinsGain + burstCoins,
     });
 
+    // 14.1 (10 §A): Momentum — fills with engagement, drains while idle; on
+    // fill, pay a coin-burst bonus (a multiple of this tap's gain) and ping
+    // momentumFiredAt so TapCore can fire the flourish.
+    const { momentum } = get();
+    const nextMomentum = momentum + BALANCE.feed.momentumPerEngage;
+    if (nextMomentum >= BALANCE.feed.momentumCap) {
+      const bonusCoins = coinsGain * BALANCE.feed.momentumBonusMult;
+      set(s => ({
+        momentum: 0,
+        lastMomentumEngageAt: now,
+        momentumFiredAt: now,
+        lastMomentumBonusCoins: bonusCoins,
+        wallet: { ...s.wallet, coins: s.wallet.coins + bonusCoins },
+        coinsEarned: s.coinsEarned + bonusCoins,
+      }));
+    } else {
+      set({ momentum: nextMomentum, lastMomentumEngageAt: now });
+    }
+
     // 01 §8.2 / 04 §13.2: a TAP CORE tap arms the next DUET LOOP pod (energy beam).
     if (activeWave?.element === "duet_loop" && activeWave.armedIndex === null
       && activeWave.completed < BALANCE.elements.duetLoop.pods) {
@@ -130,14 +168,39 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     set({ combo: Math.max(0, combo - BALANCE.feed.comboDecayPerSec * dt) });
   },
 
+  // 14.1 (10 §A): drains the Momentum meter after an idle grace period so an
+  // AFK player never triggers the bonus.
+  decayMomentum: (dt) => {
+    const { momentum, lastMomentumEngageAt } = get();
+    if (momentum <= 0) return;
+    const idleSec = (Date.now() - lastMomentumEngageAt) / 1000;
+    if (idleSec < BALANCE.feed.momentumIdleDelaySec) return;
+    set({ momentum: Math.max(0, momentum - BALANCE.feed.momentumIdleDecayPerSec * dt) });
+  },
+
   // (8.5) defensively default `reactions` on cards from a pre-8.6 server.
-  setDeck: (cards) => set({
-    deck: cards.map(c => ({ ...c, reactions: c.reactions ?? { likes: 0, comments: 0, shares: 0 } })),
-  }),
+  // 15.3: also apply the first card's buff immediately on deck load.
+  setDeck: (cards) => {
+    const normalized = cards.map(c => ({ ...c, reactions: c.reactions ?? { likes: 0, comments: 0, shares: 0 } }));
+    const firstBuff = normalized[0]?.buff;
+    const now = Date.now();
+    set({
+      deck: normalized,
+      ...(firstBuff ? {
+        viewBuffUntil: now + firstBuff.durationSec * 1000,
+        viewBuffMult: firstBuff.mult,
+      } : {}),
+    });
+    if (firstBuff) {
+      track('video_buff_applied', { handle: get().handle, buffMult: firstBuff.mult, buffDurationSec: firstBuff.durationSec, source: 'deck_load' });
+    }
+    track('video_viewed', { handle: get().handle, videoId: normalized[0]?.videoId, npc: normalized[0]?.npc ?? true });
+  },
 
   // 06 §3 pager: swipe changes the active card; combo resets and the wave
   // scheduler reschedules against the new card's mod (TAP CORE/element stage
   // — including any in-flight activeWave — persist across the swipe).
+  // 15.3: apply the new card's view-buff.
   advance: (dir) => {
     const { deck, deckIndex, tapsThisCard, reactedByVideo } = get();
     if (deck.length === 0) return;
@@ -158,13 +221,24 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
       }
     }
 
-    const nextMod = deck[nextIndex]?.mod ?? null;
+    const nextCard = deck[nextIndex];
+    const nextMod = nextCard?.mod ?? null;
+    const nextBuff = nextCard?.buff;
+    const now = Date.now();
     set({
       deckIndex: nextIndex,
       combo: 0,
       tapsThisCard: 0,
-      nextWaveAt: Date.now() + effectiveWaveIdleGapSec(nextMod) * 1000,
+      nextWaveAt: now + effectiveWaveIdleGapSec(nextMod) * 1000,
+      ...(nextBuff ? {
+        viewBuffUntil: now + nextBuff.durationSec * 1000,
+        viewBuffMult: nextBuff.mult,
+      } : {}),
     });
+    if (nextBuff) {
+      track('video_buff_applied', { handle: get().handle, buffMult: nextBuff.mult, buffDurationSec: nextBuff.durationSec, source: 'swipe' });
+    }
+    track('video_viewed', { handle: get().handle, videoId: nextCard?.videoId, npc: nextCard?.npc ?? true });
   },
 
   // Called on HomeFeed unmount (tab-switch) to flush any pending taps + reactions.
@@ -193,17 +267,37 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
     const followersGain = tapPower * BALANCE.postFollowerConversion * followerConversion * multiplier * burst;
     const likesGain = tapPower * BALANCE.postLikeConversion * multiplier * burst;
 
+    const now = Date.now();
+    const videoId = crypto.randomUUID();
+    const topic = activeTrend ?? "trending";
+    const captionId = CAPTION_IDS[Math.floor(Math.random() * CAPTION_IDS.length)];
+    const buff = { mult: BALANCE.catalog.viewBuffMult, durationSec: BALANCE.catalog.viewBuffDurationSec };
+
     const card: VideoCard = {
-      videoId: crypto.randomUUID(),
+      videoId,
       handle,
       creatorLevel: computeCreatorLevel(wallet.totalFollowers),
-      topic: activeTrend ?? "trending",
-      captionId: CAPTION_IDS[Math.floor(Math.random() * CAPTION_IDS.length)],
+      topic,
+      captionId,
       mod: MOD_IDS[Math.floor(Math.random() * MOD_IDS.length)],
-      postedAt: Date.now(),
+      postedAt: now,
       tapCount: 0,
       reactions: { likes: 0, comments: 0, shares: 0 },
+      buff,
     };
+
+    // 15.1 (11 §A): persist the video in catalogSlice with its passive yield.
+    const videoPost: VideoPost = {
+      id: videoId,
+      topic,
+      captionId,
+      createdAt: now,
+      coinsPerSec: tapPower * BALANCE.catalog.catalogYieldCoeff * multiplier,
+      followersPerSec: 0,
+      peakAtSec: BALANCE.catalog.catalogPeakAtSec,
+      buff,
+    };
+    get().addVideo(videoPost);
 
     set({
       wallet: {
@@ -213,10 +307,11 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
         totalFollowers: wallet.totalFollowers + followersGain,
         likes: wallet.likes + likesGain,
       },
-      publishReadyAt: Date.now() + BALANCE.feed.publishCooldownSec * 1000,
+      publishReadyAt: now + BALANCE.feed.publishCooldownSec * 1000,
     });
 
     lobbySendRef.current?.({ type: "postVideo", card } satisfies LobbyClientMessage);
+    track('video_posted', { handle, topic, captionId });
     return card;
   },
 
@@ -296,6 +391,23 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
       deck: newDeck,
       reactedByVideo: { ...reactedByVideo, [card.videoId]: reacted },
     });
+
+    // 14.1 (10 §A): rail reactions feed Momentum the same as TEB taps.
+    const { momentum } = get();
+    const now = Date.now();
+    const nextMomentum = momentum + BALANCE.feed.momentumPerEngage;
+    if (nextMomentum >= BALANCE.feed.momentumCap) {
+      const bonusCoins = coinsGain * BALANCE.feed.momentumBonusMult;
+      set(s => ({
+        momentum: 0,
+        lastMomentumEngageAt: now,
+        momentumFiredAt: now,
+        lastMomentumBonusCoins: bonusCoins,
+        wallet: { ...s.wallet, coins: s.wallet.coins + bonusCoins },
+      }));
+    } else {
+      set({ momentum: nextMomentum, lastMomentumEngageAt: now });
+    }
 
     return true;
   },

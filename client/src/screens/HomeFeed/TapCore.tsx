@@ -2,9 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGameStore } from "../../store";
 import { BALANCE } from "../../features/economy/balance";
+import { UPGRADE_CATALOG } from "../../features/upgrades/catalog";
 import { formatCount } from "../../lib/format";
 import { coreCoinMult, viralMult } from "../../features/feed/mods";
 import { pushFloatText } from "../../components/fx/FloatingTextLayer";
+
+// 14.4 (10 §D): stable list of gear upgrade ids — one dot per gear item owned.
+const GEAR_IDS = UPGRADE_CATALOG.filter(d => d.category === "gear").map(d => d.id);
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const RING_R = 80;
@@ -267,6 +271,7 @@ function DuetTebRing() {
 export function TapCore() {
   const combo = useGameStore(s => s.combo);
   const lastTapAt = useGameStore(s => s.lastTapAt);
+  const ownedUpgrades = useGameStore(s => s.ownedUpgrades);
   const viralUntil = useGameStore(s => s.viralUntil);
   const engageTap = useGameStore(s => s.engageTap);
   const tapPower = useGameStore(s => s.tapPower);
@@ -276,6 +281,9 @@ export function TapCore() {
   const setTebTeachSeen = useGameStore(s => s.setTebTeachSeen);
   const activeWave = useGameStore(s => s.activeWave);
   const statPulseAt = useGameStore(s => s.statPulseAt);
+  const momentum = useGameStore(s => s.momentum);
+  const momentumFiredAt = useGameStore(s => s.momentumFiredAt);
+  const lastMomentumBonusCoins = useGameStore(s => s.lastMomentumBonusCoins);
   const duetCfgPods = BALANCE.elements.duetLoop.pods;
   // True when a duet_loop chain is in progress and waiting for a core tap
   const duetTebTurn = activeWave?.element === 'duet_loop'
@@ -285,6 +293,7 @@ export function TapCore() {
   const [tapFxs, setTapFxs] = useState<TapFx[]>([]);
   const [tierFlash, setTierFlash] = useState(false);
   const [statFlash, setStatFlash] = useState(false);
+  const [momentumPop, setMomentumPop] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
   const [eruption, setEruption] = useState(false);
   const [ringDrain, setRingDrain] = useState(false);
@@ -349,6 +358,16 @@ export function TapCore() {
     const t = setTimeout(() => setStatFlash(false), 600);
     return () => clearTimeout(t);
   }, [statPulseAt]);
+
+  // 14.1 (10 §A): Momentum filled — coin-burst callout + a brief TEB flourish.
+  useEffect(() => {
+    if (momentumFiredAt === 0) return;
+    pushFloatText({ text: `+${formatCount(lastMomentumBonusCoins)}`, kind: "coin", magnitude: BALANCE.feed.momentumBonusMult, color: "var(--cyan)" });
+    pushFloatText({ text: "MOMENTUM!", kind: "callout", magnitude: 0 });
+    setMomentumPop(true);
+    const t = setTimeout(() => setMomentumPop(false), 650);
+    return () => clearTimeout(t);
+  }, [momentumFiredAt]);
 
   // Idle attract: check every second whether lastTapAt is stale
   useEffect(() => {
@@ -505,8 +524,46 @@ export function TapCore() {
         ×{(comboMult * (isViral ? BALANCE.feed.viralGainMult : 1)).toFixed(2)}
       </div>
 
+      {/* 14.1 (10 §A): Momentum meter — fills with engagement, drains while idle */}
+      <div style={{ width: 110, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+        <motion.div
+          animate={{ width: `${Math.min(100, (momentum / BALANCE.feed.momentumCap) * 100)}%` }}
+          transition={{ duration: 0.15, ease: 'linear' }}
+          style={{
+            height: '100%', background: 'var(--cyan)',
+            boxShadow: momentumPop ? '0 0 12px var(--cyan)' : '0 0 4px var(--cyan)88',
+          }}
+        />
+      </div>
+
       {/* Ring + button container (220px gives shockwaves room to expand) */}
       <div style={{ position: 'relative', width: 220, height: 220 }}>
+
+        {/* 14.4 (10 §D): owned-gear indicator dots — sit just outside the combo ring,
+            one per gear item, gold and visible only when owned. Cosmetic only. */}
+        {GEAR_IDS.map((id, i) => {
+          const angle = (i / GEAR_IDS.length) * 2 * Math.PI - Math.PI / 2;
+          const R = 88;
+          const x = 110 + R * Math.cos(angle);
+          const y = 110 + R * Math.sin(angle);
+          const owned = !!ownedUpgrades[id];
+          return (
+            <div
+              key={id}
+              style={{
+                position: 'absolute',
+                width: 5, height: 5,
+                left: x - 2.5, top: y - 2.5,
+                borderRadius: '50%',
+                background: 'var(--gold)',
+                opacity: owned ? 0.6 : 0.07,
+                boxShadow: owned ? '0 0 4px var(--gold)' : 'none',
+                transition: 'opacity 0.5s, box-shadow 0.5s',
+                pointerEvents: 'none',
+              }}
+            />
+          );
+        })}
 
         {/* SVG combo ring */}
         <svg
@@ -584,6 +641,25 @@ export function TapCore() {
                 width: 150, height: 150, marginTop: -75, marginLeft: -75,
                 borderRadius: '50%', border: '2px solid var(--cyan)',
                 boxShadow: '0 0 16px var(--cyan)', pointerEvents: 'none',
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* 14.1 (10 §A): Momentum fill flourish */}
+        <AnimatePresence>
+          {momentumPop && (
+            <motion.div
+              key="momentumflash"
+              initial={{ scale: 0.95, opacity: 0.9 }}
+              animate={{ scale: 1.45, opacity: 0 }}
+              exit={{}}
+              transition={{ duration: 0.65, ease: 'easeOut' }}
+              style={{
+                position: 'absolute', top: '50%', left: '50%',
+                width: 150, height: 150, marginTop: -75, marginLeft: -75,
+                borderRadius: '50%', border: '2px solid var(--cyan)',
+                boxShadow: '0 0 22px var(--cyan)', pointerEvents: 'none',
               }}
             />
           )}

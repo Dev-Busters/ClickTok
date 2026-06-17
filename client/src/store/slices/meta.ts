@@ -5,7 +5,7 @@ import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -94,7 +94,14 @@ export type PersistedV11 = Omit<PersistedV10, "version"> & {
   modTeachSeen: boolean;
 };
 
-export type PersistedState = PersistedV11;
+// 15.1 (11 §A): catalog is now live — videos[] already existed in the shape since v2
+// (the stub always persisted an empty array); this bump marks catalog as active so
+// any future migration can distinguish pre- and post-catalog saves.
+export type PersistedV12 = Omit<PersistedV11, "version"> & {
+  version: 12;
+};
+
+export type PersistedState = PersistedV12;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -155,7 +162,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -304,6 +311,16 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       version: 11,
       // 12.3: mod-perk teach not yet seen on existing saves.
       modTeachSeen: false,
+    };
+  }
+
+  if (version < 12) {
+    const v11 = state as PersistedV11;
+    state = {
+      ...v11,
+      version: 12,
+      // 15.1: catalog active; videos[] already in the shape since v2 (was always persisted
+      // as an empty array by the stub). No new fields — bump marks catalog as live.
     };
   }
 

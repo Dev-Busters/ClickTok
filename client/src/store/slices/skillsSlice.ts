@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import { SKILL_CATALOG } from "../../features/skills/catalog";
 import type { SkillId } from "../../features/skills/types";
+import { track } from "../../lib/telemetry";
 
 export type SkillsSlice = {
   skillLevels: Record<SkillId, number>;     // default all 0
@@ -44,6 +45,7 @@ export const createSkillsSlice: StateCreator<FullState, [], [], SkillsSlice> = (
       wallet: { ...wallet, coins: wallet.coins - cost },
     });
     get().recomputeStats();
+    track('upgrade_purchased', { id, category: 'skill', level: level + 1, coins: cost, handle: get().handle });
     return true;
   },
 });

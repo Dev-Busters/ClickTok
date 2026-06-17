@@ -6,26 +6,31 @@ export const MODIFIER_CATALOG: Record<RunModifierId, RunModifier> = {
     id: "algorithm_boost",
     name: "Algorithm Boost",
     description: "+40% start viewers, but hype decays 30% faster",
+    strategy: "Hype drains fast — Hype Dance early and often; Charisma helps it stick.",
   },
   tough_crowd: {
     id: "tough_crowd",
     name: "Tough Crowd",
     description: "Trolls show up 50% more often, but gifts pay 40% more",
+    strategy: "Toxic but lucrative — Clapback or Go Off on trolls fast; ride the bigger gifts.",
   },
   trending_sound: {
     id: "trending_sound",
     name: "Trending Sound",
     description: "Hype waves come 2x as often and hit 20% harder",
+    strategy: "Waves spawn constantly — stack Hype Dance reactions and let hype snowball.",
   },
   shadowban_risk: {
     id: "shadowban_risk",
     name: "Shadowban Risk",
     description: "15% chance of a mid-stream viewer crash",
+    strategy: "Bank gifts early — a crash can wipe your viewers at any moment.",
   },
   viral_moment: {
     id: "viral_moment",
     name: "Viral Moment",
     description: "Guaranteed one huge hype wave this run",
+    strategy: "Save your best reaction for the guaranteed wave — time Hype Dance to it.",
   },
 };
 

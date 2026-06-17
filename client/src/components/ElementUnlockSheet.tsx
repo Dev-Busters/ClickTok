@@ -1,12 +1,18 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { formatCount } from "../lib/format";
 import { pushCelebration } from "./fx/CelebrationLayer";
+import { track } from "../lib/telemetry";
 import type { ElementDef } from "../features/elements/types";
 
 export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose: () => void }) {
   const wallet = useGameStore(s => s.wallet);
   const unlockElement = useGameStore(s => s.unlockElement);
+  const setTab = useGameStore(s => s.setTab);
+  const setSheet = useGameStore(s => s.setSheet);
+  const spawnWave = useGameStore(s => s.spawnWave);
+  const [unlocked, setUnlocked] = useState(false);
 
   const followersMet = wallet.followers >= def.requires.followers;
   const coinsMet = wallet.coins >= def.requires.coins;
@@ -21,13 +27,31 @@ export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose:
         detail: def.tagline,
         color: "var(--gold)",
       });
-      onClose();
+      setUnlocked(true);
     }
+  };
+
+  // 14.3 (10 §C): close this sheet AND the Creator Studio overlay it lives in
+  // first — the wave scheduler pauses while a sheet is open
+  // (elementsSlice.expireOrResolveWave early-returns on openSheet !== null).
+  const handleTryNow = () => {
+    track('element_unlocked', { id: def.id, try_now: true, handle: useGameStore.getState().handle });
+    onClose();
+    setSheet(null);
+    setTab("home");
+    spawnWave(def.id);
+  };
+
+  const handleClose = () => {
+    if (unlocked) {
+      track('element_unlocked', { id: def.id, try_now: false, handle: useGameStore.getState().handle });
+    }
+    onClose();
   };
 
   return (
     <div
-      onPointerDown={e => { e.stopPropagation(); onClose(); }}
+      onPointerDown={e => { e.stopPropagation(); handleClose(); }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -88,27 +112,47 @@ export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose:
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          <motion.button
-            whileTap={canUnlock ? { scale: 0.97 } : undefined}
-            onClick={handleUnlock}
-            disabled={!canUnlock}
-            style={{
-              flex: 1,
-              padding: '14px',
-              fontFamily: 'var(--font-display)',
-              fontSize: '16px',
-              letterSpacing: '0.12em',
-              color: canUnlock ? '#000' : 'var(--dim)',
-              background: canUnlock ? 'var(--gold)' : 'rgba(255,255,255,0.06)',
-              border: canUnlock ? 'none' : '1px solid var(--dim)',
-              cursor: canUnlock ? 'pointer' : 'default',
-            }}
-          >
-            UNLOCK
-          </motion.button>
+          {unlocked ? (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleTryNow}
+              style={{
+                flex: 1,
+                padding: '14px',
+                fontFamily: 'var(--font-display)',
+                fontSize: '16px',
+                letterSpacing: '0.12em',
+                color: '#000',
+                background: 'var(--gold)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              TRY NOW
+            </motion.button>
+          ) : (
+            <motion.button
+              whileTap={canUnlock ? { scale: 0.97 } : undefined}
+              onClick={handleUnlock}
+              disabled={!canUnlock}
+              style={{
+                flex: 1,
+                padding: '14px',
+                fontFamily: 'var(--font-display)',
+                fontSize: '16px',
+                letterSpacing: '0.12em',
+                color: canUnlock ? '#000' : 'var(--dim)',
+                background: canUnlock ? 'var(--gold)' : 'rgba(255,255,255,0.06)',
+                border: canUnlock ? 'none' : '1px solid var(--dim)',
+                cursor: canUnlock ? 'pointer' : 'default',
+              }}
+            >
+              UNLOCK
+            </motion.button>
+          )}
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={onClose}
+            onClick={handleClose}
             style={{
               padding: '14px 20px',
               fontFamily: 'var(--font-display)',

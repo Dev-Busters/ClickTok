@@ -8,6 +8,8 @@ export type ModDef = {
   name: string;
   effectLine: string;
   appliesTo: "beat_sync" | "duet_loop" | "core" | "scheduler";
+  // 14.2 (10 §B): one-line playstyle hint — how to play around the perk, not just what it does.
+  strategy: string;
 };
 
 export const MOD_CATALOG: Record<FeedModId, ModDef> = {
@@ -17,6 +19,7 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
     name: "RING SLOW",
     effectLine: "Beat Sync rings shrink 25% slower",
     appliesTo: "beat_sync",
+    strategy: "More time to react — go for PERFECT on every ring.",
   },
   extra_ring: {
     id: "extra_ring",
@@ -24,6 +27,7 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
     name: "EXTRA RING",
     effectLine: "+1 ring per Beat Sync wave",
     appliesTo: "beat_sync",
+    strategy: "One more ring to grade — keep your rhythm steady through it.",
   },
   wide_window: {
     id: "wide_window",
@@ -31,6 +35,7 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
     name: "WIDE WINDOW",
     effectLine: "Beat Sync grading windows ×1.5",
     appliesTo: "beat_sync",
+    strategy: "Forgiving timing — push for PERFECT instead of settling for OK.",
   },
   duet_flow: {
     id: "duet_flow",
@@ -38,6 +43,7 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
     name: "LOOP BOOST",
     effectLine: "Duet Loop: +2s flow window, +1s arm timeout",
     appliesTo: "duet_loop",
+    strategy: "Chain longer Duet Loop combos — the extra time covers slower reflexes.",
   },
   core_surge: {
     id: "core_surge",
@@ -45,6 +51,7 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
     name: "CORE SURGE",
     effectLine: "TAP CORE coins ×1.5",
     appliesTo: "core",
+    strategy: "Tap the core hard while this card's on screen — it's a coin spike.",
   },
   wave_rush: {
     id: "wave_rush",
@@ -52,6 +59,7 @@ export const MOD_CATALOG: Record<FeedModId, ModDef> = {
     name: "WAVE RUSH",
     effectLine: "Waves spawn twice as often",
     appliesTo: "scheduler",
+    strategy: "Stay on Home — back-to-back waves reward staying put over swiping.",
   },
 };
 

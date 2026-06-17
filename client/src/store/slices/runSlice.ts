@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import { BALANCE } from "../../features/economy/balance";
+import { track } from "../../lib/telemetry";
 import type { ChoiceEffectId } from "../../features/livestream/choices";
 import { computeRunParams } from "../../features/livestream/computeRunParams";
 import {
@@ -162,6 +163,12 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       realGiftLog: [],
       lastChoiceResolution: null,
       pendingVoteTally: {},
+    });
+    track('run_started', {
+      topic,
+      startViewers: params.startViewers,
+      modifiers: modifiers.map(m => m.id),
+      handle: get().handle,
     });
   },
 
@@ -540,6 +547,16 @@ export const createRunSlice: StateCreator<FullState, [], [], RunSlice> = (set, g
       type: "run_result",
       title: `Stream ended — Grade ${grade}`,
       body: `Peak ${formatCount(peakViewers)} viewers · +${formatCount(followers)} 👥, +${formatCount(coins)} 🪙, +${formatCount(diamonds)} 💎, +${formatCount(likes)} ❤️`,
+    });
+
+    track('run_ended', {
+      grade,
+      reason,
+      peakViewers,
+      followers,
+      coins,
+      diamonds,
+      handle: get().handle,
     });
 
     return result;

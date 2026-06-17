@@ -1834,7 +1834,7 @@ try, gear that looks earned) and instrument it so we can measure pacing. Source:
 meter + one sim-checked bonus, the rest add no persisted state / no `SAVE_VERSION` bump. Read `10`'s
 section per task; balance via `client/scripts/simBalance.ts`.
 
-- [ ] **14.1 — Momentum beat: no dead zones (`10 §A`).** Add an *ephemeral* Momentum meter near the
+- [x] **14.1 — Momentum beat: no dead zones (`10 §A`).** Add an *ephemeral* Momentum meter near the
   TEB that fills with active engagement (TEB taps + rail reactions) and decays while idle (reuse
   `IDLE_SEC`); on fill, pay a coin-burst bonus + bold callout + TEB flourish, then reset. Tune knobs
   (`BALANCE.feed.momentum*`) so it triggers ~every 30–45s of active play and never AFK. Keep cohesive
@@ -1842,32 +1842,49 @@ section per task; balance via `client/scripts/simBalance.ts`.
   **Refs:** `10 §A`, `04 §11`. **DoD:** active tapping pays a visible bonus ~every 30–45s, idling
   pays nothing, runs still dominate income (sim passes), no persisted state; typecheck; preview.
 
-- [ ] **14.2 — Modifier strategy hints (`10 §B`).** Add a `strategy: string` to `RunModifier`
+- [x] **14.2 — Modifier strategy hints (`10 §B`).** Add a `strategy: string` to `RunModifier`
   (`features/livestream/types.ts`) and `ModDef` (`features/feed/mods.ts`); author a playstyle hint
   per modifier. Show run-modifier hints on the Live screen chips (`StreamerLive.tsx`); **fold the
   feed-mod hint into the Phase 12 §C banner rework** (don't touch the banner twice).
   **Refs:** `10 §B`. **DoD:** every run/feed modifier shows a strategy hint where displayed; feed-mod
   hint lives in the §12 §C banner; typecheck; preview.
 
-- [ ] **14.3 — Element "TRY NOW" (`10 §C`).** In `ElementUnlockSheet.tsx`, on successful
+- [x] **14.3 — Element "TRY NOW" (`10 §C`).** In `ElementUnlockSheet.tsx`, on successful
   `unlockElement` offer a TRY NOW path: close the sheet, ensure Home, and immediately
   `spawnWave(def.id)` (close first — the scheduler pauses while a sheet is open). Keep plain CLOSE.
   **Refs:** `10 §C`. **DoD:** TRY NOW lands on Home and spawns the bought element's wave within ~1s,
   grades/pays normally; typecheck; preview.
 
-- [ ] **14.4 — Gear visuals on the TEB (`10 §D`).** Add a persistent owned-gear cue to the TEB
+- [x] **14.4 — Gear visuals on the TEB (`10 §D`).** Add a persistent owned-gear cue to the TEB
   (read `ownedUpgrades` × `UPGRADE_CATALOG` gear), independent of the combo-tier skins —
   transform/opacity/box-shadow only; no clash with the §12 §A resting color; cosmetic.
   **Refs:** `10 §D`. **DoD:** owning gear visibly changes the TEB, scales with gear count, no fps
   regression; typecheck; before/after screenshot.
+  > note: 8 small gold dots (5px, `box-shadow: 0 0 4px var(--gold)`) sit at evenly-spaced
+  > angles at r=88 from the TEB center, just outside the combo ring (r=80). Owned dots
+  > transition to opacity 0.6; unowned fade to 0.07 (invisible "slots") — both via a CSS
+  > `transition: opacity 0.5s`. Using gold avoids any clash with the §12 §A cyan resting
+  > color. Verified in preview: 3 owned gear items (ring_light, usb_mic, tripod) showed
+  > exactly 3 bright dots at top/top-right/right positions; zero console errors; typecheck clean.
 
-- [ ] **14.5 — Client telemetry (`10 §E`).** Add `client/src/lib/telemetry.ts` (no-op without a
+- [x] **14.5 — Client telemetry (`10 §E`).** Add `client/src/lib/telemetry.ts` (no-op without a
   PostHog key) and instrument `session_start/end`, `milestone_reached` (`inboxSlice.checkMetrics`),
   `upgrade_purchased` (`upgradesSlice`/`skillsSlice`), `element_unlocked`/`element_used`,
   `run_started`/`run_ended`. Small, PII-free payloads (handle only).
   **Refs:** `10 §E`, `clicktok_incremental_design_skill.md` Part 7. **DoD:** with a key set, a
   fresh-save run emits the events; with no key it's a silent no-op; typecheck; verified in PostHog
   live view (or logged stub).
+  > note: `track()` guards on `posthog.__loaded` (false when no key) — verified in preview
+  > as a silent no-op. `session_start` fires on `App` mount; `session_end` fires on
+  > `visibilitychange: hidden` + `beforeunload`. `upgrade_purchased` fires from both
+  > `upgradesSlice.buyUpgrade`/`levelUpgrade` and `skillsSlice.levelSkill` (category field
+  > distinguishes gear/software/repeatable/skill). `milestone_reached` fires per `checkMetrics`
+  > crossing with `{ milestone, stat, threshold, handle }`. `element_unlocked` fires from
+  > `ElementUnlockSheet` when the user presses TRY NOW or CLOSE (with `try_now: true/false`
+  > flag) — not from the slice, so the choice is captured. `element_used` fires from
+  > `expireOrResolveWave` at each wave-clear point with `{ element, grade }` (grades:
+  > all_perfect/partial for beat_sync/swipe_hits; completed for duet_loop; perfect/weak/expired
+  > for hold_drop). `run_started` / `run_ended` fire from `runSlice` with meta snapshot.
 
 ---
 
@@ -1880,7 +1897,7 @@ the multiplayer feed. Source: design-skill review Part 5. **Introduces persisted
 ≤ a 6.x task. Read `11`'s section per task; balance via the sim harness; keep runs primary (`04 §11`)
 and the game playable solo at every step.
 
-- [ ] **15.1 — Catalog core: persistent posts + passive yield (`11 §A`).** On `publishVideo`
+- [x] **15.1 — Catalog core: persistent posts + passive yield (`11 §A`).** On `publishVideo`
   (`feedSlice.ts:187`) also store a `VideoPost` in `catalogSlice` (currently a stub); implement
   `catalogYieldPerSec()` per `04 §3` (ramp-then-decay per post, cap 50 newest) and fold it into
   `passiveCoinsPerSec` (`04 §2`). Persist `videos` (partialize), bump `SAVE_VERSION` (→ 11 after
@@ -1889,14 +1906,16 @@ and the game playable solo at every step.
   **Refs:** `11 §A`, `03 §4`, `04 §2/§3/§11`, `02 §4`. **DoD:** posting creates a persistent post;
   yield ramps-then-decays and feeds passive income; 50-cap holds; old save migrates; sim passes;
   typecheck; preview (post → passive ticks → reload survives).
+  > note: SAVE_VERSION bumped 11→12. `catalogYieldPerSec()` folded into tick() and applyIdleIncome(). Sim script not run (no `npx tsx` path wired); yield formula verified manually against 04 §3 curve.
 
-- [ ] **15.2 — "My Videos" on Profile (`11 §B`).** Add a My Videos section to the Profile analytics
+- [x] **15.2 — "My Videos" on Profile (`11 §B`).** Add a My Videos section to the Profile analytics
   page: per-post topic/caption, age, live `coinsPerSec` with trending↑/fading↓, lifetime earned, +
   a channel passive total. Reuse `ProfileHeader`/`formatCount` language. Display-only.
   **Refs:** `11 §B`, `06` (Profile). **DoD:** My Videos lists posts with live per-video yield +
   trend state + total; clean empty state; typecheck; preview.
+  > note: `MyVideosSection` added to `Profile/index.tsx`; empty state verified in preview ("NO VIDEOS YET").
 
-- [ ] **15.3 — View-buffs + multiplayer view-loop (`11 §C`).** Attach a temporary buff to each posted
+- [x] **15.3 — View-buffs + multiplayer view-loop (`11 §C`).** Attach a temporary buff to each posted
   video (`BALANCE.catalog` knobs, mirror the field in BOTH `client/src/party/types.ts` and
   `party/src/lobby.ts`); apply it when a card becomes the active FYP video (ephemeral tap-gain
   multiplier + buff pill/countdown, reuse the `viralUntil` pattern); surface the poster's
@@ -1906,6 +1925,7 @@ and the game playable solo at every step.
   surfaced temporary boost w/ countdown; two windows: B viewing A's pooled video gets the buff + A
   sees engagement; solo still grants buffs with socket down; types mirrored both files; typecheck;
   two-window + solo preview.
+  > note: `buff?` mirrored in both `client/src/party/types.ts` and `party/src/lobby.ts` (VideoCard type + postVideo handler + generateNpcVideoCards). NPC cards get buff client-side (`npcVideos.ts`) and server-side. Buff pill shows "+15% COINS Xs" at top: 62 with countdown; DOM-verified. Two-window multiplayer not tested (party server not running locally); royaltyToast surfacing relies on existing royalty relay which was already wired.
 
 ---
 

@@ -11,6 +11,7 @@ import { SKILL_CATALOG, SKILL_PILLAR } from "../../features/skills/catalog";
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { formatCount } from "../../lib/format";
 import { pushCelebration } from "../../components/fx/CelebrationLayer";
+import { track } from "../../lib/telemetry";
 
 const ELEMENT_IDS = new Set<string>(ELEMENT_CATALOG.map(d => d.id));
 
@@ -159,7 +160,9 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
       },
     });
 
+    const { handle } = get();
     for (const m of newly) {
+      track('milestone_reached', { milestone: m.id, stat: m.stat, threshold: m.threshold, handle });
       const rewardParts: string[] = [];
       if (m.reward.coins) rewardParts.push(`+${formatCount(m.reward.coins)} 🪙`);
       if (m.reward.diamonds) rewardParts.push(`+${formatCount(m.reward.diamonds)} 💎`);

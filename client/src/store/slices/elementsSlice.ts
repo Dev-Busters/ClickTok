@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import type { ElementId, ElementWave, BeatGrade } from "../../features/elements/types";
+import { track } from "../../lib/telemetry";
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { BALANCE } from "../../features/economy/balance";
 import { ringScale, gradeForScale, GRADE_MULT } from "../../features/elements/beatSync";
@@ -273,7 +274,8 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
       if (changed) set({ activeWave: { ...activeWave, rings } });
 
       if (rings.every(r => r.grade)) {
-        if (rings.every(r => r.grade === "perfect")) {
+        const beatGrade = rings.every(r => r.grade === "perfect") ? "all_perfect" : "partial";
+        if (beatGrade === "all_perfect") {
           const { tapPower, multiplier, followerConversion, combo, viralUntil, wallet } = get();
           const comboMult = 1 + Math.min(combo, BALANCE.feed.comboCap) * BALANCE.feed.comboPerTap;
           const k = cfg.perfectWaveBonus * comboMult * viralMult(viralUntil);
@@ -287,6 +289,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
             },
           });
         }
+        track('element_used', { element: 'beat_sync', grade: beatGrade, handle: get().handle });
         set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
       }
       return;
@@ -295,6 +298,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
     if (activeWave?.element === "duet_loop") {
       const cfg = BALANCE.elements.duetLoop;
       if (activeWave.completed >= cfg.pods) {
+        track('element_used', { element: 'duet_loop', grade: 'completed', handle: get().handle });
         set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
         return;
       }
@@ -311,6 +315,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
       // 600ms grace after grade assigned → clear wave
       if (activeWave.grade !== undefined) {
         if (activeWave.resolvedAt !== undefined && Date.now() - activeWave.resolvedAt > 600) {
+          track('element_used', { element: 'hold_drop', grade: activeWave.grade, handle: get().handle });
           set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
         }
         return;
@@ -334,6 +339,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
       }
       // Auto-expire if untouched for expiryAfterSec
       if (activeWave.pressedAt === null && (Date.now() - activeWave.startedAt) / 1000 >= cfg.expiryAfterSec) {
+        track('element_used', { element: 'hold_drop', grade: 'expired', handle: get().handle });
         set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
       }
       return;
@@ -343,6 +349,8 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
       // 600ms grace after all traces graded → clear wave
       if (activeWave.resolvedAt !== undefined) {
         if (Date.now() - activeWave.resolvedAt > 600) {
+          const swipeGrade = activeWave.traces.every(t => t.grade === "perfect") ? "all_perfect" : "partial";
+          track('element_used', { element: 'swipe_hits', grade: swipeGrade, handle: get().handle });
           set({ activeWave: null, nextWaveAt: Date.now() + idleGapMs });
         }
         return;

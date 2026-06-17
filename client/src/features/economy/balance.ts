@@ -133,6 +133,14 @@ export const BALANCE = {
     royaltyFollowersPerFollow: 1,  // SERVER-relayed (8.6): poster gains followers per follow
     npcSeedLikesMin: 100,          // NPC card seeded counters: likes log-uniform in
     npcSeedLikesMax: 100000,       //   [min, max]; comments/shares derived (§13.7)
+
+    // 14.1 Momentum: ephemeral no-dead-zones beat (10 §A). Fills with TEB taps
+    // + rail reactions, drains while idle; never persisted.
+    momentumPerEngage: 1,          // meter += this per TEB tap / rail reaction
+    momentumCap: 35,               // ~35 engagements to fill (≈30–45s of active play)
+    momentumIdleDelaySec: 6,       // idle grace before drain starts (matches TapCore's IDLE_SEC)
+    momentumIdleDecayPerSec: 8,    // drain rate once idle (wipes a full meter in ~4.4s)
+    momentumBonusMult: 10,         // burst = this × the gain of the tap/reaction that filled it
   },
 
   // Phase 9 — repeatable upgrades (04 §14)
@@ -140,6 +148,17 @@ export const BALANCE = {
     engagementBoost: { baseCost: 10, costGrowth: 1.75, maxLevel: 25, postPowerAddPerLevel: 1 },
     loyalFollowers:  { baseCost: 40, costGrowth: 1.80, maxLevel: 15, followerConversionAddPerLevel: 0.2 },
     autoEngageBot:   { baseCost: 75, costGrowth: 1.90, maxLevel: 20, passiveCoinsAddPerLevel: 0.5 },
+  },
+
+  // Phase 15 — Video catalog (11 §A/C)
+  catalog: {
+    catalogYieldCoeff: 0.2,      // coinsPerSec per post = postPower × this (04 §3)
+    catalogPeakAtSec: 120,       // yield peaks at this age (seconds), then decays
+    // decay: factor = max(0.1, 1 - (age - peak) / (peak × 6)); floor reached at age = 6.4 × peak
+
+    // 15.3 view-buff: temporary tap-coin boost the viewer gets when a card becomes active
+    viewBuffMult: 1.15,          // +15% coins per tap while buff is active
+    viewBuffDurationSec: 30,     // buff lasts 30s after card becomes active
   },
 
   // Phase 7.3 — the element framework (04 §13.2)

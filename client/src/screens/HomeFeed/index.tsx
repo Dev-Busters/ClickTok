@@ -52,6 +52,8 @@ export function HomeFeed() {
   const trendsAvailable = useGameStore(s => s.trendsAvailable);
   const combo         = useGameStore(s => s.combo);
   const viralUntil    = useGameStore(s => s.viralUntil);
+  const viewBuffUntil = useGameStore(s => s.viewBuffUntil);
+  const viewBuffMult  = useGameStore(s => s.viewBuffMult);
   const setSheet      = useGameStore(s => s.setSheet);
   const deck          = useGameStore(s => s.deck);
   const deckIndex     = useGameStore(s => s.deckIndex);
@@ -117,6 +119,14 @@ export function HomeFeed() {
     resetIdleTimer();
     return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
   }, [resetIdleTimer]);
+
+  // 15.3 (11 §C): tick `nowMs` once per second to drive the buff pill countdown.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (viewBuffUntil <= Date.now()) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [viewBuffUntil]);
 
   // combo only needed here for canvasIntensity (TapCore reads it from store directly)
   const fillFraction    = Math.min(combo, BALANCE.feed.comboCap) / BALANCE.feed.comboCap;
@@ -313,6 +323,34 @@ export function HomeFeed() {
         )}
       </div>
 
+      {/* ── View-buff pill (15.3 — 11 §C) ──────────────────────────────── */}
+      <AnimatePresence>
+        {viewBuffUntil > nowMs && (
+          <motion.div
+            key="view-buff-pill"
+            initial={{ opacity: 0, y: -8, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              position: 'absolute', top: 62, left: '50%', transform: 'translateX(-50%)',
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px',
+              borderRadius: 999,
+              background: 'rgba(255,210,0,0.18)',
+              border: '1px solid rgba(255,210,0,0.45)',
+              zIndex: 3,
+              pointerEvents: 'none',
+            }}
+          >
+            <span style={{ fontSize: '11px' }}>⚡</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.12em', color: 'var(--gold)' }}>
+              +{Math.round((viewBuffMult - 1) * 100)}% COINS {Math.ceil((viewBuffUntil - nowMs) / 1000)}s
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Element stage (element_stage unlock) ────────────────────────── */}
       {elementStageUnlocked && (
         <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -476,36 +514,45 @@ function ModBanner({ mod }: { mod: FeedModId }) {
   return (
     <>
       <div style={{
-        position: 'absolute', top: 56, left: 0, right: 0, height: 32,
+        position: 'absolute', top: 56, left: 0, right: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         pointerEvents: 'none',
       }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
+          display: 'flex', flexDirection: 'column', gap: 2,
           maxWidth: 340,
           padding: '5px 10px',
-          borderRadius: 999,
+          borderRadius: 14,
           background: 'rgba(0,0,0,0.5)',
           border: '1px solid rgba(255,255,255,0.12)',
         }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 7, letterSpacing: '0.13em',
+              color: 'rgba(255,255,255,0.38)',
+              background: 'rgba(255,255,255,0.07)',
+              padding: '1px 5px', borderRadius: 3,
+              flexShrink: 0,
+            }}>
+              VIDEO PERK
+            </span>
+            <span style={{ fontSize: 13, lineHeight: 1, flexShrink: 0 }}>{def.icon}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--cyan)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {def.name}
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-ui)', fontSize: 10, color: 'rgba(255,255,255,0.75)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {def.effectLine}
+            </span>
+          </div>
+          {/* 14.2 (10 §B): one-line playstyle hint, folded into this banner */}
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 7, letterSpacing: '0.13em',
-            color: 'rgba(255,255,255,0.38)',
-            background: 'rgba(255,255,255,0.07)',
-            padding: '1px 5px', borderRadius: 3,
-            flexShrink: 0,
+            fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.02em',
+            color: 'var(--dim)', textAlign: 'center',
           }}>
-            VIDEO PERK
-          </span>
-          <span style={{ fontSize: 13, lineHeight: 1, flexShrink: 0 }}>{def.icon}</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.12em', color: 'var(--cyan)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {def.name}
-          </span>
-          <span style={{
-            fontFamily: 'var(--font-ui)', fontSize: 10, color: 'rgba(255,255,255,0.75)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {def.effectLine}
+            {def.strategy}
           </span>
         </div>
       </div>

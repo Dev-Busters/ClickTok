@@ -87,6 +87,7 @@ export function generateNpcCard(index: number): VideoCard {
     tapCount,
     reactions: { likes, comments, shares },
     npc:       true,
+    buff:      { mult: BALANCE.catalog.viewBuffMult, durationSec: BALANCE.catalog.viewBuffDurationSec },
   };
 }
 

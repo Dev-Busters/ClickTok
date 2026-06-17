@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
 import { UPGRADE_CATALOG } from "../../features/upgrades/catalog";
 import type { Currency } from "../../features/economy/types";
+import { track } from "../../lib/telemetry";
 
 export type UpgradesSlice = {
   ownedUpgrades: Record<string, boolean>;
@@ -48,6 +49,7 @@ export const createUpgradesSlice: StateCreator<FullState, [], [], UpgradesSlice>
       wallet: newWallet,
     });
     get().recomputeStats();
+    track('upgrade_purchased', { id, category: def.category, coins: def.cost?.coins ?? 0, handle: get().handle });
     return true;
   },
 
@@ -74,6 +76,7 @@ export const createUpgradesSlice: StateCreator<FullState, [], [], UpgradesSlice>
       wallet: { ...wallet, coins: wallet.coins - cost },
     });
     get().recomputeStats();
+    track('upgrade_purchased', { id, category: 'repeatable', level: level + 1, coins: cost, handle: get().handle });
     return true;
   },
 });

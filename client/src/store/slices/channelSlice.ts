@@ -94,18 +94,23 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     get().checkMetrics();
     get().checkAffordableUpgrades();
     get().decayCombo(dt);
+    get().decayMomentum(dt);
     get().expireOrResolveWave();
 
-    const { passiveFollowersPerSec, multiplier, wallet, comments } = get();
-    const gained = passiveFollowersPerSec * multiplier * dt;
-    if (gained === 0) return;
+    const { passiveFollowersPerSec, passiveCoinsPerSec, multiplier, wallet, comments } = get();
+    const followerGain = passiveFollowersPerSec * multiplier * dt;
+    // 15.1 (11 §A): fold catalog yield into the meta tick so passive coins accrue live.
+    const catalogYield = get().catalogYieldPerSec();
+    const coinGain = (passiveCoinsPerSec + catalogYield.coins) * dt;
+    if (followerGain === 0 && coinGain === 0) return;
     set({
       wallet: {
         ...wallet,
-        followers: wallet.followers + gained,
-        totalFollowers: wallet.totalFollowers + gained,
+        coins: wallet.coins + coinGain,
+        followers: wallet.followers + followerGain,
+        totalFollowers: wallet.totalFollowers + followerGain,
       },
-      comments: comments + gained * 0.05 * dt,
+      comments: comments + followerGain * 0.05 * dt,
     });
   },
 
@@ -164,7 +169,10 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
       set({ lastSeenAt: now });
       return null;
     }
-    const coins = passiveCoinsPerSec * elapsedSec;
+    // 15.1 (11 §A): include catalog yield snapshot in idle income.
+    const catalogYield = get().catalogYieldPerSec(now);
+    const effectiveRate = passiveCoinsPerSec + catalogYield.coins;
+    const coins = effectiveRate * elapsedSec;
     const followers = coins * 0.1;
     set({
       wallet: {
