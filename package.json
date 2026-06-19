@@ -13,7 +13,7 @@
     "dev:party": "pnpm --filter party dev",
     "build": "pnpm --filter client build",
     "typecheck": "pnpm --filter client typecheck && pnpm --filter party typecheck",
-    "test": "echo \"No tests yet\""
+    "test": "pnpm --filter client test:rhythm"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"

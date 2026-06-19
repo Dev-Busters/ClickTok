@@ -214,4 +214,56 @@ export const BALANCE = {
       allPerfectBonus: 8,  // all traces hit → +8 × gainPerPost bonus on final trace
     },
   },
+
+  // Phase 16 — TEB node-sequence framework (04 §15.4)
+  teb: {
+    holdLaunchThresholdMs: 220,   // press longer than this (cooldown elapsed) = launch; shorter = tap
+    cooldownSec: 18,              // keeps repeat sessions below run income per minute
+
+    // charge (hold_charge) — 15.1
+    chargeStartScale: 2.4,        // ring starts at 2.4× TEB radius (clearly outside)
+    chargeEndScale: 0.55,         // shrinks past TEB's size if held too long
+    chargeShrinkSec: 1.8,         // start→end travel time
+    chargeTolerance: 0.45,        // |scale-1| within this → quality > 0; brighten this band gold
+
+    // sequence (tap_three) — 15.2
+    nodeSizePx: 72,               // diameter of each numbered node
+    parFastSec: 1.2,              // finish ≤ this → speedQuality 1
+    parSlowSec: 4.0,              // finish ≥ this → speedQuality 0
+    sequenceTimeoutSec: 8,        // auto-resolve if not completed (reward × completion fraction)
+    resultGraceSec: 1.2,          // result banner lingers this long before auto-dismiss
+
+    // reward — 15.3
+    sessionBasePayout: 4,         // perfect ceiling = 16×, matching BEAT SYNC's 17× band
+    chargeMultMin: 0.5, chargeMultMax: 2.0,
+    speedMultMin: 0.5,  speedMultMax: 2.0,
+    rhythm: {
+      countInMs: 720,
+      approachMs: 900,
+      approachStartScale: 2.2,
+      perfectWindowMs: 70,
+      greatWindowMs: 150,
+      goodWindowMs: 260,
+      perfectQuality: 0.90,
+      greatQuality: 0.65,
+      targetDiameterPx: 72,
+      hitRadiusPx: 46,
+      holdRadiusPx: 52,
+      holdBreakGraceMs: 100,
+      swipeNodeRadiusPx: 46,
+      swipeMaxLinkMs: 780,
+      traceRadiusPx: 42,
+      traceSampleCount: 48,
+      maxPointerSamples: 96,
+      trailPointCap: 10,
+      trailFadeMs: 220,
+      resultGraceMs: 1400,
+      layoutAttempts: 40,
+      rhythmBasePayout: 3,
+      performanceMultMin: 0.5,
+      performanceMultMax: 1.8,
+      rhythmComboCap: 4,
+      rhythmComboPerHit: 0.025,
+    },
+  },
 } as const;

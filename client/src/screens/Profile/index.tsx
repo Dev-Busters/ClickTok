@@ -40,6 +40,10 @@ export function Profile() {
   const setSheet           = useGameStore(s => s.setSheet);
   const skillLevels        = useGameStore(s => s.skillLevels);
   const ownedElements      = useGameStore(s => s.ownedElements);
+  const rhythmMuted        = useGameStore(s => s.rhythmMuted);
+  const reducedFeedback    = useGameStore(s => s.reducedFeedback);
+  const setRhythmMuted     = useGameStore(s => s.setRhythmMuted);
+  const setReducedFeedback = useGameStore(s => s.setReducedFeedback);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', paddingBottom: '32px' }}>
@@ -182,6 +186,17 @@ export function Profile() {
       <Divider />
 
       <CloudAccountPanel />
+
+      <Divider />
+      <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px' }}>
+        <SectionLabel icon="♪" label="RHYTHM FEEDBACK" />
+        <label style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)' }}>
+          MUTE HIT CUES <input type="checkbox" checked={rhythmMuted} onChange={e => setRhythmMuted(e.target.checked)} />
+        </label>
+        <label style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text)' }}>
+          REDUCED FEEDBACK <input type="checkbox" checked={reducedFeedback} onChange={e => setReducedFeedback(e.target.checked)} />
+        </label>
+      </div>
     </div>
   );
 }

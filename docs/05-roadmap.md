@@ -1929,6 +1929,176 @@ and the game playable solo at every step.
 
 ---
 
+## PHASE 16 — TEB node-sequence framework (design LOCKED 2026-06-17; full spec in `docs/12-teb-node-framework.md`)
+
+Goal: replace the cramped "auto-spawn a wave beside TEB" model with a **TEB-launched, full-area**
+minigame framework. You hold TEB to charge (a ring shrinks to match it), release to launch, **TEB
+disappears**, a node minigame owns the whole play area, then TEB **returns** and shows your reward.
+First move = hold-to-charge; first minigame = `tap_three` (3 numbered nodes, tap 1→2→3 fast).
+**Two locked decisions:** (1) pause the four existing element minigames now (dormant, re-home later);
+(2) TEB tap always works — only the *launch* is on a cooldown. Introduces a `SAVE_VERSION` bump
+(→13, one teach flag) + new economy numbers + a new ephemeral slice. Do tasks in order; size each ≤ a
+6.x task. Read `12`'s section per task; balance via `client/scripts/simBalance.ts`; keep runs primary
+(`04 §11`) and the FYP playable at every step.
+
+- [x] **16.1 — Pause auto-spawn elements + suppress unlock UI (`12 §F`).** Gate off the
+  `if (!activeWave)` auto-spawn branch in `elementsSlice.expireOrResolveWave()` so no wave ever pops
+  beside TEB (the rest of the fn becomes a no-op while `activeWave` stays null). Hide the per-element
+  unlock section / `ElementUnlockSheet` entry in `screens/CreatorStudio/index.tsx` and suppress the
+  element "TRY NOW" path (14.3). Leave ALL element code/components/`elementsSlice`/catalog intact
+  (dormant) for later re-homing. Note in your `> note:` whether `<ElementStage/>` stays mounted (for
+  its idle equalizer) or is removed. No persisted-state change.
+  **Refs:** `12 §F`, `12 §A`. **DoD:** with `element_stage` unlocked, nothing auto-spawns on Home and
+  no element-unlock CTAs surface; existing element code still typechecks (dormant); old saves
+  unaffected; typecheck; preview (sit on Home → no waves, no CTAs).
+  > note: `<ElementStage/>` stays mounted — it renders the idle equalizer bar harmlessly (no wave ever fires). `ElementUnlockSection` removed from `CreatorStudio` (local UI helper, not a core element component); all core element components/`elementsSlice`/catalog untouched.
+
+- [x] **16.2 — Session state machine + balance + helpers (`12 §E`, `04 §15`).** Add
+  `features/teb/types.ts` (mirror `03 §6.6`), pure helpers `features/teb/charge.ts`
+  (`ringScale`, `chargeQuality`) + `features/teb/sequence.ts` (`speedQuality`, `pickNodePositions`,
+  `SEQUENCE_CATALOG` with `tap_three`), and `store/slices/tebSlice.ts` (`session`, `tebReadyAt`,
+  `beginCharge`/`releaseCharge`/`tapNode`/`tickTebSession`/`dismissResult` + the resolve helper).
+  Wire `tickTebSession()` into `channelSlice.tick(dt)` alongside `expireOrResolveWave()`. Add the
+  `BALANCE.teb` block from `04 §15.4`. `session`/`tebReadyAt` are EPHEMERAL (exclude from
+  `partialize`). No UI yet.
+  **Refs:** `12 §E`, `03 §6.6`, `04 §15`. **DoD:** driving the slice by hand (preview_eval / console)
+  advances charging→sequence→result→cleared and the cooldown gates relaunch; `releaseCharge` sets a
+  plausible `chargeQuality`; `tapNode` only advances on the current target; typecheck.
+
+- [x] **16.3 — Charge interaction on TEB (`12 §A/§B`).** In `screens/HomeFeed/TapCore.tsx`: keep the
+  immediate engagement tap on `pointerDown`, and additionally start a hold timer; if still held at
+  `holdLaunchThresholdMs` AND launch-eligible (framework unlocked, no session, `Date.now() >=
+  tebReadyAt`) call `beginCharge()`. Render a `TebChargeRing` concentric with TEB that shrinks
+  `chargeStartScale`→`chargeEndScale` over `chargeShrinkSec` (gold "match" glow within
+  `chargeTolerance`, HOLD-DROP-style), and `releaseCharge()` on pointer up/cancel. Show a "ready to
+  charge" cue only when eligible. One-time teach caption ("HOLD — release when the ring matches the
+  button"); add persisted `tebChargeTeachSeen` → **bump `SAVE_VERSION` 12→13** + `PersistedV13` +
+  migration (default false) + `toPersistedState`, per `store/slices/meta.ts` precedent.
+  **Refs:** `12 §A/§B`, `04 §15.1`, `03 §6.6`. **DoD:** holding launches a visible shrinking ring;
+  releasing near the match reads as high charge (early/late as low); quick tap still pays normal
+  engagement; cooldown blocks immediate relaunch; teach shows once (old save migrates); typecheck;
+  preview.
+
+- [x] **16.4 — Node sequence layer + TEB hide (`12 §C`).** While `session.phase === 'sequence'`, hide
+  the TEB button (TapCore renders no button) and mount `NodeSequenceLayer` (`position:absolute;
+  inset:0`, `pointerEvents:'auto'`, above the video canvas / below the bottom nav) over the play-area
+  container that holds `<TapCore/>`. Render the 3 numbered nodes at `pickNodePositions`-derived spots
+  (full-area, top/bottom safe insets); highlight the current target; ignore wrong-order taps; call
+  `tapNode(id)` on the target. Resolve on completion or `sequenceTimeoutSec`.
+  **Refs:** `12 §C`, `04 §15.2`, `03 §6.6`. **DoD:** after a charge release TEB disappears and 3
+  numbered nodes fill the play area (clear of top row + bottom nav); tapping 1→2→3 completes; faster =
+  higher speedQuality; wrong-order taps ignored; timeout resolves gracefully; typecheck; preview.
+
+- [x] **16.5 — Reward resolve + result banner + cooldown (`12 §D`).** Implement the combined payout in
+  the resolve helper per `04 §15.3` (`chargeMult × speedMult × completion × comboMult × viralMult` →
+  coins/followers/likes; do NOT reset combo); set `phase:'result'` with the breakdown and start
+  `tebReadyAt`. Render `SessionResultBanner` near the returned TEB (charge grade + speed grade +
+  total reward via `pushFloatText`), auto-dismiss after `resultGraceSec` → `dismissResult()`. Fire
+  `teb_session_started`/`teb_session_resolved` telemetry if 14.5 is in. Sim-verify the session band
+  vs. elements and that runs still dominate (`04 §11`).
+  **Refs:** `12 §D`, `04 §15.3/§11`. **DoD:** completing a sequence pays the combined reward, shows
+  both grades + total as TEB returns, then a cooldown before the next launch; great charge + fast taps
+  pays the most; sim passes; typecheck; preview end-to-end (idle→hold→charge→nodes→reward→cooldown).
+  > note: Rebalanced `sessionBasePayout` 6→4 and `cooldownSec` 6→18 after the Phase 16 sim showed repeat sessions out-earning midgame runs; perfect TEB is now 16× vs. BEAT SYNC's 17× and typical sessions remain below runs at all snapshots. State-machine smoke, typecheck, and build pass. In-app browser preview was attempted on loopback, localhost, and LAN but could not connect to the local Vite server in this environment.
+
+---
+
+## PHASE 17 — TEB Rhythm Canvas (design LOCKED 2026-06-19; full spec in `docs/13-teb-rhythm-canvas.md`)
+
+Goal: turn Phase 16's one tap sequence into a polished, extensible rhythm layer: approach timing,
+hold/release, continuous swipe chains, curved tracing, judgements, full FYP takeover, original
+ClickTok visual language, accessibility, and measured performance. Keep React/DOM/Framer; use one
+pointer router and pure scoring helpers; runs remain primary. Introduces one persisted per-chart
+teach map and `SAVE_VERSION` bump 13→14. Do tasks in order; each must leave `tap_three` playable.
+
+- [x] **17.1 — Generic chart/session model (`13 §A/§C/§F`, `03 §6.6`).** Replace the Phase 16
+  `sequence` runtime with `count_in`/`playing` phases, generic `RhythmChart`/`RuntimeNode`/
+  `RhythmJudgement`/`RhythmPointer` types, `SequenceId` union, and `chartCatalog.ts`. Add seeded
+  `buildChart(sequence, seed, rect)` with measured normalized geometry, safe-area validation,
+  bounded layout attempts, and authored fallbacks. Adapt `tap_three` only; preserve its current
+  behavior/reward while the new fields are introduced. All new runtime fields are ephemeral.
+  **Refs:** `13` §A/§C/§F, `03` §6.6, `02` §3/§5. **DoD:** same hold→tap-three→result loop works
+  through the generic model; deterministic seed produces identical valid geometry at the same
+  rect; 320×640 and 390×844 layouts avoid safe zones/overlap; typecheck + pure layout tests.
+
+- [x] **17.2 — Pointer router + judgement/reward engine (`13 §B/§D`, `04 §16`).** Add pure
+  `pointerReducer.ts`, `judgement.ts`, and `reward.ts`; route pointer down/move/up/cancel through
+  `tebSlice`; enforce one primary pointer, pointer-id matching, sample cap, and safe cancellation.
+  Convert `tap_three` to authored `hitAt` timing with PERFECT/GREAT/GOOD/MISS, rhythm combo, weighted
+  `performanceQuality`, completion, and the `04 §16.3` payout. Do not add hold/swipe/trace UI yet.
+  **Refs:** `13` §B/§D/§F, `04` §16, `03` §6.6. **DoD:** boundary tests cover every timing window,
+  wrong target, second pointer, cancel, timeout, combo reset/preserve, and formula-exact reward;
+  old quick tapping unchanged; sim keeps Phase 17 ceiling/run-primary constraints; typecheck.
+
+- [x] **17.3 — Full-playfield visual foundation + polished TAP THREE (`13 §E`, `06 §12`).** Extract
+  Phase 16 rhythm UI from `TapCore.tsx` into `screens/HomeFeed/rhythm/`. Add 720ms count-in,
+  hide/disable all feed chrome and paging while the chart owns the field, retain the dim moving
+  video backdrop, and build `RhythmHud`, shared target anatomy, contracting approach rings,
+  judgement bursts, capped pointer trail, chart-complete bloom, and TEB return transition. No
+  raster target art: circles, rails, numbers, and glyphs stay responsive/code-native.
+  **Refs:** `13` §A/§E, `06` §12. **DoD:** TAP THREE reads immediately over every VideoCanvas topic;
+  chrome cannot intercept play; target hierarchy/judgements/TEB return are polished at 390×844 and
+  320px wide; reduced motion remains legible; no relevant console warnings; browser screenshots.
+  > note: in-app browser interaction/DOM QA passed at 390×844 and 320×640 with zero console
+  > warnings; its CDP screenshot command repeatedly timed out, so no screenshot artifact was saved.
+
+- [x] **17.4 — HOLD THE BEAT (`hold_pulse`) (`13 §B/§C`, `04 §16.2`).** Add `HoldTarget` and the
+  two-node short→long hold chart. Pointerdown judges onset, pointer capture tracks inside-time with
+  `holdBreakGraceMs`, radial fill/end-cap communicate release timing, and pointerup/cancel judges
+  integrity + release. A broken hold continues the chart and cannot leave capture stuck.
+  **Refs:** `13` §B/§C, `04` §16.1–16.2, `06` §12.4. **DoD:** early/on-time/late starts/releases,
+  brief/long excursions, cancel, hidden-tab resume, and timeout are tested; visuals make "keep
+  holding" vs. "release now" obvious without prose; mouse + touch-sized browser QA; typecheck.
+
+- [x] **17.5 — CONNECT swipe chain (`swipe_chain`) (`13 §B/§C`, `04 §16.2`).** Add `SwipeChain`:
+  press node 1, retain capture, cross nodes 2→4 in order, illuminate completed links, ignore future
+  nodes crossed out of order, and resolve remaining links as misses on early release/cancel. Score
+  geometric backtracking/control independent of pointer event frequency.
+  **Refs:** `13` §B/§C, `04` §16.2, `06` §12.4. **DoD:** one continuous gesture completes the chart;
+  wrong order/second pointer/fast sparse events/early release/cancel behave deterministically;
+  generated links do not cross forbidden UI zones or each other; browser touch/mouse QA; typecheck.
+
+- [x] **17.6 — RIDE THE LINE trace slider (`trace_arc`) (`13 §B/§C`, `04 §16.2`).** Add `TracePath`
+  with seeded S-curve/arc geometry, broad rail, guide bead, start/end caps, fixed-distance coverage
+  buckets, active fill, and capped luminous trail. Score path coverage and end timing; sampling rate
+  cannot change the result. Use SVG path geometry in DOM; profile before considering Pixi.
+  **Refs:** `13` §B/§C/§E/§H, `04` §16.2, `06` §12.4. **DoD:** perfect/partial/off-path/early-release/
+  cancel cases test exactly; same physical trace at sparse/dense events scores within tolerance;
+  mobile p95 frame time meets §H budget with no unbounded DOM growth; browser QA; typecheck.
+
+- [x] **17.7 — Shuffle bag + per-chart teaching + save v14 (`13 §A/§F/§G`).** Implement an ephemeral
+  no-immediate-repeat shuffle bag and first-encounter gesture teaches for all four charts. Persist
+  `tebSequenceTeachSeen`, bump `SAVE_VERSION` 13→14, add `PersistedV14`, migration, and
+  `toPersistedState`; migrate `{tap_three:true}` only when the old charge teach was already seen.
+  Add skip/dismiss and keyboard fallback affordances without adding a mode-picker UI.
+  **Refs:** `13` §A/§F/§G, `03` §6.6, `02` §4. **DoD:** four charts appear without immediate repeat;
+  each teach appears once and never blocks node one; v13 save migrates/reloads; keyboard fallback
+  can complete every chart (simplified trace checkpoints allowed); typecheck + preview.
+
+- [x] **17.8 — Rhythm polish, feedback, telemetry, balance, and playtest (`13 §E/§H`, `04 §16.5`).**
+  Add optional synthesized hit cues (gesture-unlocked, silent failure), supported-device PERFECT/
+  completion haptics, `reducedFeedback`, final visual polish, and aggregate-only Phase 17 telemetry.
+  Extend `simBalance.ts` per chart; add a dev performance overlay or probe for frame time/DOM counts;
+  run five attempts per chart on pointer and keyboard, plus 320px/390×844/reduced-motion/tab-hide
+  matrices. Keep raw pointer coordinates client-only.
+  **Refs:** `13` §E/§G/§H, `04` §16.5, `06` §12. **DoD:** telemetry payloads match spec; mute/
+  reducedFeedback/reduced-motion work independently; all charts remain below LIVE income/min;
+  p95 frame time and DOM caps pass; five-run human test can identify each verb after one teach;
+  typecheck, tests, build, and browser QA pass with screenshots and no relevant console warnings.
+  > note: tuned `rhythmBasePayout` 4→3 after the real balance sim showed the 4× midpoint narrowly
+  > overtaking LIVE at the mid snapshot; the perfect chart ceiling is now 11.88×. The older sim's
+  > targets (a)/(f) remain red because current pre-Phase-17 catalog costs no longer match those
+  > historical assertions; the Phase 17 per-chart run-primary check passes independently.
+  > Browser QA completed each chart through its PERFECT result banner; the 320px trace probe read
+  > p95 16.9ms / 1 live target node with zero console warnings. Screenshot capture was unavailable
+  > because the in-app browser's CDP capture command timed out repeatedly.
+
+**Phase 17 exit criteria:** four short, original, osu!-inspired ClickTok rhythm charts launch from
+the existing TEB hold, own the full FYP safely, feel consistent and highly polished, resolve through
+one tested judgement/reward engine, remain accessible/resilient, and never outrank LIVE economically.
+
+---
+
 ## How to update this file
 When you finish a task: change `[ ]`→`[x]`, and if you deviated from the spec, add a one-line
 `> note:` under it explaining what changed and why (so the next model and the docs stay honest).

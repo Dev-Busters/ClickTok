@@ -657,3 +657,210 @@ unlocks the `+` button (08 §B — staggered creator path).
 - (§13.8) VIRAL is the session heartbeat: target 1–3 triggers per active minute mid-game. If it's
   rarer, raise `viralExitCombo` (shorter climb); if it's constant, lower it. Instrument viral
   triggers/session and sweep rate alongside the §13.2 spikes.
+
+## 15. TEB sessions — the node-sequence framework (Phase 16; design in `12`, types in `03` §6.6)
+
+The TEB-launched, full-area minigame loop. **Supersedes** the auto-spawn element waves (§13.2),
+which are paused. A session = hold-to-charge → node sequence → reward, then a launch cooldown.
+Reward is paid in the same currency family as elements (coins/followers/likes via the
+`post*Conversion` constants), so it folds into per-minute income — and **runs must still dominate**
+(§11). All constants below are **starting placeholders to sim-tune**, not final balance.
+
+### 15.1 The charge (move `hold_charge`)
+```
+elapsed       = (now - pressedAt) / 1000
+ringScale     = chargeStartScale + (chargeEndScale - chargeStartScale) * clamp01(elapsed / chargeShrinkSec)
+chargeQuality = clamp01(1 - |ringScale - 1| / chargeTolerance)   // 1.0 = ring matches TEB exactly
+```
+- Scale `1.0` = TEB's size = the target. Releasing dead-on → `chargeQuality = 1`; outside
+  `chargeTolerance` → `0`. A zero charge still launches the sequence (charge is a multiplier, never
+  a gate). No release by `elapsed >= chargeShrinkSec` → auto-release at `chargeQuality = 0`.
+
+### 15.2 The sequence (`tap_three`) speed
+```
+elapsedSec   = (completedAt - startedAt) / 1000        // startedAt = nodes appeared
+speedQuality = clamp01((parSlowSec - elapsedSec) / (parSlowSec - parFastSec))
+completion   = nodesDone / totalNodes                  // 1.0 on full clear; <1 on timeout
+```
+
+### 15.3 The combined payout
+```
+chargeMult = chargeMultMin + (chargeMultMax - chargeMultMin) * chargeQuality
+speedMult  = speedMultMin  + (speedMultMax  - speedMultMin)  * speedQuality
+comboMult  = 1 + min(combo, comboCap) * comboPerTap     // same combo formula as elements (§13.1)
+k          = sessionBasePayout * chargeMult * speedMult * completion * comboMult * viralMult(viralUntil)
+
+coins      = tapPower * postCoinConversion     * multiplier * k
+followers  = tapPower * postFollowerConversion * followerConversion * multiplier * k
+likes      = tapPower * postLikeConversion     * multiplier * k
+```
+Session does NOT reset combo; it reads the current combo/VIRAL. The ceiling (perfect charge +
+lightning speed + full clear) should land in the band of a great BEAT SYNC all-PERFECT wave.
+
+### 15.4 Starting constants (`BALANCE.teb` — sim-tune)
+```ts
+teb: {
+  holdLaunchThresholdMs: 220,   // press longer than this (cooldown elapsed) = launch; shorter = tap
+  cooldownSec: 18,              // keeps repeat sessions below run income per minute
+
+  // charge (hold_charge) — 15.1
+  chargeStartScale: 2.4,        // ring starts at 2.4× TEB radius (clearly outside)
+  chargeEndScale: 0.55,         // shrinks past TEB's size if held too long
+  chargeShrinkSec: 1.8,         // start→end travel time
+  chargeTolerance: 0.45,        // |scale-1| within this → quality > 0; brighten this band gold
+
+  // sequence (tap_three) — 15.2
+  nodeSizePx: 72,               // diameter of each numbered node
+  parFastSec: 1.2,              // finish ≤ this → speedQuality 1
+  parSlowSec: 4.0,              // finish ≥ this → speedQuality 0
+  sequenceTimeoutSec: 8,        // auto-resolve if not completed (reward × completion fraction)
+  resultGraceSec: 1.2,          // result banner lingers this long before auto-dismiss
+
+  // reward — 15.3
+  sessionBasePayout: 4,         // perfect ceiling = 16×, matching BEAT SYNC's 17× band
+  chargeMultMin: 0.5, chargeMultMax: 2.0,
+  speedMultMin: 0.5,  speedMultMax: 2.0,
+}
+```
+
+### 15.5 Tuning guidance
+- A focused human should clear `tap_three` near `parFastSec` maybe a third of the time; tune
+  `parFastSec`/`parSlowSec` (not payouts) first if PostHog shows all-slow finishes.
+- A dead-on charge should be hittable ~half the time; tune `chargeTolerance` first if PostHog shows
+  mostly zero-charge launches.
+- Watch sessions/active-minute and median (chargeQuality, speedQuality) in PostHog. If sessions
+  out-earn an equivalent minute of runs, cut `sessionBasePayout` first — §11 rules everything.
+- `cooldownSec` paces the loop: too short and it crowds out runs; too long and the FYP feels dead
+  between sessions (tapping still fills the gap, but the launch is the dopamine beat).
+
+## 16. TEB Rhythm Canvas (Phase 17; design in `13`, types in `03` §6.6)
+
+Phase 17 keeps the Phase 16 charge multiplier but replaces a sequence-wide speed grade with
+per-interaction rhythm judgements. All chart kinds share one payout formula and one ceiling.
+
+### 16.1 Timing quality
+
+```text
+absErrorMs = abs(actualAt - targetAt)
+
+timingQuality(error) =
+  1                                               when error <= perfectWindowMs
+  lerp(1, greatQuality, inverseLerp(perfectWindowMs, greatWindowMs, error))
+  lerp(greatQuality, 0, inverseLerp(greatWindowMs, goodWindowMs, error))
+  0                                               when error > goodWindowMs
+```
+
+Judgement labels are derived from final interaction quality, not raw timing alone:
+
+```text
+PERFECT quality >= perfectQuality
+GREAT   quality >= greatQuality
+GOOD    quality > 0
+MISS    quality = 0
+```
+
+### 16.2 Per-kind quality
+
+```text
+tapQuality = timingQuality(pointerDownAt - hitAt)
+
+holdIntegrity = heldInsideTargetMs / holdDurationMs
+holdQuality   = 0.30*timingQuality(pointerDownAt - hitAt)
+              + 0.45*holdIntegrity
+              + 0.25*timingQuality(pointerUpAt - releaseAt)
+
+linksFraction = linksCompleted / totalLinks
+gestureControl = clamp01(1 - backtrackDistance / max(idealPathDistance, 1))
+swipeQuality   = 0.25*timingQuality(pointerDownAt - hitAt)
+               + 0.45*linksFraction
+               + 0.30*gestureControl
+
+traceQuality = 0.20*timingQuality(pointerDownAt - hitAt)
+             + 0.55*distanceWeightedPathCoverage
+             + 0.25*timingQuality(pointerUpAt - releaseAt)
+```
+
+Pointer sampling frequency must not change a score. Hold integrity is integrated over elapsed
+time, swipe control uses geometric distance, and trace coverage uses fixed path-distance buckets.
+
+### 16.3 Session quality and reward
+
+```text
+performanceQuality = weightedMean(interactionQuality, interactionWeight)
+completion         = resolvedRequiredUnits / totalRequiredUnits
+rhythmComboMult    = 1 + min(maxRhythmCombo, rhythmComboCap) * rhythmComboPerHit
+
+chargeMult      = chargeMultMin + (chargeMultMax - chargeMultMin) * chargeQuality
+performanceMult = performanceMultMin
+                + (performanceMultMax - performanceMultMin) * performanceQuality
+feedComboMult    = 1 + min(feedCombo, comboCap) * comboPerTap
+
+k = rhythmBasePayout
+  * chargeMult
+  * performanceMult
+  * completion
+  * rhythmComboMult
+  * feedComboMult
+  * viralMult(viralUntil)
+
+coins     = tapPower * postCoinConversion * multiplier * k
+followers = tapPower * postFollowerConversion * followerConversion * multiplier * k
+likes     = tapPower * postLikeConversion * multiplier * k
+```
+
+Interaction weights are `tap=1`, `hold=1.5`, `swipe link=0.75`, `trace=2`. These normalize chart
+complexity; they do not multiply payout directly. A chart with more DOM objects must not pay more
+merely because it contains more objects.
+
+### 16.4 Starting constants (`BALANCE.teb.rhythm` — sim/playtest tune)
+
+```ts
+rhythm: {
+  countInMs: 720,
+  approachMs: 900,
+  approachStartScale: 2.2,
+
+  perfectWindowMs: 70,
+  greatWindowMs: 150,
+  goodWindowMs: 260,
+  perfectQuality: 0.90,
+  greatQuality: 0.65,
+
+  targetDiameterPx: 72,
+  hitRadiusPx: 46,          // forgiving invisible radius around the 72px disc
+  holdRadiusPx: 52,
+  holdBreakGraceMs: 100,
+  swipeNodeRadiusPx: 46,
+  swipeMaxLinkMs: 780,
+  traceRadiusPx: 42,
+  traceSampleCount: 48,     // fixed-distance samples, not pointer-event samples
+  maxPointerSamples: 96,    // telemetry/debug cap; raw samples never leave client
+
+  trailPointCap: 10,
+  trailFadeMs: 220,
+  resultGraceMs: 1400,
+  layoutAttempts: 40,
+
+  rhythmBasePayout: 3,
+  performanceMultMin: 0.5,
+  performanceMultMax: 1.8,
+  rhythmComboCap: 4,
+  rhythmComboPerHit: 0.025, // max ×1.10; feedback matters more than payout
+}
+```
+
+`perfect charge × perfect performance × max rhythm combo = 11.88 × gainPerPost` before the
+existing feed-combo/VIRAL multipliers. This stays below Phase 16's 16× ceiling and the dormant
+BEAT SYNC 17× reference band while preserving LIVE as the primary active-income loop.
+
+### 16.5 Tuning rules
+
+- Tune interaction windows/radii from human MISS rates before touching payout.
+- Target first-encounter completion: `tap_three >= 85%`, `hold_pulse >= 75%`,
+  `swipe_chain >= 70%`, `trace_arc >= 65%`.
+- Target focused-player PERFECT/GREAT share after five attempts: 45–70%; all-PERFECT should be a
+  celebration, not the median outcome.
+- Compare each chart independently against bare tapping, dormant elements, and LIVE income per
+  minute. If a chart exceeds LIVE, lower `rhythmBasePayout`; do not make controls less responsive.
+- Chart duration plus the existing 18s launch cooldown controls frequency. Do not add per-chart
+  cooldowns or unequal reward multipliers in Phase 17.

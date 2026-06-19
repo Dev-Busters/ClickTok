@@ -3,9 +3,10 @@ import type { VideoPost } from "../../features/channel/types";
 import type { SkillId } from "../../features/skills/types";
 import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
+import type { SequenceId } from "../../features/teb/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 14;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -101,7 +102,18 @@ export type PersistedV12 = Omit<PersistedV11, "version"> & {
   version: 12;
 };
 
-export type PersistedState = PersistedV12;
+// 16.2: adds the one-time TEB charge teach flag.
+export type PersistedV13 = Omit<PersistedV12, "version"> & {
+  version: 13;
+  tebChargeTeachSeen: boolean;
+};
+
+export type PersistedV14 = Omit<PersistedV13, "version"> & {
+  version: 14;
+  tebSequenceTeachSeen: Partial<Record<SequenceId, boolean>>;
+};
+
+export type PersistedState = PersistedV14;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -134,6 +146,8 @@ export function toPersistedState(state: FullState): PersistedState {
     affordableNotifiedPillars: state.affordableNotifiedPillars,
     elementsTeachSeen: state.elementsTeachSeen,
     modTeachSeen: state.modTeachSeen,
+    tebChargeTeachSeen: state.tebChargeTeachSeen,
+    tebSequenceTeachSeen: state.tebSequenceTeachSeen,
   };
 }
 
@@ -162,7 +176,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -321,6 +335,24 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       version: 12,
       // 15.1: catalog active; videos[] already in the shape since v2 (was always persisted
       // as an empty array by the stub). No new fields — bump marks catalog as live.
+    };
+  }
+
+  if (version < 13) {
+    const v12 = state as PersistedV12;
+    state = {
+      ...v12,
+      version: 13,
+      tebChargeTeachSeen: false,
+    };
+  }
+
+  if (version < 14) {
+    const v13 = state as PersistedV13;
+    state = {
+      ...v13,
+      version: 14,
+      tebSequenceTeachSeen: v13.tebChargeTeachSeen ? { tap_three: true } : {},
     };
   }
 

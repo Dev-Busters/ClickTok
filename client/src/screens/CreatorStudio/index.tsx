@@ -5,10 +5,6 @@ import { isFeatureUnlocked } from "../../features/metrics/unlocks";
 import { CurrencyBar } from "../../components/CurrencyBar";
 import { UpgradeShop } from "../../components/UpgradeShop";
 import { SkillsPanel } from "../../components/SkillsPanel";
-import { ELEMENT_CATALOG } from "../../features/elements/catalog";
-import { ElementUnlockSheet } from "../../components/ElementUnlockSheet";
-import { formatCount } from "../../lib/format";
-import type { ElementDef } from "../../features/elements/types";
 import type { UpgradePillar } from "../../features/upgrades/types";
 
 type StudioTab = UpgradePillar;
@@ -155,19 +151,12 @@ export function CreatorStudio({ onClose }: { onClose: () => void }) {
 // ── VIEWER section: clicker upgrades + element unlocks ───────────────────────
 
 function ViewerSection() {
-  const metricsReached = useGameStore(s => s.metricsReached);
-  const elementStageUnlocked = isFeatureUnlocked("element_stage", metricsReached);
   return (
     <>
       <UpgradeShop pillar="viewer" />
       <SectionDivider />
       <SkillsPanel pillar="viewer" />
-      {elementStageUnlocked && (
-        <>
-          <SectionDivider />
-          <ElementUnlockSection />
-        </>
-      )}
+      {/* 16.1: ElementUnlockSection hidden — elements paused, re-home as TEB nodes later */}
     </>
   );
 }
@@ -205,98 +194,6 @@ function LiveSection() {
   );
 }
 
-// ── Element unlock list (Viewer section) ─────────────────────────────────────
-
-function ElementUnlockSection() {
-  const ownedElements = useGameStore(s => s.ownedElements);
-  const wallet = useGameStore(s => s.wallet);
-  const [sheetDef, setSheetDef] = useState<ElementDef | null>(null);
-
-  const locked = ELEMENT_CATALOG.filter(d => !ownedElements[d.id]);
-  const owned  = ELEMENT_CATALOG.filter(d =>  ownedElements[d.id]);
-
-  return (
-    <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.2em' }}>
-          ELEMENTS
-        </span>
-        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
-      </div>
-
-      {/* Owned elements */}
-      {owned.map(def => (
-        <div key={def.id} style={{
-          display: 'flex', alignItems: 'center', gap: '14px',
-          padding: '13px 14px',
-          background: 'rgba(255,255,255,0.015)',
-          border: '1px solid rgba(255,255,255,0.03)',
-          opacity: 0.6,
-        }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '30px', color: 'var(--cyan)', lineHeight: 1, width: '34px', flexShrink: 0 }}>✓</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px', color: 'var(--text)', letterSpacing: '0.03em', lineHeight: 1 }}>
-              {def.name}
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.04em', marginTop: '2px' }}>
-              {def.tagline}
-            </div>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--cyan)', letterSpacing: '0.18em' }}>OWNED</div>
-        </div>
-      ))}
-
-      {/* Locked / unlockable elements */}
-      {locked.map(def => {
-        const followersMet = wallet.followers >= def.requires.followers;
-        const canAfford = followersMet && wallet.coins >= def.requires.coins;
-        const withinReach = followersMet && wallet.coins >= def.requires.coins * 0.8;
-
-        return (
-          <motion.button
-            key={def.id}
-            whileTap={canAfford ? { scale: 0.985 } : undefined}
-            onClick={() => setSheetDef(def)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '14px',
-              width: '100%', textAlign: 'left',
-              padding: '13px 14px',
-              background: withinReach ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.015)',
-              border: `1px solid ${withinReach ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)'}`,
-              cursor: 'pointer',
-            }}
-          >
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '30px', color: withinReach ? 'var(--gold)' : 'var(--dim)', lineHeight: 1, width: '34px', flexShrink: 0 }}>
-              🔓
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px', color: 'var(--text)', letterSpacing: '0.03em', lineHeight: 1 }}>
-                {def.name}
-              </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--dim)', letterSpacing: '0.04em', marginTop: '2px' }}>
-                {def.tagline}
-              </div>
-              {!followersMet && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--gold)', letterSpacing: '0.08em', marginTop: '2px' }}>
-                  REQUIRES {formatCount(def.requires.followers)} FOLLOWERS
-                </div>
-              )}
-            </div>
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '22px', color: canAfford ? 'var(--cyan)' : 'var(--dim)', lineHeight: 1 }}>
-                {formatCount(def.requires.coins)}
-              </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em' }}>COINS</div>
-            </div>
-          </motion.button>
-        );
-      })}
-
-      {sheetDef && <ElementUnlockSheet def={sheetDef} onClose={() => setSheetDef(null)} />}
-    </div>
-  );
-}
 
 // ── Shared divider ────────────────────────────────────────────────────────────
 

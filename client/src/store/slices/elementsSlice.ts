@@ -250,7 +250,7 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
   },
 
   expireOrResolveWave: () => {
-    const { activeWave, openSheet, phase, spectating, ownedElements, nextWaveAt, deck, deckIndex } = get();
+    const { activeWave, openSheet, phase, spectating, deck, deckIndex } = get();
     // 01 §8.2 / 04 §13.2: scheduler pauses while a sheet is open or a run/spectate is active.
     if (openSheet !== null || phase !== "idle" || spectating !== null) return;
 
@@ -380,13 +380,8 @@ export const createElementsSlice: StateCreator<FullState, [], [], ElementsSlice>
     }
 
     if (!activeWave) {
-      if (Date.now() < nextWaveAt) return;
-      const owned = ELEMENT_CATALOG.filter(d => ownedElements[d.id]).map(d => d.id);
-      if (owned.length === 0) return;
-      const { lastSpawnedElement } = get();
-      const lastIdx = lastSpawnedElement ? owned.indexOf(lastSpawnedElement) : -1;
-      const next = owned[(lastIdx + 1) % owned.length];
-      get().spawnWave(next);
+      // 16.1: auto-spawn paused — elements re-home as TEB nodes in a later phase.
+      return;
     }
   },
 });

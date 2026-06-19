@@ -11,6 +11,7 @@ import { SKILL_CATALOG, SKILL_PILLAR } from "../../features/skills/catalog";
 import { ELEMENT_CATALOG } from "../../features/elements/catalog";
 import { formatCount } from "../../lib/format";
 import { pushCelebration } from "../../components/fx/CelebrationLayer";
+import { BALANCE } from "../../features/economy/balance";
 import { track } from "../../lib/telemetry";
 
 const ELEMENT_IDS = new Set<string>(ELEMENT_CATALOG.map(d => d.id));
@@ -174,6 +175,9 @@ export const createInboxSlice: StateCreator<FullState, [], [], InboxSlice> = (se
 
       // 12.2 (08 §B): celebration popup on every feature unlock.
       if (m.unlocks) {
+        if (m.unlocks === "element_stage") {
+          set({ tebReadyAt: Date.now() + BALANCE.teb.cooldownSec * 1000 });
+        }
         if (ELEMENT_IDS.has(m.unlocks)) {
           pushCelebration({
             icon: "🔓",

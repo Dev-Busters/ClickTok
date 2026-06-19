@@ -444,3 +444,23 @@ Then add two new rhythm elements:
 Pop-numbers v2 (bigger, bolder, color-coded, cascade with arc + scatter), celebration popups on
 unlocks (radial burst), cohesive CRT/arcade meters across all screens. Quality reference:
 Pegfinity's f17 frame — a screenful of bold gold/green/cyan numbers during a big moment.
+
+## 12. TEB Rhythm Canvas (Phase 17; design LOCKED 2026-06-19)
+
+Phase 16 established the new active-play contract: hold TEB to charge, release to clear the FYP,
+play a full-area sequence, then return to tapping. Phase 17 makes that contract the permanent
+rhythm-game layer.
+
+- **Fantasy:** engagement scatters out of TEB as a short creator-rhythm challenge, then recombines
+  into a burst of channel growth.
+- **Verbs:** timed tap, press-and-hold/release, continuous swipe between nodes, and curved trace.
+- **Cadence:** 1.5–4 second charts separated by the existing launch cooldown; these are punctuation
+  inside the FYP, not a replacement for LIVE runs.
+- **Readability:** osu!-inspired approach timing and slider-follow principles, expressed through
+  ClickTok's cyan/red chromatic split, gold mastery, CRT restraint, and moving video backdrop.
+- **Economy:** one normalized judgement model and one reward band. Mechanical complexity does not
+  create extra inflation; LIVE remains the primary active-income source.
+- **Architecture:** data-authored deterministic charts, one pointer router, pure judgement/reward
+  helpers, DOM/Framer rendering first, Pixi only after measured frame-budget failure.
+
+Full design: `docs/13-teb-rhythm-canvas.md`. Types: `03` §6.6. Formulas: `04` §16. UI: `06` §12.

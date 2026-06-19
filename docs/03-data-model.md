@@ -547,6 +547,129 @@ export type FeedSlice = {
 ```
 ```
 
+## 6.6 The TEB Rhythm Canvas (Phases 16–17 — see `12`/`13`; numbers in `04` §15–16)
+
+> The TEB-launched, full-area rhythm framework. Phase 16 proves charge→tap sequence→reward;
+> Phase 17 generalizes it to timed tap, hold, swipe-chain, and trace charts. One **session** at a
+> time. Runtime/chart/pointer state is ephemeral; only teach flags persist.
+
+```ts
+// features/teb/types.ts (client-only)
+
+export type NodeKind = "tap" | "hold" | "swipe" | "trace";
+export type SequenceId = "tap_three" | "hold_pulse" | "swipe_chain" | "trace_arc";
+
+// Fractional [0,1] position measured within RhythmPlayfield's safe rectangle.
+export type NodePos = { x: number; y: number };
+
+// Authored timing/interaction definition. Geometry is assigned by buildChart().
+export type NodeDef =
+  | { id: number; kind: "tap"; hitAtMs: number }
+  | { id: number; kind: "hold"; hitAtMs: number; durationMs: number }
+  | { id: number; kind: "swipe"; hitAtMs: number; toId: number }
+  | { id: number; kind: "trace"; hitAtMs: number; durationMs: number };
+
+export type SequenceDef = {
+  id: SequenceId;
+  name: string;
+  gestureHint: "tap" | "hold" | "swipe" | "trace";
+  nodes: NodeDef[];
+};
+
+// How the player manipulates TEB to launch. Phase 17 deliberately keeps one unambiguous move.
+export type TebMoveId = "hold_charge";
+
+export type RhythmNodeState = "upcoming" | "active" | "resolved" | "missed";
+
+export type RuntimeNode = {
+  id: number;
+  kind: NodeKind;
+  pos: NodePos;
+  hitAt: number;                    // ms epoch
+  releaseAt: number | null;         // hold/trace end; null for tap/swipe start nodes
+  path: NodePos[] | null;           // swipe/trace geometry; null for tap/hold
+  state: RhythmNodeState;
+  quality: number | null;           // [0,1] after resolution
+  completedAt: number | null;
+};
+
+export type RhythmJudgementLabel = "perfect" | "great" | "good" | "miss";
+export type RhythmJudgement = {
+  nodeId: number;
+  kind: NodeKind;
+  label: RhythmJudgementLabel;
+  quality: number;
+  at: number;
+  pos: NodePos;
+};
+
+// Serializable pointer summary only — never store PointerEvent/DOM objects in Zustand.
+export type RhythmPointer = {
+  pointerId: number;
+  inputKind: "pointer" | "keyboard";
+  nodeId: number;
+  startedAt: number;
+  start: NodePos;
+  current: NodePos;
+  visitedNodeIds: number[];
+  pathCoverage: number;
+  samples: { pos: NodePos; at: number }[];
+} | null;
+
+export type RhythmChart = {
+  sequence: SequenceId;
+  seed: number;
+  durationMs: number;
+  nodes: RuntimeNode[];
+};
+
+// One in-flight session (ephemeral). Discriminated by phase:
+export type TebSession =
+  | { phase: "charging"; move: "hold_charge"; pressedAt: number }   // shrinking ring around TEB
+  | { phase: "count_in";                                            // TEB hidden; chrome leaving
+      chart: RhythmChart;
+      chargeQuality: number;
+      startsAt: number }
+  | { phase: "playing";                                             // full-area rhythm ownership
+      chart: RhythmChart;
+      chargeQuality: number;
+      startedAt: number;
+      pointer: RhythmPointer;
+      judgements: RhythmJudgement[];
+      nextIndex: number;
+      rhythmCombo: number;
+      maxRhythmCombo: number }
+  | { phase: "result";                                              // TEB returned; reward shown
+      sequence: SequenceId;
+      chargeQuality: number;
+      performanceQuality: number;      // weighted judgement quality [0,1]
+      completion: number;              // resolved required units / total [0,1]
+      maxRhythmCombo: number;
+      reward: { coins: number; followers: number; likes: number; k: number }; // k = combined mult
+      resolvedAt: number };
+
+// store/slices/tebSlice.ts
+export type TebSlice = {
+  session: TebSession | null;   // ephemeral — NOT persisted (like activeWave)
+  tebReadyAt: number;           // ephemeral launch-cooldown clock (ms epoch; <=now = ready)
+  // ⚠ PERSISTED — one-time charge teach (12 §B). Bump SAVE_VERSION 12→13 + migration (default false).
+  tebChargeTeachSeen: boolean;
+  // ⚠ PERSISTED Phase 17 — per-chart teach flags. Bump SAVE_VERSION 13→14; see `13` §F.
+  tebSequenceTeachSeen: Partial<Record<SequenceId, boolean>>;
+  setTebChargeTeachSeen: () => void;
+  markTebSequenceTeachSeen: (sequence: SequenceId) => void;
+
+  beginCharge: () => void;      // guard: framework unlocked, no session, cooldown elapsed
+  releaseCharge: (rect: { width: number; height: number }) => void; // build chart → count_in
+  rhythmPointerDown: (input: { pointerId: number; pos: NodePos; at: number }) => void;
+  rhythmPointerMove: (input: { pointerId: number; pos: NodePos; at: number }) => void;
+  rhythmPointerUp: (input: { pointerId: number; pos: NodePos; at: number }) => void;
+  rhythmPointerCancel: (pointerId: number) => void;
+  tickTebSession: () => void;   // count-in/start windows/timeouts/result grace
+  dismissResult: () => void;    // clear session (cooldown keeps running)
+};
+```
+
 ## 7. UI slice & navigation
 
 ```ts

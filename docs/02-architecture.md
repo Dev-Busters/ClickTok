@@ -44,6 +44,7 @@ client/src/
     upgrades/                   # gear/software catalog + apply logic
     skills/                     # creator skills catalog + leveling
     livestream/                 # run engine: event spawner, scoring, reactions
+    teb/                        # TEB launch + rhythm charts, input reducer, judgement/reward
     social/                     # trends, raids, global events (Phase 4)
   store/
     index.ts                    # createStore: combines slices + persist
@@ -67,6 +68,11 @@ client/src/
   party/types.ts                # shared client<->server message types — exists
   components/                   # shared dumb UI primitives (Button, Sheet, Stat, etc.)
 ```
+
+Phase 17 rhythm boundary (`13`): `features/teb/` owns serializable chart definitions, seeded
+geometry, pure pointer transitions, judgement, and reward. `screens/HomeFeed/rhythm/` owns DOM/SVG
+rendering and pointer capture plumbing. `tebSlice` owns the ephemeral session snapshot. Do not put
+DOM nodes, browser PointerEvents, SVG path instances, Framer controls, or timer handles in Zustand.
 
 Pragmatic note for cheap models: feature folders are the *destination*. If a task is small, it's
 fine to keep a helper next to its consumer and move it later — but new **screens** and **store

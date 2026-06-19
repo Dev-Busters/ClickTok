@@ -513,6 +513,47 @@ console.log("── Target (e): no dead zone > 10 active minutes ─────
 console.log(`  Max gap between purchases: ${early.maxDeadZoneSec}s (${(early.maxDeadZoneSec / 60).toFixed(1)} min)`);
 console.log(`  ${pass(passE)}  (target: < ${TARGET_E_MAX_SEC}s)\n`);
 
+// ── Phase 17: shared rhythm-chart band and run-primary check ─────────────────
+const beatSyncPerfectK = BALANCE.elements.beatSync.rings * 4
+  + BALANCE.elements.beatSync.perfectWaveBonus;
+const tebPerfectK = BALANCE.teb.rhythm.rhythmBasePayout
+  * BALANCE.teb.chargeMultMax
+  * BALANCE.teb.rhythm.performanceMultMax
+  * (1 + BALANCE.teb.rhythm.rhythmComboCap * BALANCE.teb.rhythm.rhythmComboPerHit);
+const typicalChargeQuality = 0.65;
+const typicalPerformanceQuality = 0.7;
+const typicalCompletion = 0.9;
+const tebTypicalK = BALANCE.teb.rhythm.rhythmBasePayout
+  * (BALANCE.teb.chargeMultMin + (BALANCE.teb.chargeMultMax - BALANCE.teb.chargeMultMin) * typicalChargeQuality)
+  * (BALANCE.teb.rhythm.performanceMultMin + (BALANCE.teb.rhythm.performanceMultMax - BALANCE.teb.rhythm.performanceMultMin) * typicalPerformanceQuality)
+  * typicalCompletion
+  * (1 + 3 * BALANCE.teb.rhythm.rhythmComboPerHit);
+const targetChargeSec = (BALANCE.teb.chargeStartScale - 1)
+  / (BALANCE.teb.chargeStartScale - BALANCE.teb.chargeEndScale)
+  * BALANCE.teb.chargeShrinkSec;
+const typicalSequenceSec = (BALANCE.teb.parFastSec + BALANCE.teb.parSlowSec) / 2;
+const typicalSessionsPerMin = 60
+  / (targetChargeSec + typicalSequenceSec + BALANCE.teb.cooldownSec);
+
+const tebRunChecks = SNAPSHOTS.map((snap) => {
+  const stats = recomputeStats(snap.ownedUpgrades, snap.skillLevels, snap.upgradeLevels);
+  const tebCoinsPerMin = stats.tapPower * BALANCE.postCoinConversion * stats.multiplier
+    * tebTypicalK * typicalSessionsPerMin;
+  const runCoinsPerMin = analyzeRun(snap).totalCoins / (BALANCE.run.durationSec / 60);
+  return { label: snap.label, tebCoinsPerMin, runCoinsPerMin, pass: runCoinsPerMin > tebCoinsPerMin };
+});
+const passTebRunsPrimary = tebRunChecks.every(check => check.pass);
+
+console.log("── Phase 17: rhythm chart reward-band verification ────────────");
+console.log(`  Perfect TEB multiplier       : ${tebPerfectK.toFixed(1)}× gainPerPost`);
+console.log(`  Perfect BEAT SYNC multiplier : ${beatSyncPerfectK.toFixed(1)}× gainPerPost`);
+console.log(`  Ceiling ratio                : ${(tebPerfectK / beatSyncPerfectK).toFixed(2)}×`);
+console.log(`  Typical TEB multiplier       : ${tebTypicalK.toFixed(3)}× gainPerPost`);
+for (const check of tebRunChecks) {
+  console.log(`  ${check.label}: TEB ${fmt(check.tebCoinsPerMin)}/min vs run ${fmt(check.runCoinsPerMin)}/min  ${pass(check.pass)}`);
+}
+console.log(`  ${pass(passTebRunsPrimary)}  runs remain primary at all snapshots\n`);
+
 // ── Summary table ─────────────────────────────────────────────────────────────
 console.log("═══════════════════════════════════════════════════════════════");
 console.log("  PASS / FAIL SUMMARY");
@@ -528,8 +569,9 @@ console.log(`  (c) run ≥ 2× idle at all stages  : ${pass(allPassC)}${failedC.
 console.log(`  (d) diamonds 2–10 per run        : ${pass(allPassD)}${failedD.length ? "  → fails at: " + failedD.join(", ") : ""}`);
 console.log(`  (e) no 10-min dead zone          : ${pass(passE)}`);
 console.log(`  (f) first repeatable ≤ 3 taps    : ${pass(passF)}`);
+console.log(`  (17) each chart < run / minute   : ${pass(passTebRunsPrimary)}`);
 console.log();
 
-const allPass = passA && passB && allPassC && allPassD && passE && passF;
+const allPass = passA && passB && allPassC && allPassD && passE && passF && passTebRunsPrimary;
 console.log(allPass ? "  ✅ ALL TARGETS PASS" : "  ❌ SOME TARGETS FAIL — tune balance.ts and re-run");
 console.log("═══════════════════════════════════════════════════════════════\n");

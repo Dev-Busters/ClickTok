@@ -16,6 +16,8 @@ import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
 import { CelebrationLayer } from "../components/fx/CelebrationLayer";
 import { AnimatePresence, motion } from "framer-motion";
 import { isFeatureUnlocked } from "../features/metrics/unlocks";
+import { buildChart, offsetChart } from "../features/teb/chartBuilder";
+import type { SequenceId } from "../features/teb/types";
 
 const Live = lazy(() => import("../screens/Live").then(m => ({ default: m.Live })));
 
@@ -32,6 +34,8 @@ export function Shell() {
   const spectating = useGameStore(s => s.spectating);
   const pendingDrop = useGameStore(s => s.pendingDrop);
   const royaltyToast = useGameStore(s => s.royaltyToast);
+  const tebSession = useGameStore(s => s.session);
+  const rhythmOwnsField = tebSession?.phase === "count_in" || tebSession?.phase === "playing" || tebSession?.phase === "result";
 
   const [idleReport, setIdleReport] = useState<IdleReport | null>(null);
 
@@ -41,6 +45,17 @@ export function Shell() {
       setIdleReport(report);
     }
   }, [applyIdleIncome]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const sequence = new URLSearchParams(window.location.search).get("rhythmQa") as SequenceId | null;
+    if (!sequence || !["tap_three", "hold_pulse", "swipe_chain", "trace_arc"].includes(sequence)) return;
+    const startsAt = Date.now() + 1200;
+    useGameStore.setState({
+      session: { phase: "count_in", chart: offsetChart(buildChart(sequence, 17017, { width: window.innerWidth, height: window.innerHeight }), startsAt), chargeQuality: 1, startsAt },
+      tebSequenceTeachSeen: { tap_three: true, hold_pulse: true, swipe_chain: true, trace_arc: true },
+    });
+  }, []);
 
   useGameLoop();
   useLobby();
@@ -78,7 +93,7 @@ export function Shell() {
             {activeTab === 'profile' && <Profile />}
           </div>
 
-          {navUnlocked && (
+          {navUnlocked && !rhythmOwnsField && (
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}

@@ -6,6 +6,8 @@ import { UPGRADE_CATALOG } from "../../features/upgrades/catalog";
 import { formatCount } from "../../lib/format";
 import { coreCoinMult, viralMult } from "../../features/feed/mods";
 import { pushFloatText } from "../../components/fx/FloatingTextLayer";
+import { isFeatureUnlocked } from "../../features/metrics/unlocks";
+import { ringScale } from "../../features/teb/charge";
 
 // 14.4 (10 §D): stable list of gear upgrade ids — one dot per gear item owned.
 const GEAR_IDS = UPGRADE_CATALOG.filter(d => d.category === "gear").map(d => d.id);
@@ -267,6 +269,39 @@ function DuetTebRing() {
   );
 }
 
+function TebChargeRing({ pressedAt }: { pressedAt: number }) {
+  const [scale, setScale] = useState<number>(BALANCE.teb.chargeStartScale);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentScale = ringScale(pressedAt);
+      setScale(currentScale);
+
+      if (currentScale <= BALANCE.teb.chargeEndScale) clearInterval(interval);
+    }, 16);
+    return () => clearInterval(interval);
+  }, [pressedAt]);
+
+  const isWithinTolerance = Math.abs(scale - 1) <= BALANCE.teb.chargeTolerance;
+  const ringColor = isWithinTolerance ? "var(--gold)" : "rgba(255,255,255,0.4)";
+  const glow = isWithinTolerance ? "0 0 16px var(--gold), inset 0 0 8px var(--gold)" : "none";
+  const size = 140 * scale;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 110, left: 110,
+      width: size, height: size,
+      transform: 'translate(-50%, -50%)',
+      borderRadius: '50%',
+      border: `2px dashed ${ringColor}`,
+      boxShadow: glow,
+      pointerEvents: 'none',
+      zIndex: 4,
+    }} />
+  );
+}
+
 // ── Main component (self-contained — reads store directly) ────────────────────
 export function TapCore() {
   const combo = useGameStore(s => s.combo);
@@ -285,6 +320,16 @@ export function TapCore() {
   const momentumFiredAt = useGameStore(s => s.momentumFiredAt);
   const lastMomentumBonusCoins = useGameStore(s => s.lastMomentumBonusCoins);
   const duetCfgPods = BALANCE.elements.duetLoop.pods;
+
+  // TEB node-sequence store actions and variables
+  const tebReadyAt = useGameStore(s => s.tebReadyAt);
+  const setTebChargeTeachSeen = useGameStore(s => s.setTebChargeTeachSeen);
+  const session = useGameStore(s => s.session);
+  const beginCharge = useGameStore(s => s.beginCharge);
+  const releaseCharge = useGameStore(s => s.releaseCharge);
+  const metricsReached = useGameStore(s => s.metricsReached);
+  const isTebUnlocked = isFeatureUnlocked("element_stage", metricsReached);
+
   // True when a duet_loop chain is in progress and waiting for a core tap
   const duetTebTurn = activeWave?.element === 'duet_loop'
     && activeWave.armedIndex === null
@@ -300,12 +345,48 @@ export function TapCore() {
   const [nowTick, setNowTick] = useState(() => Date.now());
   // TEB first-press teach: show once per lifetime, auto-dismiss after 3s
   const [showTebTeach, setShowTebTeach] = useState(false);
+  const [showTebChargeTeach, setShowTebChargeTeach] = useState(false);
   const tebTeachTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const tebChargeTeachTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fxTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const eruptionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const ringDrainTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const prevTier = useRef(0);
   const prevViralUntil = useRef(0);
+
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Global pointerup/cancel tracking
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      if (useGameStore.getState().session?.phase === "charging") {
+        releaseCharge({ width: window.innerWidth, height: window.innerHeight });
+      }
+    };
+
+    window.addEventListener("pointerup", handleGlobalPointerUp);
+    window.addEventListener("pointercancel", handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener("pointerup", handleGlobalPointerUp);
+      window.removeEventListener("pointercancel", handleGlobalPointerUp);
+    };
+  }, [releaseCharge]);
+
+  // Trigger float texts when session transitions to result
+  const prevPhase = useRef<string | null>(null);
+  useEffect(() => {
+    if (session?.phase === "result" && prevPhase.current !== "result") {
+      const reward = session.reward;
+      pushFloatText({ text: `+${formatCount(reward.coins)} 🪙`, kind: "coin", magnitude: reward.k, color: "var(--gold)" });
+      pushFloatText({ text: `+${formatCount(reward.followers)} 👤`, kind: "coin", magnitude: reward.k, color: "var(--text)" });
+      pushFloatText({ text: `+${formatCount(reward.likes)} ♥`, kind: "coin", magnitude: reward.k, color: "var(--red)" });
+    }
+    prevPhase.current = session?.phase ?? null;
+  }, [session]);
 
   const clampedCombo = Math.min(combo, BALANCE.feed.comboCap);
   const fillFraction = clampedCombo / BALANCE.feed.comboCap;
@@ -384,13 +465,39 @@ export function TapCore() {
       clearTimeout(eruptionTimer.current);
       clearTimeout(ringDrainTimer.current);
       clearTimeout(tebTeachTimer.current);
+      clearTimeout(tebChargeTeachTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (session?.phase !== "charging") {
+      setShowTebChargeTeach(false);
+      return;
+    }
+    if (useGameStore.getState().tebChargeTeachSeen) return;
+    setTebChargeTeachSeen();
+    setShowTebChargeTeach(true);
+    clearTimeout(tebChargeTeachTimer.current);
+    tebChargeTeachTimer.current = setTimeout(() => setShowTebChargeTeach(false), 3000);
+    return () => {
+      clearTimeout(tebChargeTeachTimer.current);
+      setShowTebChargeTeach(false);
+    };
+  }, [session?.phase, setTebChargeTeachSeen]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     const now = Date.now();
     const wasViral = viralUntil > now;
+
+    // Start hold timer for charging if eligible
+    const isEligible = isTebUnlocked && session === null && now >= tebReadyAt;
+    if (isEligible) {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = setTimeout(() => {
+        beginCharge();
+      }, BALANCE.teb.holdLaunchThresholdMs);
+    }
 
     // TEB first-press teaching: show once ever on the very first tap
     if (!tebTeachSeen) {
@@ -438,6 +545,7 @@ export function TapCore() {
   };
 
   const showTapLabel = lastTapAt === 0 || isIdle;
+  const isLaunchEligible = isTebUnlocked && session === null && Date.now() >= tebReadyAt;
 
   return (
     <div style={{
@@ -446,6 +554,36 @@ export function TapCore() {
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
       zIndex: 3,
     }}>
+      {/* 16.3: one-time hold-to-charge teaching callout. */}
+      <AnimatePresence>
+        {showTebChargeTeach && (
+          <motion.div
+            key="teb-charge-teach"
+            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+            style={{
+              display: 'flex', alignItems: 'center',
+              padding: '5px 14px', borderRadius: 8,
+              background: 'rgba(0,0,0,0.72)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '9px',
+              letterSpacing: '0.12em',
+              color: 'var(--dim)',
+            }}>
+              HOLD - RELEASE WHEN THE RING MATCHES
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 9.1: TEB first-press teaching callout — one-time, auto-dismisses after 3s */}
       <AnimatePresence>
         {showTebTeach && (
@@ -608,6 +746,13 @@ export function TapCore() {
           {duetTebTurn && <DuetTebRing key="duet-teb" />}
         </AnimatePresence>
 
+        {/* 16.3: hold-to-charge ring, concentric with TEB. */}
+        <AnimatePresence>
+          {session?.phase === "charging" && (
+            <TebChargeRing key="teb-charge-ring" pressedAt={session.pressedAt} />
+          )}
+        </AnimatePresence>
+
         {/* Tier-up flash ring */}
         <AnimatePresence>
           {tierFlash && (
@@ -730,6 +875,37 @@ export function TapCore() {
             )}
           </AnimatePresence>
         </motion.button>
+
+        {/* 16.3: ready cue only when the launch cooldown has elapsed. */}
+        <AnimatePresence>
+          {isLaunchEligible && (
+            <motion.div
+              key="hold-ready"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: [0.55, 1, 0.55], y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: 18,
+                transform: 'translateX(-50%)',
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: 'rgba(245,166,35,0.14)',
+                border: '1px solid rgba(245,166,35,0.35)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8,
+                letterSpacing: '0.14em',
+                color: 'var(--gold)',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              HOLD READY
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* FX: shockwaves + gravity-arc particles */}
         <AnimatePresence>

@@ -96,6 +96,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     get().decayCombo(dt);
     get().decayMomentum(dt);
     get().expireOrResolveWave();
+    get().tickTebSession();
 
     const { passiveFollowersPerSec, passiveCoinsPerSec, multiplier, wallet, comments } = get();
     const followerGain = passiveFollowersPerSec * multiplier * dt;

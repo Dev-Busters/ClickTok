@@ -11,7 +11,6 @@ export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose:
   const unlockElement = useGameStore(s => s.unlockElement);
   const setTab = useGameStore(s => s.setTab);
   const setSheet = useGameStore(s => s.setSheet);
-  const spawnWave = useGameStore(s => s.spawnWave);
   const [unlocked, setUnlocked] = useState(false);
 
   const followersMet = wallet.followers >= def.requires.followers;
@@ -31,15 +30,12 @@ export function ElementUnlockSheet({ def, onClose }: { def: ElementDef; onClose:
     }
   };
 
-  // 14.3 (10 §C): close this sheet AND the Creator Studio overlay it lives in
-  // first — the wave scheduler pauses while a sheet is open
-  // (elementsSlice.expireOrResolveWave early-returns on openSheet !== null).
+  // 16.1: spawnWave suppressed — elements paused, re-home as TEB nodes later.
   const handleTryNow = () => {
     track('element_unlocked', { id: def.id, try_now: true, handle: useGameStore.getState().handle });
     onClose();
     setSheet(null);
     setTab("home");
-    spawnWave(def.id);
   };
 
   const handleClose = () => {

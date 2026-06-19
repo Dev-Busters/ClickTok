@@ -367,3 +367,80 @@ Remove locked "???" pods entirely. `ElementStage` renders ONLY active waves; the
   labels/HUD, `--font-ui` (Rajdhani) for body.
 - Every number that can get large uses `formatCount`. Every actionable element has a pressed state
   (Framer `whileTap`/scale), matching current components.
+
+## 12. Phase 17 — TEB Rhythm Canvas (`13`)
+
+### 12.1 Playfield takeover
+
+On charge release, `RhythmPlayfield` becomes the Home screen's interaction owner from count-in
+through result:
+
+- hide and disable top stats, Studio, modifier/buff pills, video info, engagement rail, metric
+  tracker, swipe hint, GO LIVE, and bottom navigation;
+- freeze feed paging and engagement-rail actions;
+- keep the active `VideoCanvas` moving beneath a dark scrim/vignette at reduced contrast;
+- mount the rhythm layer above the video and below global emergency/system sheets;
+- capture the measured playfield rectangle after chrome exits, then build chart geometry;
+- restore all feed chrome only after result grace, not between the last hit and reward.
+
+The usable field respects CSS safe-area insets but includes the space normally occupied by the
+right rail and bottom nav. At 390×844 the first target may not enter the top 52 px or bottom 28 px;
+at other sizes derive insets from the actual container and safe-area variables.
+
+### 12.2 Persistent rhythm HUD
+
+Only one HUD cluster remains during play:
+
+- top-left: `×N` rhythm combo, hidden at zero;
+- top-right: compact live quality percentage or four-segment quality ticks;
+- no timer bar, score panel, chart card, currency display, or permanent instructions;
+- HUD uses code-native `--font-display` numbers and `--font-mono` labels with a dark text keyline;
+- HUD never receives pointer events.
+
+### 12.3 Count-in and teaching
+
+Count-in lasts 720 ms and shows:
+
+- chart name (`TAP THREE`, `HOLD THE BEAT`, `CONNECT`, or `RIDE THE LINE`);
+- one original SVG gesture pictogram;
+- one verb: `TAP`, `HOLD · RELEASE`, `PRESS · CONNECT`, or `PRESS · TRACE`;
+- three restrained field pulses; no modal/card backdrop.
+
+On first encounter, add one extra gesture demonstration before count-in. The teach may be skipped,
+is recorded per chart, and disappears before the first target becomes active.
+
+### 12.4 Targets, paths, and judgement bursts
+
+- Visible target diameter: 72 px default, never below 64 px.
+- Upcoming targets use a dark glass disc, white keyline, and separated cyan/red chromatic ghosts.
+- The current target uses a gold approach ring contracting from 2.2× to 1×.
+- Target order is always encoded with a number/glyph, never color alone.
+- Hold targets add radial fill and a converging release cap.
+- Swipe paths show dim future links and illuminate completed links behind the pointer.
+- Trace paths use a broad dark rail, thin white center, cyan/red edge ghosts, and a guide bead.
+- PERFECT/GREAT/GOOD/MISS appears at the resolved target for <=420 ms, then leaves the field.
+- MISS is readable but quiet: inward collapse, broken ring, no full-screen red wash.
+
+### 12.5 Result and TEB return
+
+The last resolved target collapses toward the center and reforms as TEB. A short center judgement
+bloom precedes the existing reward banner. The banner shows:
+
+- chart name;
+- charge grade;
+- performance grade;
+- max rhythm combo;
+- coins/followers/likes reward.
+
+The banner must not look like a generic modal. It is a compact anchored layer near TEB; tapping TEB
+continues normal engagement while the launch cooldown runs.
+
+### 12.6 Responsive, accessibility, and reduced feedback
+
+- Rebuild normalized geometry after resize/orientation change; never stretch an old chart.
+- Use a larger invisible hit radius than the visible disc.
+- `prefers-reduced-motion` removes spark travel, field zoom, and after-image drift but preserves
+  timing rings, path fill, target state, and judgement text.
+- A `reducedFeedback` setting removes haptics, strong flash, and screen-scale completion bloom.
+- Keyboard fallback is visible only after keyboard input or in accessibility settings.
+- All chart text maintains 4.5:1 contrast against the darkest keyline/backing treatment.
