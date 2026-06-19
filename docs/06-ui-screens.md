@@ -293,6 +293,9 @@ Reached from a "CREATOR INSIGHTS ›" row on the Profile screen's stats section.
 
 ### 10.3 Fresh Home layout (Phase 9.3 — post progressive-unlock)
 
+> **Superseded for fresh saves by Phase 18 (`14`, this doc §13).** Keep this as historical behavior
+> for preserved old saves only; do not combine its independent metric reveals with the new journey.
+
 Before any metric is crossed, Home renders ONLY:
 1. Top stat strip: followers (hero) + coins pill.
 2. TEB at center, with first-press teaching (§10.1) + idle "TAP" attract.
@@ -318,6 +321,9 @@ SOFTWARE. No "OWNED" state — repeatables are always levelable until maxed.
 ## 11. Phase 10 — Creator Studio & FYP de-clutter (`01` §11)
 
 ### 11.1 Creator Studio screen (`screens/CreatorStudio/`)
+
+> **Phase 18 opening override:** before the video FYP chapter, use §13.3's one-tab/one-card Studio.
+> The full three-pillar surface below remains dormant for later progression.
 
 Full-screen hub opened via:
 - A **STUDIO** button in the Home top stat-strip (right side, compact icon+label), gated by the
@@ -357,6 +363,79 @@ pills). Tap → open Studio overlay.
 
 Remove locked "???" pods entirely. `ElementStage` renders ONLY active waves; the
 `LockedPod` render block is deleted. Unlocking elements happens in Studio → Viewer.
+
+## 13. Phase 18 — staged opening and interaction-field rhythm (`14`)
+
+### 13.1 Sparse pre-video Home
+
+Before `video_fyp`, Home uses a dedicated composition rather than an empty version of the final
+feed. Render only:
+
+1. Followers hero at the top; add the Coin pill only when Studio reveals it.
+2. One compact current-goal chip with action, progress, and reward.
+3. TEB centered in the large free interaction field.
+4. Ambient background motion with no fake video metadata.
+5. A Studio edge button only after its reveal.
+
+Do not render hidden feature placeholders, bottom navigation, social rail, video caption, creator
+avatar, currency pills at zero, passive-income copy, or a scrollable milestone list. The current
+goal chip must stay clear of TEB and be no taller than two short lines at 320px width.
+
+### 13.2 Reveal and teaching pattern
+
+Major unlocks use one consistent four-beat interaction:
+
+```text
+goal completes → compact celebration names the feature → SHOW ME
+→ camera/focus travels to the new control → one-action coach mark → normal play
+```
+
+- Celebration is anchored near the unlocked control, not a generic center modal.
+- Other unlock checks pause until the first-use teach resolves.
+- Dismissed teaches leave a gentle cyan/red pulse and change the goal chip to `TRY <FEATURE>`.
+- Use strong motion only for the reveal; normal available/affordable states use restrained glow.
+- Reduced motion replaces travel/scale with opacity, outline, and focus order.
+
+### 13.3 Creator Studio onboarding mode
+
+Studio initially shows a header/back button, a single **FYP** tab, Coin balance, and one full-width
+Audience Reach card. The card's hierarchy is:
+
+- name + `LV N`;
+- plain-language benefit;
+- large exact `current → next` value;
+- cost and one primary `UPGRADE` action.
+
+After Lv1 purchase, animate the changed Followers/tap value first, then reveal Engagement Rate
+below it and enable Audience Reach's next level. Do not show locked future categories or cards.
+
+### 13.4 Engagement-ready TEB
+
+When rhythm unlocks, a thin engagement ring/meter becomes part of TEB's existing visual anatomy.
+It fills on quick taps without competing with the Followers float text. At full:
+
+- the ring closes and holds a stable gold edge;
+- idle copy changes to `READY — HOLD`;
+- the first-time hold/release teach points directly to TEB;
+- the state remains readable without pulsing the entire screen.
+
+### 13.5 Rhythm interaction field (corrected Phase 17 behavior)
+
+Count-in, play, and result remove only TEB and TEB-local clutter. Keep top stats, Studio control,
+video, avatar/handle, caption, social rail, and bottom navigation visible at their normal opacity.
+Do not mount a full-screen dim layer.
+
+Measure the available center from live chrome rectangles. Rhythm targets render inside that field;
+chrome remains above/beside it visually and is temporarily pointer-inert. On 390×844, reserve the
+top stat strip, right rail, lower caption block, and nav. On 320×640, reduce target spread/spacing
+before reducing hit areas. Result feedback reforms into TEB at center.
+
+### 13.6 Video FYP chapter transition
+
+The first video unlock introduces the existing FYP layout as a single cluster: video backdrop,
+creator identity/description, and social rail. Teach one highlighted social action before paging or
+new navigation becomes active. TEB and the goal chip retain their learned positions where possible,
+so the new chapter feels additive rather than like a different application.
 
 ## 9. Visual language rules
 

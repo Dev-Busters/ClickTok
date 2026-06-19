@@ -13,10 +13,12 @@ This document is the source of truth for Phase 17. Canonical types live in `03` 
 
 1. **Keep the Phase 16 launch.** Quick TEB taps always pay normal engagement. Holding after the
    cooldown starts the shrinking charge ring; releasing launches a rhythm chart. Do not add a
-   radial mode picker or make ordinary tapping ambiguous in this phase.
-2. **The rhythm state owns the playfield.** From count-in through result, feed paging, engagement
-   rail, captions, tracker chips, top stats, and bottom navigation are hidden and non-interactive.
-   The active video remains as a dim, moving backdrop so the game still feels like ClickTok.
+   radial mode picker or make ordinary tapping ambiguous in this phase. **Phase 18 override:** the
+   opening engagement meter replaces the time-only cooldown and quick taps pay Followers + meter
+   fill (`14` §E).
+2. **The rhythm state owns the playfield (superseded by Phase 18).** Phase 17 originally hid feed
+   chrome during count-in through result. Phase 18 keeps all unlocked FYP chrome visible at normal
+   brightness and limits rhythm to the measured central interaction field; see `14` §F.
 3. **One input system, several chart kinds.** Tap, hold, swipe-chain, and trace interactions all
    flow through one Pointer Events router with pointer capture. Components render state; pure
    helpers judge it. No chart owns global listeners or mutates the wallet directly.
@@ -41,13 +43,14 @@ idle/tap → charging → count_in → playing → result → idle/tap
 ```
 
 - **charging:** unchanged Phase 16 TEB ring match. A quick tap still pays before the hold threshold.
-- **count_in:** TEB disappears immediately on release. Feed chrome fades out over 140 ms. The chart
-  title and one gesture pictogram appear for `countInMs`; three restrained pulse ticks establish
-  cadence. The chart cannot receive input yet.
-- **playing:** the chart owns the full phone playfield. A compact combo/quality HUD uses the top safe
-  edge; everything else is targets, path, backdrop, and transient feedback.
+- **count_in:** TEB disappears immediately on release. The chart title and one gesture pictogram
+  appear inside the interaction field for `countInMs`; three restrained pulse ticks establish
+  cadence. The chart cannot receive input yet. Phase 18 keeps surrounding chrome visible.
+- **playing:** the chart owns the measured central interaction field. Targets, paths, and transient
+  feedback avoid the live bounding rectangles of surrounding FYP chrome (`14` §F).
 - **result:** input locks, the final judgement blooms at center, TEB reforms from the last target,
-  and the existing reward breakdown appears briefly. Feed chrome returns only after result grace.
+  and the existing reward breakdown appears briefly. Phase 18 chrome never leaves; its input gate
+  is released after result grace.
 
 ### Selection
 
@@ -58,8 +61,9 @@ idle/tap → charging → count_in → playing → result → idle/tap
 - first encounter with a new chart forces that chart's short teach overlay;
 - no user-facing mode picker in Phase 17 — launch should remain one fluid gesture.
 
-All Phase 17 charts reuse the existing `element_stage` / `follower_120` framework gate. Chart
-variety arrives through first-play sequencing, not another currency or Studio shop.
+All Phase 17 charts originally reused the existing `element_stage` / `follower_120` framework gate.
+**Phase 18 override:** opening eligibility comes from ordered progression, begins with `tap_three`
+only, and passes the eligible set into the shuffle bag (`14` §E).
 
 ## §B — Input grammar
 

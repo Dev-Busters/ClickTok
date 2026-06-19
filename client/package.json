@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:rhythm": "tsx scripts/testRhythm.ts"
+    "test:rhythm": "tsx scripts/testRhythm.ts && tsx scripts/testOnboarding.ts",
+    "sim:onboarding": "tsx scripts/simOnboarding.ts"
   },
   "dependencies": {
     "@pixi/react": "^7.1.2",

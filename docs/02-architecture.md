@@ -39,6 +39,7 @@ client/src/
     Profile/                    # channel mgmt: stats, gear, software, skills
     Live/                       # the run (livestream) — feed + react + hotbar
   features/
+    onboarding/                  # ordered opening goals, reveal catalog, pure progression checks
     economy/                    # currency helpers, formula functions (pure)
     channel/                    # posting, catalog, passive income
     upgrades/                   # gear/software catalog + apply logic
@@ -73,6 +74,17 @@ Phase 17 rhythm boundary (`13`): `features/teb/` owns serializable chart definit
 geometry, pure pointer transitions, judgement, and reward. `screens/HomeFeed/rhythm/` owns DOM/SVG
 rendering and pointer capture plumbing. `tebSlice` owns the ephemeral session snapshot. Do not put
 DOM nodes, browser PointerEvents, SVG path instances, Framer controls, or timer handles in Zustand.
+
+Phase 18 onboarding boundary (`14`): `features/onboarding/` owns the ordered goal catalog and pure
+requirement/progress checks. `onboardingSlice` owns durable journey/reveal/teach state and is the sole
+authority for fresh-opening feature availability. Screens render that state and report semantic
+actions (`studio_opened`, `upgrade_bought`, `teach_completed`); they never infer unlocks directly
+from wallet totals. Legacy metrics remain achievement data and may not mutate onboarding state.
+
+Phase 18 rhythm layout (`14` §F): `HomeFeed` measures visible chrome rectangles and passes one
+`RhythmInteractionField` rectangle to the chart builder. Rhythm renderers do not query or hide feed
+components themselves. Home owns temporary chrome input-gating; rhythm owns target input inside the
+measured field. This keeps progression, layout, and scoring independently testable.
 
 Pragmatic note for cheap models: feature folders are the *destination*. If a task is small, it's
 fine to keep a helper next to its consumer and move it later — but new **screens** and **store

@@ -55,6 +55,9 @@ export const BALANCE = {
 
 ## 1. Posting (active clicker)
 
+> **Phase 18 opening override:** before the video FYP chapter, use §17. Quick TEB taps grant
+> Followers only; legacy multi-currency post rewards must not leak into the staged opening.
+
 ```
 postPower        = (basePostPower + Σ gear.postPowerAdd + charismaPostBonus)
                      × Π gear.postPowerMult
@@ -620,6 +623,10 @@ Early-curve checkpoints (11.2, `postCoinConversion: 1.0` → ~1 🪙/tap cold):
 
 ### 14.3 Metric ladder — thresholds, rewards, unlocks (08 §B, SAVE_VERSION 10)
 
+> **Phase 18 opening override:** this ladder remains historical achievement data but does not grant
+> rewards or reveal fresh-opening features. The ordered §17.3 Creator Goals are authoritative until
+> `video_fyp` completes.
+
 | id | stat | threshold | reward | unlocks (feature flag) |
 |---|---|---|---|---|
 | `views_10`      | Views (taps) | 10  | +15 🪙  | `fyp_video` — active card fills backdrop |
@@ -864,3 +871,113 @@ BEAT SYNC 17× reference band while preserving LIVE as the primary active-income
   minute. If a chart exceeds LIVE, lower `rhythmBasePayout`; do not make controls less responsive.
 - Chart duration plus the existing 18s launch cooldown controls frequency. Do not add per-chart
   cooldowns or unequal reward multipliers in Phase 17.
+
+## 17. Phase 18 opening economy and pacing (`14` §A–E)
+
+Phase 18 overrides §1 for the fresh opening: quick TEB taps grant Followers only. Coins and Likes
+do not ride along with the tap. After `video_fyp`, later chapters may introduce additional payout
+sources explicitly; they must never appear merely because legacy §1 code still runs.
+
+### 17.1 Starting constants (`BALANCE.onboarding`)
+
+```ts
+onboarding: {
+  studioFollowers: 400,
+  minorFollowerGoal1: 700,
+  minorFollowerGoal2: 1200,
+  rhythmFollowers: 2400,
+  videoFypFollowers: 10000,
+
+  baseFollowersPerTap: 1,
+  audienceReach: {
+    baseCost: 10,
+    costGrowth: 1.8,
+    followerAddPerLevel: 0.5,
+  },
+  engagementRate: {
+    baseCost: 18,
+    costGrowth: 1.9,
+    fillAddPerLevel: 0.25,
+  },
+  engagement: {
+    cap: 100,
+    baseFillPerTap: 1,
+  },
+
+  goalCoins: {
+    unlockStudio: 10,          // exactly Audience Reach Lv1
+    buyAudienceReach: 18,      // exactly Engagement Rate Lv1
+    reach700: 20,
+    ownThreeFypLevels: 35,
+    reach1200: 40,
+  },
+  tapThreeCoins: {
+    completionBase: 12,
+    qualityBonusMax: 8,
+  },
+}
+```
+
+These are Phase 18's first playable calibration, not sacred final values. Change them only as one
+coherent table in docs/code/simulation; do not lower thresholds piecemeal to make a reveal fire.
+
+### 17.2 TEB and upgrade formulas
+
+```text
+followersPerTap = baseFollowersPerTap
+                + audienceReachLevel × audienceReach.followerAddPerLevel
+
+engagementPerTap = engagement mechanic unlocked
+                  ? engagement.baseFillPerTap
+                    + engagementRateLevel × engagementRate.fillAddPerLevel
+                  : 0
+
+engagementFill' = min(engagement.cap, engagementFill + engagementPerTap)
+
+openingUpgradeCost(baseCost, growth, currentLevel)
+  = round(baseCost × growth^currentLevel)
+```
+
+Opening taps do not apply `postCoinConversion`, `postLikeConversion`, feed combo, VIRAL, catalog,
+or passive-income modifiers. `audience_reach` must change Followers/tap only;
+`engagement_rate` must change engagement fill/tap only. This separation is what makes each purchase
+legible.
+
+### 17.3 Ordered Creator Goals
+
+| Goal | Requirement | Coins | Reveal |
+|---|---:|---:|---|
+| `meet_teb` | 10 taps | 0 | — |
+| `unlock_studio` | 400 total Followers | 10 | Creator Studio + Coins |
+| `buy_audience_reach` | Audience Reach Lv1 | 18 | Engagement Rate + Audience Reach Lv2+ |
+| `reach_700` | 700 total Followers | 20 | — |
+| `own_three_fyp_levels` | 3 total opening-upgrade levels | 35 | — |
+| `reach_1200` | 1,200 total Followers | 40 | — |
+| `unlock_rhythm` | 2,400 total Followers and prior goals complete | 0 | engagement meter + TAP THREE |
+| `complete_first_rhythm` | 1 TAP THREE completion | chart payout | repeatable Coin loop |
+| `unlock_video_fyp` | 10,000 total Followers and prior goals complete | 0 | video FYP chapter |
+
+The ordered requirement is mandatory: a player above 10,000 Followers cannot resolve every row in
+one check. Resolve one goal, complete any reveal/teach, then activate the next.
+
+### 17.4 First rhythm reward
+
+```text
+tapThreeCoins = completionBase + round(qualityBonusMax × performanceQuality)
+```
+
+`performanceQuality` is the existing clamped Phase 17 value. A completed chart therefore pays
+12–20 Coins. It pays no opening Followers or Likes; those rewards would obscure the new Coin-source
+lesson. Launch consumes a full engagement meter, so remove the old 18-second-only cooldown from the
+opening loop. A result/animation lock may still prevent double launch.
+
+### 17.5 Pacing simulation acceptance
+
+Simulate at 2.0, 3.0, and 5.0 deliberate taps/second with plausible purchase choices and human
+rhythm quality. The median 3 taps/second route must land inside `14` §A's time bands. No route may:
+
+- unlock Studio without being able to buy Audience Reach Lv1;
+- reach rhythm before buying at least three total FYP-upgrade levels;
+- depend on random drops, idle income, legacy milestone rewards, or LIVE;
+- reach video FYP before 10 active minutes at 5 taps/second;
+- require more than 30 active minutes at 2 taps/second with reasonable upgrades/rhythm play.

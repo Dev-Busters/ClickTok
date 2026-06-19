@@ -724,12 +724,14 @@ export type MetricDef = {
 
 ```ts
 // store/slices/meta.ts
-export const SAVE_VERSION = 9; // current (as of Phase 11.3)
+export const SAVE_VERSION = 14; // current before Phase 18; Phase 18 implementation bumps to 15
 // v1 → base shape; v2 → wallet/skills/videos; v3 → inbox/milestones;
 // v4 → ownedElements (7.3); v5 → upgradeLevels + tebTeachSeen (9.1)
 // v6 → metricsReached + lifetime counters (9.2); v7 → affordableNotifiedPillars (10.2)
 // v8 → metricsReached id rename follower_100→follower_200 (11.2)
-// v9 → elementsTeachSeen (11.3)
+// v9 → elementsTeachSeen (11.3); v10 → metric-id re-derive; v11 → modTeachSeen;
+// v12 → catalog activation marker; v13 → tebChargeTeachSeen;
+// v14 → tebSequenceTeachSeen
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
 //   multiplier, followerConversion, boonMultiplier, lastSeenAt,
@@ -748,3 +750,81 @@ export type PersistedV1 = {
   lastSeenAt: number;
 };
 ```
+
+## 10. Staged onboarding & opening progression (Phase 18 — see `14`; numbers in `04` §17)
+
+Phase 18 does not delete `MetricDef`; metrics remain achievements and later progression inputs.
+The fresh opening is instead driven by an ordered goal state that cannot cascade.
+
+```ts
+// features/onboarding/types.ts
+export const ONBOARDING_REVISION = 1 as const;
+
+export type OnboardingStepId =
+  | "meet_teb"
+  | "unlock_studio"
+  | "buy_audience_reach"
+  | "reach_700"
+  | "own_three_fyp_levels"
+  | "reach_1200"
+  | "unlock_rhythm"
+  | "complete_first_rhythm"
+  | "unlock_video_fyp";
+
+export type OnboardingFeatureId =
+  | "creator_studio"
+  | "engagement_meter"
+  | "tap_three"
+  | "video_fyp";
+
+export type OpeningUpgradeId = "audience_reach" | "engagement_rate";
+
+export type GoalRequirement =
+  | { kind: "tap_count"; amount: number }
+  | { kind: "total_followers"; amount: number }
+  | { kind: "upgrade_level"; id: OpeningUpgradeId; amount: number }
+  | { kind: "total_opening_upgrade_levels"; amount: number }
+  | { kind: "rhythm_completions"; sequenceId: "tap_three"; amount: number }
+  | { kind: "acknowledge_reveal"; feature: OnboardingFeatureId };
+
+export type OnboardingGoalDef = {
+  id: OnboardingStepId;
+  label: string;
+  benefit: string;
+  requirement: GoalRequirement;
+  reward?: { coins?: number };
+  reveals?: OnboardingFeatureId;
+  teachId?: string;
+};
+
+export type OnboardingReveal = {
+  feature: OnboardingFeatureId;
+  shownAt: number;
+  dismissed: boolean;
+};
+
+// store/slices/onboardingSlice.ts
+export type OnboardingSlice = {
+  onboardingRevision: typeof ONBOARDING_REVISION;
+  onboardingStep: OnboardingStepId;
+  completedOnboardingGoals: OnboardingStepId[];
+  activeOnboardingReveal: OnboardingReveal | null;
+  onboardingTeachesSeen: Record<string, true>;
+  engagementFill: number; // persisted; clamp 0..BALANCE.onboarding.engagement.cap
+  tapThreeCompletions: number;
+
+  checkOnboardingGoal: () => void;
+  acknowledgeOnboardingReveal: () => void;
+  completeOnboardingTeach: (teachId: string) => void;
+  addEngagement: (amount: number) => void;
+  consumeEngagementForRhythm: () => boolean;
+  resetOnboardingRevision: () => void; // development/release-controlled action
+};
+```
+
+Opening feature availability derives from completed ordered goals, not `metricsReached`. The old
+metric flags must not unlock fresh-opening UI in parallel. Once `video_fyp` is complete, later
+chapters may bridge back into authored metrics or additional ordered goal catalogs.
+
+Phase 18 implementation bumps the current code save version **14 → 15** and persists the fields
+above. TEB rhythm session geometry, active pointers, and judgement state remain ephemeral.

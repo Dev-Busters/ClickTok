@@ -2005,6 +2005,9 @@ First move = hold-to-charge; first minigame = `tap_three` (3 numbered nodes, tap
 
 ## PHASE 17 — TEB Rhythm Canvas (design LOCKED 2026-06-19; full spec in `docs/13-teb-rhythm-canvas.md`)
 
+> **Historical completion note:** Phase 18 supersedes this phase's full-screen chrome takeover and
+> opening chart availability; keep its input/scoring/rendering engine, then apply Phase 18 gates.
+
 Goal: turn Phase 16's one tap sequence into a polished, extensible rhythm layer: approach timing,
 hold/release, continuous swipe chains, curved tracing, judgements, full FYP takeover, original
 ClickTok visual language, accessibility, and measured performance. Keep React/DOM/Framer; use one
@@ -2096,6 +2099,104 @@ teach map and `SAVE_VERSION` bump 13→14. Do tasks in order; each must leave `t
 **Phase 17 exit criteria:** four short, original, osu!-inspired ClickTok rhythm charts launch from
 the existing TEB hold, own the full FYP safely, feel consistent and highly polished, resolve through
 one tested judgement/reward engine, remain accessible/resilient, and never outrank LIVE economically.
+
+---
+
+## PHASE 18 — Staged onboarding & progression reset (design LOCKED 2026-06-19; full spec in `docs/14-onboarding-progression-reset.md`)
+
+Goal: replace the live build's rapid unlock cascade with a paced opening chapter. A fresh save sees
+only TEB, Followers, and one ordered goal. Studio arrives with one affordable FYP upgrade; its first
+purchase reveals the second. TAP THREE later becomes the first repeatable Coin source. The video FYP
+returns only after the player has learned taps, upgrades, engagement fill, and rhythm. Existing later
+content remains dormant. Phase 18 also corrects Phase 17's blackout: rhythm removes TEB only and
+plays inside a measured center field while all unlocked FYP chrome stays visible.
+
+- [x] **18.1 — Ordered onboarding state + legacy-cascade quarantine (`14` §A/§B/§H).** Add the
+  `features/onboarding/` goal catalog/types/helpers and `onboardingSlice` exactly as `03` §10. Only
+  one active goal may resolve; major reveal/teach states block the next resolution while progress
+  may continue accumulating. During onboarding revision 1, opening feature checks derive from the
+  ordered goals and ignore legacy `METRIC_CATALOG` feature flags/rewards. Keep old metrics available
+  as later achievements. Add a development reset action but do not choose or ship a destructive live
+  reset yet.
+  **Refs:** `14` §A/§B/§H, `03` §10, `02` §4/§5. **DoD:** pure tests prove a 10,000-follower state
+  cannot cascade through the journey; reload resumes active reveal/teach; old metric code remains
+  intact but cannot expose opening UI; development reset preserves handle/settings; typecheck.
+
+- [x] **18.2 — Followers-only opening economy + FYP upgrade catalog (`14` §C/§D, `04` §17).** Gate
+  the opening TEB payout to Followers only and add the dedicated `audience_reach` and
+  `engagement_rate` upgrades/formulas. Add ordered goal Coin rewards exactly from `04` §17; hide
+  Coins before Studio and suppress Likes/Diamonds/passive/catalog/feed bonuses throughout the
+  opening. Opening upgrade effects must not reuse bundled `postPower` behavior.
+  **Refs:** `14` §C/§D, `04` §17.1–17.4, `03` §1/§2/§10. **DoD:** formula tests verify exact
+  Followers/tap, engagement/tap, costs, and rewards; taps cannot change Coins/Likes/Diamonds;
+  Studio goal always funds Audience Reach Lv1; typecheck + economy simulation.
+
+- [x] **18.3 — Sparse pre-video Home + one-goal reveal system (`14` §B/§G, `06` §13.1–13.2).** Add
+  a dedicated pre-video Home composition: Followers, current goal, ambient background, and TEB;
+  reveal Coins/Studio only when authored. Build the reusable anchored celebration, `SHOW ME` focus,
+  first-use coach mark, queued-unlock guard, and reduced-motion variant. Remove all unavailable HUD,
+  fake video metadata, nav, and locked previews from this state.
+  **Refs:** `14` §B/§G, `06` §13.1–13.2. **DoD:** fresh 320×640 and 390×844 saves show only the
+  contracted surfaces; Studio reveal points to the real button and blocks later reveals until first
+  use; dismiss/reload/focus behavior works; no relevant console warnings; browser screenshots.
+
+- [x] **18.4 — Creator Studio onboarding mode + sequential upgrade disclosure (`14` §D, `06`
+  `§13.3`).** Render only the FYP tab and Audience Reach at first; buying Lv1 reveals Engagement
+  Rate and Audience Reach Lv2+. Show exact current→next values and animate the changed Followers/tap
+  result. Hide every later tab/card/category rather than rendering locks. Keep the full existing
+  Studio dormant for later progression.
+  **Refs:** `14` §D, `06` §13.3, `04` §17.1–17.3. **DoD:** first open has one affordable card;
+  purchase changes the next tap exactly, reveals exactly two new choices, and goal progression
+  resumes; inaccessible legacy purchases cannot be invoked through actions; typecheck + browser QA.
+
+- [x] **18.5 — Engagement meter + first-chart progression gate (`14` §E, `06` §13.4).** Add the
+  persisted engagement meter after the ordered rhythm reveal. Quick taps fill it; Engagement Rate
+  visibly improves fill/tap; full state teaches `READY — HOLD`; launching consumes the meter and
+  uses the existing charge interaction. Progression supplies eligible charts so only `tap_three`
+  can run. Replace the opening 18-second cooldown with meter readiness while retaining result/input
+  locks.
+  **Refs:** `14` §E, `03` §6.6/§10, `04` §17.2/§17.4, `06` §13.4. **DoD:** the meter is absent
+  before reveal, survives reload, cannot overfill/double-spend, launches only at full, and refills
+  immediately after result; other charts never appear; mouse/touch/keyboard paths pass; typecheck.
+
+- [x] **18.6 — Rhythm interaction-field correction (`14` §F, `06` §13.5).** Remove Phase 17's
+  global blackout/chrome-hide behavior. Measure visible chrome rectangles and mount rhythm in the
+  remaining central field. Hide only TEB/local float text. Keep stats, Studio, video, creator info,
+  social rail, captions, and nav visible at normal brightness but pointer-inert through result.
+  Rebuild chart geometry against the measured field and retain hit-area/accessibility budgets.
+  **Refs:** `14` §F, `13` §A/§C/§E, `06` §13.5. **DoD:** all four chart renderers remain valid in
+  the field, though only TAP THREE is progression-eligible; no target overlaps live chrome at
+  320×640/390×844; chrome never disappears/dims or steals input; TEB returns correctly; reduced
+  motion + browser screenshots + zero relevant console warnings.
+
+- [x] **18.7 — First-video FYP chapter transition (`14` §G, `06` §13.6).** Gate the existing video
+  feed behind `video_fyp`. On goal completion, transition ambient Home into the first card and teach
+  creator identity/description/social rail as one cluster; require one highlighted FYP action before
+  paging/navigation activates. Preserve learned TEB/goal placement and reuse the current FYP after
+  the teach.
+  **Refs:** `14` §G, `06` §13.6. **DoD:** no video data/UI leaks early; reveal cannot coincide with
+  rhythm/Studio ceremony; one taught FYP action enables normal feed behavior; reload at every
+  transition point is safe; responsive browser QA + typecheck.
+
+- [x] **18.8 — Save v15, pacing telemetry, simulation, and first-session playtest (`14` §H/§I,
+  `04` §17.5).** Persist revision/goal/reveal/teach/meter/completion state and bump `SAVE_VERSION`
+  14→15. Implement both non-destructive old-save migration and development reset; leave the live
+  wipe choice explicit in release notes. Add aggregate pacing telemetry and extend the simulator for
+  2/3/5 taps-per-second routes. Playtest five fresh starts, deliberately test slow/fast/dismiss/
+  reload paths, and tune the §17 table coherently until §A pacing bands pass.
+  **Refs:** `14` §A/§H/§I, `03` §10, `04` §17. **DoD:** migration tests cover v14 preserve/reset
+  paths; Studio/rhythm/video timing alarms are queryable; no major reveal cascade; median fresh
+  route hits every target band; `pnpm typecheck`, tests, build, sim, 320×640/390×844/reduced-motion/
+  keyboard/browser QA and screenshots pass with no relevant console warnings.
+  > note: tuned `rhythmFollowers` 2,000→2,400 after the five-route pacing sim put the 3 taps/sec
+  > rhythm reveal at 8.1m and video FYP at 19.9m. Save v15 preserves v14 players by marking the
+  > staged opening complete; the destructive live reset remains unshipped. Legacy sim targets
+  > (a)/(f) remain historical red while the active run-primary and Phase 18 pacing checks pass.
+
+**Phase 18 exit criteria:** a fresh player always understands the one current goal, encounters only
+one newly useful system at a time, makes several legible upgrade decisions before rhythm, learns
+TAP THREE as the first repeatable Coin loop, and reaches the video FYP as a paced chapter reveal.
+Rhythm uses TEB's free interaction space without blacking out or removing the surrounding FYP.
 
 ---
 

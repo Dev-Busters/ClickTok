@@ -352,6 +352,9 @@ This generalizes today's `FOLLOWER_MILESTONES` / `checkMilestones` / `milestones
 
 ### 10.3 Progressive-unlock framework
 
+> **Superseded for fresh saves by Phase 18 (`13`/`14`).** These flags remain historical/later-game
+> data; they may not independently reveal opening features or rewards.
+
 `isFeatureUnlocked(featureId)` derives from which unlock-bearing metrics have been crossed
 (reads `metricsReached`; no extra persisted set needed). UI surfaces render nothing until
 unlocked. Gated surfaces and their unlock metric:
@@ -368,6 +371,9 @@ unlocked. Gated surfaces and their unlock metric:
 chip on Home always shows what to aim for next.
 
 ### 10.4 Dual-axis upgrades — repeatable leveled upgrades
+
+> **Phase 18 opening override:** Creator Studio begins with the two progressively disclosed FYP
+> upgrades in `14` §D. The catalog below remains dormant until later authored journey steps.
 
 The existing one-time gear/software catalog ("obtain new content") gains a second axis:
 **repeatable leveled upgrades** ("improve along the way"). A `repeatable: true` flag on
@@ -464,3 +470,22 @@ rhythm-game layer.
   helpers, DOM/Framer rendering first, Pixi only after measured frame-budget failure.
 
 Full design: `docs/13-teb-rhythm-canvas.md`. Types: `03` §6.6. Formulas: `04` §16. UI: `06` §12.
+
+## 13. Staged onboarding & progression reset (Phase 18; design LOCKED 2026-06-19)
+
+Phase 18 replaces the rapid independent metric cascade with an authored opening journey. A fresh
+player begins with only TEB, Followers, and one current goal. TEB taps award Followers only. Creator
+Studio is the first major reveal; it opens with one affordable FYP upgrade, and buying that upgrade
+reveals the second upgrade plus further levels of the first. Deterministic Creator Goal rewards fund
+these opening purchases until TAP THREE becomes the first repeatable Coin source.
+
+Major systems are introduced one at a time through `goal → reveal → SHOW ME → first use`. Existing
+later-game content remains dormant rather than being deleted. The first-video unlock changes the
+sparse onboarding Home into the existing FYP composition as one taught chapter transition.
+
+Rhythm no longer blacks out or replaces the whole FYP. TEB alone disappears; targets use a measured
+central interaction field while creator identity, descriptions, social rail, stats, and navigation
+remain visible at normal brightness and temporarily pointer-inert.
+
+Full design: `docs/14-onboarding-progression-reset.md`. Types: `03` §10. Formulas: `04` §17. UI:
+`06` §13.

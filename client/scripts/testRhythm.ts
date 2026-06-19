@@ -54,7 +54,7 @@ for (let i = 0; i < 20; i++) {
 }
 
 const migrated = migrate({ tebChargeTeachSeen: true }, 13);
-assert.equal(migrated.version, 14);
+assert.equal(migrated.version, 15);
 assert.deepEqual(migrated.tebSequenceTeachSeen, { tap_three: true });
 
 console.log("rhythm: layout, timing, pointer, gesture, shuffle and reward checks passed");

@@ -10,6 +10,7 @@ import { pickSequence } from "../../features/teb/chartCatalog";
 import { distanceWeightedPathCoverage, gestureControl, holdQuality, interactionWeight, judgementLabel, swipeQuality, timingQuality, traceQuality } from "../../features/teb/judgement";
 import { pointerReducer } from "../../features/teb/pointerReducer";
 import { computeRhythmReward } from "../../features/teb/reward";
+import { isOnboardingFeatureAvailable } from "../../features/onboarding/helpers";
 
 export type TebSlice = {
   session: TebSession | null;
@@ -63,9 +64,13 @@ function resolveSession(set: (patch: Partial<FullState>) => void, get: () => Ful
   const performanceQuality = totalWeight ? judged.reduce((sum, j) => sum + j.quality * interactionWeight(j.kind), 0) / totalWeight : 0;
   const completion = session.chart.nodes.length ? judged.filter(j => j.quality > 0).length / session.chart.nodes.length : 0;
   const state = get();
-  const reward = computeRhythmReward({ chargeQuality: session.chargeQuality, performanceQuality, completion,
+  const opening = !isOnboardingFeatureAvailable("video_fyp", state.completedOnboardingGoals);
+  const normalReward = computeRhythmReward({ chargeQuality: session.chargeQuality, performanceQuality, completion,
     maxRhythmCombo: session.maxRhythmCombo, feedCombo: state.combo, viralUntil: state.viralUntil,
     tapPower: state.tapPower, multiplier: state.multiplier, followerConversion: state.followerConversion, now });
+  const openingCoins = BALANCE.onboarding.tapThreeCoins.completionBase
+    + Math.round(BALANCE.onboarding.tapThreeCoins.qualityBonusMax * performanceQuality);
+  const reward = opening ? { coins: openingCoins, followers: 0, likes: 0, k: openingCoins } : normalReward;
   const counts = { perfect: 0, great: 0, good: 0, miss: 0 };
   for (const j of judged) counts[j.label]++;
   set({
@@ -74,11 +79,13 @@ function resolveSession(set: (patch: Partial<FullState>) => void, get: () => Ful
     coinsEarned: state.coinsEarned + reward.coins,
     session: { phase: "result", sequence: session.chart.sequence, chargeQuality: session.chargeQuality,
       performanceQuality, completion, maxRhythmCombo: session.maxRhythmCombo, reward, resolvedAt: now },
-    tebReadyAt: now + BALANCE.teb.cooldownSec * 1000,
+    tebReadyAt: opening ? 0 : now + BALANCE.teb.cooldownSec * 1000,
+    tapThreeCompletions: opening && session.chart.sequence === "tap_three" ? state.tapThreeCompletions + 1 : state.tapThreeCompletions,
   });
   track("teb_interaction_judged", { sequence: session.chart.sequence, ...counts });
   track("teb_chart_resolved", { sequence: session.chart.sequence, performanceQuality, completion,
     maxRhythmCombo: session.maxRhythmCombo, duration: now - session.startedAt, cancelled, rewardCoins: reward.coins });
+  if (opening) queueMicrotask(() => get().checkOnboardingGoal());
 }
 
 export const createTebSlice: StateCreator<FullState, [], [], TebSlice> = (set, get) => ({
@@ -95,7 +102,14 @@ export const createTebSlice: StateCreator<FullState, [], [], TebSlice> = (set, g
 
   beginCharge: () => {
     const s = get();
-    if (!isFeatureUnlocked("element_stage", s.metricsReached) || s.session || Date.now() < s.tebReadyAt) return;
+    const opening = !isOnboardingFeatureAvailable("video_fyp", s.completedOnboardingGoals);
+    if (opening && (!isOnboardingFeatureAvailable("engagement_meter", s.completedOnboardingGoals) || s.engagementFill < BALANCE.onboarding.engagement.cap)) return;
+    if (opening && s.activeOnboardingReveal?.feature === "engagement_meter" && !s.activeOnboardingReveal.dismissed) return;
+    if (!opening && !isFeatureUnlocked("element_stage", s.metricsReached)) return;
+    if (s.session || (!opening && Date.now() < s.tebReadyAt)) return;
+    if (opening && s.activeOnboardingReveal?.feature === "engagement_meter" && s.activeOnboardingReveal.dismissed) {
+      s.completeOnboardingTeach("rhythm_first_hold");
+    }
     set({ session: { phase: "charging", move: "hold_charge", pressedAt: Date.now() } });
   },
 
@@ -103,7 +117,12 @@ export const createTebSlice: StateCreator<FullState, [], [], TebSlice> = (set, g
     const session = get().session;
     if (!session || session.phase !== "charging") return;
     const now = Date.now();
-    const picked = pickSequence(sequenceBag, previousSequence);
+    const opening = !isOnboardingFeatureAvailable("video_fyp", get().completedOnboardingGoals);
+    if (opening && !get().consumeEngagementForRhythm()) {
+      set({ session: null });
+      return;
+    }
+    const picked = pickSequence(sequenceBag, previousSequence, opening ? ["tap_three"] : undefined);
     sequenceBag = picked.bag;
     previousSequence = picked.sequence;
     const seed = Math.floor(Math.random() * 0x7fffffff);

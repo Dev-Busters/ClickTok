@@ -88,6 +88,12 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   },
 
   tick: (dt) => {
+    const stagedJourney = get().onboardingTeachesSeen.legacy_preserved !== true;
+    if (stagedJourney) {
+      get().decayCombo(dt);
+      get().tickTebSession();
+      return;
+    }
     // 3.2: runs every frame (the meta loop always calls tick()), so this is
     // the single integration point that catches totalFollowers crossing a
     // milestone from any source (taps, passive income, idle income, runs).
@@ -164,6 +170,10 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
   },
 
   applyIdleIncome: (now) => {
+    if (get().onboardingTeachesSeen.legacy_preserved !== true) {
+      set({ lastSeenAt: now });
+      return null;
+    }
     const { lastSeenAt, passiveCoinsPerSec, wallet } = get();
     const elapsedSec = Math.min((now - lastSeenAt) / 1000, BALANCE.idleCapSec);
     if (elapsedSec <= 0) {

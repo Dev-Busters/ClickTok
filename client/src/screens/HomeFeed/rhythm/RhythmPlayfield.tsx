@@ -13,6 +13,7 @@ import { JudgementBurst } from "./JudgementBurst";
 import { RhythmHud } from "./RhythmHud";
 import { RhythmPerfOverlay } from "./RhythmPerfOverlay";
 import { chartCompleteFeedback, playRhythmFeedback } from "../../../features/teb/feedback";
+import { isOnboardingFeatureAvailable } from "../../../features/onboarding/helpers";
 
 function grade(q: number): string { return q >= .9 ? "PERFECT" : q >= .65 ? "GREAT" : q > 0 ? "GOOD" : "MISS"; }
 
@@ -28,6 +29,7 @@ export function RhythmPlayfield() {
   const pauseRhythm = useGameStore(s => s.pauseRhythm);
   const muted = useGameStore(s => s.rhythmMuted);
   const reducedFeedback = useGameStore(s => s.reducedFeedback);
+  const completedGoals = useGameStore(s => s.completedOnboardingGoals);
   const ref = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(Date.now());
   const lastJudgementAt = useRef(0);
@@ -90,14 +92,14 @@ export function RhythmPlayfield() {
   const firstTeach = !teachSeen[sequence];
   const playing = session.phase === "playing";
   const quality = playing && session.judgements.length ? session.judgements.reduce((s, j) => s + j.quality, 0) / session.judgements.length : 1;
+  const videoFyp = isOnboardingFeatureAvailable("video_fyp", completedGoals);
 
   return <motion.div ref={ref} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .14 }}
     onPointerDown={e => { if (!playing) return; e.currentTarget.setPointerCapture(e.pointerId); down(normalize(e)); }}
     onPointerMove={e => { if (playing) move(normalize(e)); }}
     onPointerUp={e => { if (playing) up(normalize(e)); }}
     onPointerCancel={e => cancel(e.pointerId)} onLostPointerCapture={e => { if (playing) cancel(e.pointerId); }}
-    style={{ position: "absolute", inset: 0, zIndex: 80, touchAction: playing ? "none" : "auto", userSelect: "none", overflow: "hidden", pointerEvents: playing ? "auto" : "none" }}>
-    <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle,rgba(0,0,0,.42),rgba(0,0,0,.78))", pointerEvents: "none" }} />
+    style={{ position: "absolute", top: videoFyp ? 72 : 122, right: videoFyp ? 76 : 12, bottom: videoFyp ? 168 : 92, left: 12, zIndex: 80, touchAction: playing ? "none" : "auto", userSelect: "none", overflow: "visible", pointerEvents: playing ? "auto" : "none" }}>
     {session.phase === "count_in" && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", textAlign: "center", pointerEvents: "auto" }}>
       <motion.div animate={reduced ? { opacity: 1 } : { scale: [1, 1.06, 1], opacity: [0, 1, 1] }} transition={{ duration: .7 }}>
         <div style={{ fontFamily: "var(--font-display)", fontSize: 30, color: "white", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>{def.name}</div>
@@ -119,7 +121,7 @@ export function RhythmPlayfield() {
       <div style={{ textAlign: "center", padding: "14px 20px", borderTop: "1px solid var(--gold)", borderBottom: "1px solid var(--cyan)", background: "rgba(0,0,0,.68)", boxShadow: "0 0 28px rgba(255,210,0,.2)" }}>
         <b style={{ fontFamily: "var(--font-display)", color: "var(--gold)", letterSpacing: ".12em" }}>{def.name}</b>
         <div style={{ margin: "7px 0", fontFamily: "var(--font-mono)", fontSize: 11, color: "white" }}>CHARGE {grade(session.chargeQuality)} · RHYTHM {grade(session.performanceQuality)} · ×{session.maxRhythmCombo}</div>
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "white" }}>🪙 +{formatCount(session.reward.coins)}　👤 +{formatCount(session.reward.followers)}　♥ +{formatCount(session.reward.likes)}</div>
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "white" }}>{videoFyp ? <>🪙 +{formatCount(session.reward.coins)}　👤 +{formatCount(session.reward.followers)}　♥ +{formatCount(session.reward.likes)}</> : <>🪙 +{formatCount(session.reward.coins)}</>}</div>
       </div>
     </motion.div>}
     <RhythmPerfOverlay />

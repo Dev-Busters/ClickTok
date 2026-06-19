@@ -23,6 +23,8 @@ import {
 } from "../../features/metrics/unlocks";
 import type { MetricDef } from "../../features/metrics/types";
 import type { VideoCard, ReactionKind, FeedModId } from "../../party/types";
+import { isOnboardingFeatureAvailable } from "../../features/onboarding/helpers";
+import { OpeningHome } from "./OpeningHome";
 
 // 06 §3 Phase 8: canned comment one-liner pool — cosmetic only, moderation-safe.
 const COMMENT_LINES = [
@@ -45,6 +47,12 @@ const cardVariants = {
 };
 
 export function HomeFeed() {
+  const completed = useGameStore(state => state.completedOnboardingGoals);
+  if (!isOnboardingFeatureAvailable("video_fyp", completed)) return <OpeningHome />;
+  return <VideoHomeFeed />;
+}
+
+function VideoHomeFeed() {
   // Store reads
   const wallet        = useGameStore(s => s.wallet);
   const multiplier    = useGameStore(s => s.multiplier);
@@ -65,6 +73,7 @@ export function HomeFeed() {
   const reactedByVideo = useGameStore(s => s.reactedByVideo);
   const reactToCard   = useGameStore(s => s.reactToCard);
   const metricsReached = useGameStore(s => s.metricsReached);
+  const onboardingTeachesSeen = useGameStore(s => s.onboardingTeachesSeen);
   const viewsTotal    = useGameStore(s => s.viewsTotal);
   const streams       = useGameStore(s => s.streams);
   const coinsEarned   = useGameStore(s => s.coinsEarned);
@@ -72,11 +81,11 @@ export function HomeFeed() {
   const rhythmOwnsField = tebSession?.phase === "count_in" || tebSession?.phase === "playing" || tebSession?.phase === "result";
 
   // 12.2 (08 §B): granular unlock flags — one feature per metric crossing.
-  const fypVideoUnlocked       = isFeatureUnlocked("fyp_video",       metricsReached);
-  const engagementRailUnlocked = isFeatureUnlocked("engagement_rail", metricsReached);
-  const feedScrollUnlocked     = isFeatureUnlocked("feed_scroll",     metricsReached);
+  const fypVideoUnlocked       = true;
+  const engagementRailUnlocked = true;
+  const feedScrollUnlocked     = onboardingTeachesSeen.video_fyp_first_action === true;
   const elementStageUnlocked   = isFeatureUnlocked("element_stage",   metricsReached);
-  const studioUnlocked         = isFeatureUnlocked("studio",          metricsReached);
+  const studioUnlocked         = true;
   const goLiveUnlocked         = isFeatureUnlocked("live",            metricsReached);
   const diamondsUnlocked       = isFeatureUnlocked("diamonds",        metricsReached);
   const affordablePillars = useGameStore(s => s.affordablePillars);
@@ -237,8 +246,8 @@ export function HomeFeed() {
                 intensity={canvasIntensity}
               />
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.48)', pointerEvents: 'none' }} />
-              {!rhythmOwnsField && activeCard && <ModBanner mod={activeCard.mod} />}
-              {!rhythmOwnsField && <VideoInfoOverlay card={activeCard} />}
+              {activeCard && <ModBanner mod={activeCard.mod} />}
+              <VideoInfoOverlay card={activeCard} />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -246,8 +255,8 @@ export function HomeFeed() {
         <div style={{ position: 'absolute', inset: 0 }}>
           <VideoCanvas seed={activeCard?.handle ?? "fyp"} topic={activeCard?.topic ?? "trending"} intensity={canvasIntensity} />
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.48)', pointerEvents: 'none' }} />
-          {!rhythmOwnsField && activeCard && <ModBanner mod={activeCard.mod} />}
-          {!rhythmOwnsField && <VideoInfoOverlay card={activeCard} />}
+          {activeCard && <ModBanner mod={activeCard.mod} />}
+          <VideoInfoOverlay card={activeCard} />
         </div>
       )}
 
@@ -259,7 +268,7 @@ export function HomeFeed() {
       )}
 
       {/* ── Top stat strip ───────────────────────────────────────────────── */}
-      {!rhythmOwnsField && <div style={{
+      <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: 56,
         display: 'flex', alignItems: 'center',
         padding: '0 14px',
@@ -324,7 +333,7 @@ export function HomeFeed() {
             )}
           </motion.button>
         )}
-      </div>}
+      </div>
 
       {/* ── View-buff pill (15.3 — 11 §C) ──────────────────────────────── */}
       {!rhythmOwnsField && <AnimatePresence>
@@ -368,7 +377,7 @@ export function HomeFeed() {
       <FloatingTextLayer />
 
       {/* ── Engagement rail (engagement_rail unlock) ────────────────────── */}
-      {!rhythmOwnsField && engagementRailUnlocked && (
+      {engagementRailUnlocked && (
         <motion.div
           onPointerDown={e => e.stopPropagation()}
           initial={{ opacity: 0, x: 24 }}
@@ -461,7 +470,7 @@ export function HomeFeed() {
       )}
 
       {/* ── GO LIVE pill (live unlock) ──────────────────────────────────── */}
-      {!rhythmOwnsField && goLiveUnlocked && (
+      {goLiveUnlocked && (
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -500,6 +509,7 @@ export function HomeFeed() {
       )}
 
       <AnimatePresence>{rhythmOwnsField && <RhythmPlayfield />}</AnimatePresence>
+      {rhythmOwnsField && <div aria-hidden style={{ position: "absolute", inset: 0, zIndex: 79, pointerEvents: "auto", background: "transparent" }} />}
     </div>
   );
 }

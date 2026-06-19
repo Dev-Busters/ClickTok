@@ -4,9 +4,10 @@ import type { SkillId } from "../../features/skills/types";
 import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { SequenceId } from "../../features/teb/types";
+import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -113,7 +114,20 @@ export type PersistedV14 = Omit<PersistedV13, "version"> & {
   tebSequenceTeachSeen: Partial<Record<SequenceId, boolean>>;
 };
 
-export type PersistedState = PersistedV14;
+export type PersistedV15 = Omit<PersistedV14, "version"> & {
+  version: 15;
+  onboardingRevision: typeof ONBOARDING_REVISION;
+  onboardingStep: OnboardingStepId;
+  completedOnboardingGoals: OnboardingStepId[];
+  activeOnboardingReveal: FullState["activeOnboardingReveal"];
+  onboardingTeachesSeen: Record<string, true>;
+  openingUpgradeLevels: Record<OpeningUpgradeId, number>;
+  engagementFill: number;
+  tapThreeCompletions: number;
+  onboardingStepStartedAt: number;
+};
+
+export type PersistedState = PersistedV15;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -148,6 +162,15 @@ export function toPersistedState(state: FullState): PersistedState {
     modTeachSeen: state.modTeachSeen,
     tebChargeTeachSeen: state.tebChargeTeachSeen,
     tebSequenceTeachSeen: state.tebSequenceTeachSeen,
+    onboardingRevision: state.onboardingRevision,
+    onboardingStep: state.onboardingStep,
+    completedOnboardingGoals: state.completedOnboardingGoals,
+    activeOnboardingReveal: state.activeOnboardingReveal,
+    onboardingTeachesSeen: state.onboardingTeachesSeen,
+    openingUpgradeLevels: state.openingUpgradeLevels,
+    engagementFill: state.engagementFill,
+    tapThreeCompletions: state.tapThreeCompletions,
+    onboardingStepStartedAt: state.onboardingStepStartedAt,
   };
 }
 
@@ -176,7 +199,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -353,6 +376,23 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       ...v13,
       version: 14,
       tebSequenceTeachSeen: v13.tebChargeTeachSeen ? { tap_three: true } : {},
+    };
+  }
+
+  if (version < 15) {
+    const v14 = state as PersistedV14;
+    state = {
+      ...v14,
+      version: 15,
+      onboardingRevision: ONBOARDING_REVISION,
+      onboardingStep: "unlock_video_fyp",
+      completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm", "complete_first_rhythm", "unlock_video_fyp"],
+      activeOnboardingReveal: null,
+      onboardingTeachesSeen: { studio_first_use: true, rhythm_first_hold: true, video_fyp_first_action: true, legacy_preserved: true },
+      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
+      engagementFill: 0,
+      tapThreeCompletions: 1,
+      onboardingStepStartedAt: Date.now(),
     };
   }
 

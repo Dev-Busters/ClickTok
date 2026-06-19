@@ -33,8 +33,8 @@ export const CHART_CATALOG = {
 
 export const ALL_SEQUENCES = Object.keys(CHART_CATALOG) as SequenceId[];
 
-export function refillShuffleBag(previous: SequenceId | null, random: () => number = Math.random): SequenceId[] {
-  const bag = [...ALL_SEQUENCES];
+export function refillShuffleBag(previous: SequenceId | null, random: () => number = Math.random, eligible: readonly SequenceId[] = ALL_SEQUENCES): SequenceId[] {
+  const bag = [...eligible];
   for (let i = bag.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [bag[i], bag[j]] = [bag[j], bag[i]];
@@ -43,8 +43,10 @@ export function refillShuffleBag(previous: SequenceId | null, random: () => numb
   return bag;
 }
 
-export function pickSequence(bag: SequenceId[], previous: SequenceId | null): { sequence: SequenceId; bag: SequenceId[] } {
-  const nextBag = bag.length ? [...bag] : refillShuffleBag(previous);
+export function pickSequence(bag: SequenceId[], previous: SequenceId | null, eligible: readonly SequenceId[] = ALL_SEQUENCES): { sequence: SequenceId; bag: SequenceId[] } {
+  const allowed = new Set(eligible);
+  const nextBag = bag.filter(sequence => allowed.has(sequence));
+  if (nextBag.length === 0) nextBag.push(...refillShuffleBag(previous, Math.random, eligible));
   const sequence = nextBag.shift() ?? "tap_three";
   return { sequence, bag: nextBag };
 }

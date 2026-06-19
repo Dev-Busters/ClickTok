@@ -1,0 +1,139 @@
+import { useEffect, useRef } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { BALANCE } from "../../features/economy/balance";
+import { goalById, isOnboardingFeatureAvailable, requirementValue, followersPerTap } from "../../features/onboarding/helpers";
+import { formatCount } from "../../lib/format";
+import { useGameStore } from "../../store";
+import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
+
+function OpeningTeb() {
+  const openingTap = useGameStore(state => state.openingTap);
+  const beginCharge = useGameStore(state => state.beginCharge);
+  const releaseCharge = useGameStore(state => state.releaseCharge);
+  const session = useGameStore(state => state.session);
+  const fill = useGameStore(state => state.engagementFill);
+  const completed = useGameStore(state => state.completedOnboardingGoals);
+  const teaches = useGameStore(state => state.onboardingTeachesSeen);
+  const reveal = useGameStore(state => state.activeOnboardingReveal);
+  const completeTeach = useGameStore(state => state.completeOnboardingTeach);
+  const level = useGameStore(state => state.openingUpgradeLevels.audience_reach);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const meterUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
+  const ready = meterUnlocked && fill >= BALANCE.onboarding.engagement.cap;
+
+  const start = () => {
+    openingTap();
+    if (!ready || session) return;
+    holdTimer.current = setTimeout(() => {
+      beginCharge();
+      if (reveal?.feature === "engagement_meter" && reveal.dismissed && !teaches.rhythm_first_hold) completeTeach("rhythm_first_hold");
+    }, BALANCE.teb.holdLaunchThresholdMs);
+  };
+  const end = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+    if (useGameStore.getState().session?.phase === "charging") releaseCharge({ width: window.innerWidth, height: window.innerHeight });
+  };
+
+  useEffect(() => {
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.repeat || (event.key !== " " && event.key !== "Enter")) return;
+      event.preventDefault();
+      start();
+    };
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.key === " " || event.key === "Enter") end();
+    };
+    window.addEventListener("keydown", keyDown);
+    window.addEventListener("keyup", keyUp);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("keydown", keyDown);
+      window.removeEventListener("keyup", keyUp);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    };
+  });
+
+  return (
+    <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
+      <motion.button
+        aria-label={ready ? "Ready. Hold to launch TAP THREE" : "Tap TEB to gain Followers"}
+        onPointerDown={event => { event.stopPropagation(); start(); }}
+        whileTap={{ scale: .96 }}
+        style={{
+          width: 188, height: 188, borderRadius: "50%", cursor: "pointer", color: "white",
+          border: `3px solid ${ready ? "var(--gold)" : "var(--cyan)"}`,
+          background: "radial-gradient(circle at 38% 32%,rgba(255,255,255,.15),rgba(7,8,12,.96) 66%)",
+          boxShadow: ready ? "0 0 34px rgba(255,210,0,.34),inset 0 0 28px rgba(255,210,0,.16)" : "0 0 28px rgba(37,244,238,.18),inset 0 0 24px rgba(37,244,238,.12)",
+          position: "relative", overflow: "hidden",
+        }}
+      >
+        {meterUnlocked && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 48, letterSpacing: ".08em", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>TEB</span>
+        <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".14em", color: ready ? "var(--gold)" : "var(--dim)" }}>
+          {ready ? "READY — HOLD" : `+${followersPerTap(level).toFixed(1)} FOLLOWERS / TAP`}
+        </span>
+      </motion.button>
+      {meterUnlocked && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".12em", color: ready ? "var(--gold)" : "var(--dim)" }}>ENGAGEMENT {Math.round(fill)} / 100</div>}
+    </div>
+  );
+}
+
+function RevealCard() {
+  const reveal = useGameStore(state => state.activeOnboardingReveal);
+  const acknowledge = useGameStore(state => state.acknowledgeOnboardingReveal);
+  const reduced = useReducedMotion();
+  if (!reveal || reveal.dismissed) return null;
+  const copy = reveal.feature === "creator_studio" ? ["CREATOR STUDIO UNLOCKED", "Turn Coins into stronger taps"]
+    : reveal.feature === "engagement_meter" ? ["TAP THREE UNLOCKED", "Fill Engagement, then hold TEB"]
+    : ["YOUR FYP IS READY", "Meet your audience"];
+  return <motion.div initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} style={{ position: "absolute", top: 76, right: 14, zIndex: 30, width: 238, padding: 14, borderRadius: 14, background: "rgba(8,10,15,.96)", border: "1px solid var(--cyan)", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
+    <strong style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: ".06em" }}>{copy[0]}</strong>
+    <span style={{ display: "block", margin: "4px 0 12px", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>{copy[1]}</span>
+    <button onClick={acknowledge} style={{ width: "100%", padding: "9px 12px", borderRadius: 999, border: 0, background: "var(--cyan)", color: "#050608", fontFamily: "var(--font-mono)", fontWeight: 800, letterSpacing: ".12em" }}>SHOW ME</button>
+  </motion.div>;
+}
+
+export function OpeningHome() {
+  const wallet = useGameStore(state => state.wallet);
+  const step = useGameStore(state => state.onboardingStep);
+  const completed = useGameStore(state => state.completedOnboardingGoals);
+  const reveal = useGameStore(state => state.activeOnboardingReveal);
+  const teaches = useGameStore(state => state.onboardingTeachesSeen);
+  const levels = useGameStore(state => state.openingUpgradeLevels);
+  const viewsTotal = useGameStore(state => state.viewsTotal);
+  const tapThreeCompletions = useGameStore(state => state.tapThreeCompletions);
+  const setSheet = useGameStore(state => state.setSheet);
+  const completeTeach = useGameStore(state => state.completeOnboardingTeach);
+  const session = useGameStore(state => state.session);
+  const rhythm = session?.phase === "count_in" || session?.phase === "playing" || session?.phase === "result";
+  const studio = isOnboardingFeatureAvailable("creator_studio", completed);
+  const goal = goalById(step);
+  const progress = requirementValue(goal.requirement, { viewsTotal, totalFollowers: wallet.totalFollowers, openingUpgradeLevels: levels, tapThreeCompletions });
+
+  const openStudio = () => {
+    if (reveal?.feature === "creator_studio" && !reveal.dismissed) return;
+    setSheet("creatorStudio");
+    if (reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use) completeTeach("studio_first_use");
+  };
+
+  return <main data-onboarding="pre-video-home" style={{ position: "relative", height: "100%", minHeight: "100svh", overflow: "hidden", background: "radial-gradient(circle at 50% 44%,rgba(37,244,238,.09),transparent 32%),linear-gradient(155deg,#11131a,#06070a 58%,#16070c)" }}>
+    <motion.div aria-hidden animate={{ opacity: [.25, .5, .25], x: [-10, 12, -10] }} transition={{ duration: 9, repeat: Infinity }} style={{ position: "absolute", width: 250, height: 250, borderRadius: "50%", filter: "blur(70px)", background: "rgba(255,31,75,.16)", right: -100, bottom: 30 }} />
+    <header style={{ position: "absolute", inset: "0 0 auto", height: 66, padding: "14px 16px", zIndex: 10, display: "flex", alignItems: "baseline", gap: 8, background: "linear-gradient(rgba(0,0,0,.62),transparent)" }}>
+      <strong style={{ fontFamily: "var(--font-display)", fontSize: 32 }}>{formatCount(wallet.followers)}</strong>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)", letterSpacing: ".16em" }}>FOLLOWERS</span>
+      {studio && <><strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 24 }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>COINS</span></>}
+    </header>
+    <div data-onboarding="goal" style={{ position: "absolute", top: 72, left: 14, right: studio ? 104 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{goal.label}</div>
+      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{Math.min(progress.current, progress.target).toLocaleString()} / {progress.target.toLocaleString()}{goal.reward?.coins ? ` · +${goal.reward.coins} COINS` : ""}</div>
+    </div>
+    {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 72, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
+    {!rhythm && <OpeningTeb />}
+    <AnimatePresence>{rhythm && <RhythmPlayfield />}</AnimatePresence>
+    <RevealCard />
+  </main>;
+}
