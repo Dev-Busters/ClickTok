@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, requirementValue, followersPerTap } from "../../features/onboarding/helpers";
+import { goalById, isOnboardingFeatureAvailable, requirementValue, followerChance } from "../../features/onboarding/helpers";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
@@ -74,7 +74,7 @@ function OpeningTeb() {
         {meterUnlocked && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
         <span style={{ fontFamily: "var(--font-display)", fontSize: 48, letterSpacing: ".08em", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>TEB</span>
         <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".14em", color: ready ? "var(--gold)" : "var(--dim)" }}>
-          {ready ? "READY — HOLD" : `+${followersPerTap(level).toFixed(1)} FOLLOWERS / TAP`}
+          {ready ? "READY — HOLD" : `${Math.round(followerChance(level) * 100)}% FOLLOWER CHANCE`}
         </span>
       </motion.button>
       {meterUnlocked && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".12em", color: ready ? "var(--gold)" : "var(--dim)" }}>ENGAGEMENT {Math.round(fill)} / 100</div>}
@@ -106,6 +106,7 @@ export function OpeningHome() {
   const levels = useGameStore(state => state.openingUpgradeLevels);
   const viewsTotal = useGameStore(state => state.viewsTotal);
   const tapThreeCompletions = useGameStore(state => state.tapThreeCompletions);
+  const engagementFill = useGameStore(state => state.engagementFill);
   const setSheet = useGameStore(state => state.setSheet);
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const session = useGameStore(state => state.session);
@@ -113,6 +114,7 @@ export function OpeningHome() {
   const studio = isOnboardingFeatureAvailable("creator_studio", completed);
   const goal = goalById(step);
   const progress = requirementValue(goal.requirement, { viewsTotal, totalFollowers: wallet.totalFollowers, openingUpgradeLevels: levels, tapThreeCompletions });
+  const openingChapterComplete = completed.includes("complete_first_rhythm");
 
   const openStudio = () => {
     if (reveal?.feature === "creator_studio" && !reveal.dismissed) return;
@@ -128,8 +130,8 @@ export function OpeningHome() {
       {studio && <><strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 24 }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>COINS</span></>}
     </header>
     <div data-onboarding="goal" style={{ position: "absolute", top: 72, left: 14, right: studio ? 104 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
-      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{goal.label}</div>
-      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{Math.min(progress.current, progress.target).toLocaleString()} / {progress.target.toLocaleString()}{goal.reward?.coins ? ` · +${goal.reward.coins} COINS` : ""}</div>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "REFILL ENGAGEMENT · PLAY TAP THREE" : goal.label}</div>
+      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? `${Math.round(engagementFill)} / ${BALANCE.onboarding.engagement.cap} · REPEATABLE COINS` : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} COINS` : ""}`}</div>
     </div>
     {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 72, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
     {!rhythm && <OpeningTeb />}

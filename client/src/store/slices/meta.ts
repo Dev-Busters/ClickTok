@@ -7,7 +7,7 @@ import type { SequenceId } from "../../features/teb/types";
 import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -127,7 +127,9 @@ export type PersistedV15 = Omit<PersistedV14, "version"> & {
   onboardingStepStartedAt: number;
 };
 
-export type PersistedState = PersistedV15;
+export type PersistedV16 = Omit<PersistedV15, "version"> & { version: 16 };
+
+export type PersistedState = PersistedV16;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -199,7 +201,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -393,6 +395,20 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       engagementFill: 0,
       tapThreeCompletions: 1,
       onboardingStepStartedAt: Date.now(),
+    };
+  }
+
+  if (version < 16) {
+    const v15 = state as PersistedV15;
+    const legacyPreserved = v15.onboardingTeachesSeen?.legacy_preserved === true;
+    const { video_fyp_first_action: _videoTeach, ...teachesWithoutVideo } = v15.onboardingTeachesSeen ?? {};
+    state = legacyPreserved ? { ...v15, version: 16 } : {
+      ...v15,
+      version: 16,
+      onboardingStep: v15.onboardingStep === "unlock_video_fyp" ? "complete_first_rhythm" : v15.onboardingStep,
+      completedOnboardingGoals: v15.completedOnboardingGoals.filter(goal => goal !== "unlock_video_fyp"),
+      activeOnboardingReveal: v15.activeOnboardingReveal?.feature === "video_fyp" ? null : v15.activeOnboardingReveal,
+      onboardingTeachesSeen: teachesWithoutVideo,
     };
   }
 

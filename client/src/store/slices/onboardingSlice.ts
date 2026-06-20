@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, nextGoal, resolvableGoal, followersPerTap, engagementPerTap, openingUpgradeCost, isOnboardingFeatureAvailable } from "../../features/onboarding/helpers";
+import { goalById, nextGoal, resolvableGoal, rollOpeningFollower, engagementPerTap, openingUpgradeCost, isOnboardingFeatureAvailable } from "../../features/onboarding/helpers";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import { track } from "../../lib/telemetry";
 import type { FullState } from "../index";
@@ -91,7 +91,7 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   openingTap: () => {
     const state = get();
     if (state.session) return;
-    const followers = followersPerTap(state.openingUpgradeLevels.audience_reach);
+    const followers = rollOpeningFollower(state.openingUpgradeLevels.audience_reach);
     const meterUnlocked = isOnboardingFeatureAvailable("engagement_meter", state.completedOnboardingGoals);
     const engagement = meterUnlocked ? engagementPerTap(state.openingUpgradeLevels.engagement_rate) : 0;
     set({

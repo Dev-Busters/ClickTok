@@ -6,16 +6,15 @@ import { CurrencyBar } from "../../components/CurrencyBar";
 import { UpgradeShop } from "../../components/UpgradeShop";
 import { SkillsPanel } from "../../components/SkillsPanel";
 import type { UpgradePillar } from "../../features/upgrades/types";
-import { isOnboardingFeatureAvailable, followersPerTap, engagementPerTap, openingUpgradeCost } from "../../features/onboarding/helpers";
+import { followerChance, engagementPerTap, openingUpgradeCost } from "../../features/onboarding/helpers";
 import type { OpeningUpgradeId } from "../../features/onboarding/types";
 import { formatCount } from "../../lib/format";
 
 type StudioTab = UpgradePillar;
 
 export function CreatorStudio({ onClose }: { onClose: () => void }) {
-  const completed = useGameStore(state => state.completedOnboardingGoals);
   const legacyPreserved = useGameStore(state => state.onboardingTeachesSeen.legacy_preserved === true);
-  if (!isOnboardingFeatureAvailable("video_fyp", completed) || !legacyPreserved) return <OpeningCreatorStudio onClose={onClose} />;
+  if (!legacyPreserved) return <OpeningCreatorStudio onClose={onClose} />;
   return <FullCreatorStudio onClose={onClose} />;
 }
 
@@ -45,12 +44,12 @@ function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
           const level = levels[id];
           const cost = openingUpgradeCost(id, level);
           const audience = id === "audience_reach";
-          const current = audience ? followersPerTap(level) : engagementPerTap(level);
-          const next = audience ? followersPerTap(level + 1) : engagementPerTap(level + 1);
+          const current = audience ? followerChance(level) : engagementPerTap(level);
+          const next = audience ? followerChance(level + 1) : engagementPerTap(level + 1);
           return <motion.section key={id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0, boxShadow: changed === id ? "0 0 26px rgba(37,244,238,.3)" : "0 0 0 rgba(0,0,0,0)" }} style={{ marginBottom: 14, padding: 18, borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.045)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><strong style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>{audience ? "AUDIENCE REACH" : "ENGAGEMENT RATE"}</strong><span style={{ fontFamily: "var(--font-mono)", color: "var(--cyan)", fontSize: 10 }}>LV {level}</span></div>
-            <p style={{ margin: "6px 0 14px", color: "var(--dim)", fontFamily: "var(--font-mono)", fontSize: 10 }}>{audience ? "Adds Followers to every quick TEB tap." : "Fills the Engagement meter faster per tap."}</p>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: changed === id ? "var(--cyan)" : "white" }}>{current.toFixed(2)} → {next.toFixed(2)} <small style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>{audience ? "FOLLOWERS / TAP" : "ENGAGEMENT / TAP"}</small></div>
+            <p style={{ margin: "6px 0 14px", color: "var(--dim)", fontFamily: "var(--font-mono)", fontSize: 10 }}>{audience ? "Raises the chance that a TEB tap gains 1 Follower." : "Fills the Engagement meter faster per tap."}</p>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: changed === id ? "var(--cyan)" : "white" }}>{audience ? `${Math.round(current * 100)}% → ${Math.round(next * 100)}%` : `${current.toFixed(2)} → ${next.toFixed(2)}`} <small style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>{audience ? "FOLLOWER CHANCE" : "ENGAGEMENT / TAP"}</small></div>
             <button disabled={wallet.coins < cost} onClick={() => buy(id)} style={{ width: "100%", marginTop: 16, padding: 12, border: 0, borderRadius: 999, background: wallet.coins >= cost ? "var(--cyan)" : "rgba(255,255,255,.08)", color: wallet.coins >= cost ? "#040608" : "var(--dim)", fontFamily: "var(--font-mono)", fontWeight: 800, letterSpacing: ".12em" }}>UPGRADE · 🪙 {cost}</button>
           </motion.section>;
         })}

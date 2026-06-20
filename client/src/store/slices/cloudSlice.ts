@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { FullState } from "../index";
-import type { PersistedState } from "./meta";
+import { migrate, type PersistedState } from "./meta";
 
 // 4.5: Supabase auth/sync status — ephemeral (re-derived from the Supabase
 // session on load), not persisted via the localStorage `partialize`.
@@ -19,6 +19,47 @@ export type CloudSlice = {
   loadPersistedState: (persisted: PersistedState) => void;
 };
 
+export function persistedStatePatch(persisted: PersistedState): Partial<FullState> {
+  return {
+    handle: persisted.handle,
+    wallet: persisted.wallet,
+    comments: persisted.comments,
+    tapPower: persisted.tapPower,
+    passiveFollowersPerSec: persisted.passiveFollowersPerSec,
+    passiveCoinsPerSec: persisted.passiveCoinsPerSec,
+    multiplier: persisted.multiplier,
+    followerConversion: persisted.followerConversion,
+    boonMultiplier: persisted.boonMultiplier,
+    lastSeenAt: persisted.lastSeenAt,
+    ownedUpgrades: persisted.ownedUpgrades,
+    upgradeLevels: persisted.upgradeLevels,
+    skillLevels: persisted.skillLevels,
+    videos: persisted.videos,
+    notifications: persisted.notifications,
+    lastDailyClaimAt: persisted.lastDailyClaimAt,
+    metricsReached: persisted.metricsReached,
+    ownedElements: persisted.ownedElements,
+    tebTeachSeen: persisted.tebTeachSeen,
+    viewsTotal: persisted.viewsTotal,
+    coinsEarned: persisted.coinsEarned,
+    streams: persisted.streams,
+    affordableNotifiedPillars: persisted.affordableNotifiedPillars,
+    elementsTeachSeen: persisted.elementsTeachSeen,
+    modTeachSeen: persisted.modTeachSeen,
+    tebChargeTeachSeen: persisted.tebChargeTeachSeen,
+    tebSequenceTeachSeen: persisted.tebSequenceTeachSeen,
+    onboardingRevision: persisted.onboardingRevision,
+    onboardingStep: persisted.onboardingStep,
+    completedOnboardingGoals: persisted.completedOnboardingGoals,
+    activeOnboardingReveal: persisted.activeOnboardingReveal,
+    onboardingTeachesSeen: persisted.onboardingTeachesSeen,
+    openingUpgradeLevels: persisted.openingUpgradeLevels,
+    engagementFill: persisted.engagementFill,
+    tapThreeCompletions: persisted.tapThreeCompletions,
+    onboardingStepStartedAt: persisted.onboardingStepStartedAt,
+  };
+}
+
 export const createCloudSlice: StateCreator<FullState, [], [], CloudSlice> = (set, get) => ({
   cloudUserId: null,
   cloudIsAnonymous: true,
@@ -31,31 +72,8 @@ export const createCloudSlice: StateCreator<FullState, [], [], CloudSlice> = (se
   setCloudSyncStatus: (status) => set({ cloudSyncStatus: status }),
 
   loadPersistedState: (persisted) => {
-    set({
-      handle: persisted.handle,
-      wallet: persisted.wallet,
-      comments: persisted.comments,
-      tapPower: persisted.tapPower,
-      passiveFollowersPerSec: persisted.passiveFollowersPerSec,
-      passiveCoinsPerSec: persisted.passiveCoinsPerSec,
-      multiplier: persisted.multiplier,
-      followerConversion: persisted.followerConversion,
-      boonMultiplier: persisted.boonMultiplier,
-      lastSeenAt: persisted.lastSeenAt,
-      ownedUpgrades: persisted.ownedUpgrades,
-      upgradeLevels: persisted.upgradeLevels,
-      skillLevels: persisted.skillLevels,
-      videos: persisted.videos,
-      notifications: persisted.notifications,
-      lastDailyClaimAt: persisted.lastDailyClaimAt,
-      metricsReached: persisted.metricsReached,
-      ownedElements: persisted.ownedElements,
-      tebTeachSeen: persisted.tebTeachSeen,
-      viewsTotal: persisted.viewsTotal,
-      coinsEarned: persisted.coinsEarned,
-      streams: persisted.streams,
-      affordableNotifiedPillars: persisted.affordableNotifiedPillars,
-    });
+    const migrated = migrate(persisted, persisted.version ?? 1);
+    set(persistedStatePatch(migrated));
     get().recomputeStats();
   },
 });

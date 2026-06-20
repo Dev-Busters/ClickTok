@@ -17,7 +17,6 @@ import { CelebrationLayer } from "../components/fx/CelebrationLayer";
 import { AnimatePresence, motion } from "framer-motion";
 import { buildChart, offsetChart } from "../features/teb/chartBuilder";
 import type { SequenceId } from "../features/teb/types";
-import { isOnboardingFeatureAvailable } from "../features/onboarding/helpers";
 
 const Live = lazy(() => import("../screens/Live").then(m => ({ default: m.Live })));
 
@@ -28,10 +27,8 @@ export function Shell() {
   const openSheet = useGameStore(s => s.openSheet);
   const setSheet = useGameStore(s => s.setSheet);
   const phase = useGameStore(s => s.phase);
-  const completedOnboardingGoals = useGameStore(s => s.completedOnboardingGoals);
   const onboardingTeachesSeen = useGameStore(s => s.onboardingTeachesSeen);
-  const navUnlocked = isOnboardingFeatureAvailable("video_fyp", completedOnboardingGoals)
-    && onboardingTeachesSeen.video_fyp_first_action === true;
+  const navUnlocked = onboardingTeachesSeen.legacy_preserved === true;
   const applyIdleIncome = useGameStore(s => s.applyIdleIncome);
   const spectating = useGameStore(s => s.spectating);
   const pendingDrop = useGameStore(s => s.pendingDrop);
@@ -71,18 +68,22 @@ export function Shell() {
       openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1 },
       engagementFill: 100,
     });
-    if (onboardingQa === "video" || onboardingQa === "videoReady") useGameStore.setState({
-      wallet: { followers: 10000, totalFollowers: 10000, coins: 60, likes: 0, diamonds: 0 },
-      onboardingStep: "unlock_video_fyp",
-      completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm", "complete_first_rhythm", "unlock_video_fyp"],
-      activeOnboardingReveal: onboardingQa === "video" ? { feature: "video_fyp", shownAt: Date.now(), dismissed: false } : null,
-      onboardingTeachesSeen: onboardingQa === "video" ? { studio_first_use: true, rhythm_first_hold: true } : { studio_first_use: true, rhythm_first_hold: true, video_fyp_first_action: true },
-      openingUpgradeLevels: { audience_reach: 3, engagement_rate: 2 },
-      metricsReached: [],
-      passiveFollowersPerSec: 0,
-      passiveCoinsPerSec: 0,
-      ownedElements: {},
+    if (onboardingQa === "complete") useGameStore.setState({
+      wallet: { followers: 2600, totalFollowers: 2600, coins: 60, likes: 0, diamonds: 0 },
+      viewsTotal: 2600,
+      onboardingStep: "complete_first_rhythm",
+      completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm", "complete_first_rhythm"],
+      activeOnboardingReveal: null,
+      onboardingTeachesSeen: { studio_first_use: true, rhythm_first_hold: true },
+      openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1 },
+      engagementFill: 0,
+      tapThreeCompletions: 1,
+      session: null,
     });
+    if (onboardingQa === "legacy") useGameStore.setState(state => ({
+      onboardingTeachesSeen: { ...state.onboardingTeachesSeen, legacy_preserved: true },
+      activeOnboardingReveal: null,
+    }));
     const sequence = params.get("rhythmQa") as SequenceId | null;
     if (!sequence || !["tap_three", "hold_pulse", "swipe_chain", "trace_arc"].includes(sequence)) return;
     const startsAt = Date.now() + 1200;
@@ -157,7 +158,6 @@ export function Shell() {
 
       {/* 10.5: celebration popups — element/pillar unlocks, affordable alerts */}
       {onboardingTeachesSeen.legacy_preserved === true && <CelebrationLayer />}
-      <VideoFypTeach />
 
       {/* 7.6: royalty toast — appears on any tab when someone engages your video */}
       {royaltyToast && (
@@ -173,18 +173,4 @@ export function Shell() {
       )}
     </div>
   );
-}
-
-function VideoFypTeach() {
-  const reveal = useGameStore(state => state.activeOnboardingReveal);
-  const acknowledge = useGameStore(state => state.acknowledgeOnboardingReveal);
-  const completeTeach = useGameStore(state => state.completeOnboardingTeach);
-  const react = useGameStore(state => state.reactToCard);
-  if (reveal?.feature !== "video_fyp") return null;
-  if (!reveal.dismissed) return <><div aria-hidden style={{ position: "absolute", inset: 0, zIndex: 349, background: "transparent" }} /><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ position: "absolute", top: 76, right: 14, zIndex: 350, width: 240, padding: 14, borderRadius: 14, background: "rgba(8,10,15,.96)", border: "1px solid var(--cyan)" }}>
-    <strong style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 22 }}>YOUR VIDEO FYP</strong>
-    <span style={{ display: "block", margin: "4px 0 12px", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>Creators, captions and reactions are now live.</span>
-    <button onClick={acknowledge} style={{ width: "100%", padding: 9, border: 0, borderRadius: 999, background: "var(--cyan)", color: "#050608", fontFamily: "var(--font-mono)", fontWeight: 800 }}>SHOW ME</button>
-  </motion.div></>;
-  return <><div aria-hidden style={{ position: "absolute", inset: 0, zIndex: 349, background: "transparent" }} /><motion.button initial={{ opacity: 0, scale: .9 }} animate={{ opacity: 1, scale: [1, 1.06, 1] }} transition={{ scale: { repeat: Infinity, duration: 1.4 } }} onClick={() => { react("like"); completeTeach("video_fyp_first_action"); }} style={{ position: "absolute", right: 12, bottom: 242, zIndex: 350, padding: "10px 14px", borderRadius: 999, border: "2px solid var(--cyan)", background: "rgba(0,0,0,.9)", color: "white", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: ".1em" }}>♥ TRY LIKE</motion.button></>;
 }

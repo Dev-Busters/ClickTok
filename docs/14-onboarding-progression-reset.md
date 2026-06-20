@@ -19,8 +19,8 @@ Phase 18.
    can cascade during one tapping burst. A reveal must be acknowledged and its first-use teach must
    complete before the next major reveal can fire.
 3. **Every reveal changes the next decision.** New UI is never decorative. Creator Studio arrives
-   with one affordable upgrade; the engagement meter arrives with a launch verb; video FYP arrives
-   with its social controls.
+   with one affordable upgrade and the engagement meter arrives with a launch verb. Video FYP is
+   deferred to a later authored chapter.
 4. **There is always one legible objective.** The current goal remains visible without opening a
    menu. It names the action, progress, and reward. Completed goals advance automatically after
    their reveal/teach, so there is no quest-log housekeeping.
@@ -49,9 +49,8 @@ Follower requirements read monotonic `wallet.totalFollowers`, never the spendabl
 | 6 | `reach_1200` | Reach 1,200 Followers | Award the final pre-rhythm Coin bundle |
 | 7 | `unlock_rhythm` | Reach 2,400 Followers after prior goals | Reveal engagement meter and hold/release teach; unlock only `tap_three` |
 | 8 | `complete_first_rhythm` | Complete TAP THREE once | Pay guaranteed Coins; reveal accuracy bonus and replay loop |
-| 9 | `unlock_video_fyp` | Reach 10,000 Followers using taps, upgrades, and rhythm income | Transition to the current video FYP layout and begin the next progression chapter |
 
-`unlock_studio`, `unlock_rhythm`, and `unlock_video_fyp` are **major reveals**. They may not resolve
+`unlock_studio` and `unlock_rhythm` are **major reveals**. They may not resolve
 in the same interaction or while another reveal is queued. Minor goals may award Coins or unlock an
 upgrade level without adding HUD.
 
@@ -59,11 +58,9 @@ upgrade level without adding HUD.
 
 Tune thresholds and costs from measured human tap rate, not arbitrary round-number ladders:
 
-- Creator Studio reveal: **2–4 minutes** of ordinary first-time play.
+- Creator Studio reveal: **7–12 minutes** at an ordinary first-time tap rate.
 - First Studio purchase: within **30–60 seconds** of opening Studio; its goal reward guarantees it.
-- First rhythm reveal: **8–12 minutes total**, after at least two meaningful upgrade purchases.
-- First video FYP reveal: **15–25 minutes total** on the median route, after several rhythm
-  completions and purchases.
+- First rhythm reveal: **22–32 minutes total**, after at least two meaningful upgrade purchases.
 - Major reveals: never closer than **three active minutes** apart in the target first session.
 
 These are experience budgets, not AFK timers. Faster tapping and sensible purchases should matter,
@@ -99,9 +96,10 @@ progress fills → goal complete → reward lands → reveal ceremony (if any)
 
 ### Followers
 
-- Quick TEB taps grant Followers and increment lifetime taps.
+- Every quick TEB tap rolls the displayed Follower chance, grants exactly 1 Follower on success,
+  and increments lifetime taps whether it succeeds or not.
 - Followers are the headline growth number and unlock gate. They are not spent in Phase 18.
-- `audience_reach` increases the exact displayed `Followers / tap` value.
+- `audience_reach` increases the exact displayed Follower success chance.
 
 ### Coins
 
@@ -134,14 +132,14 @@ Canonical opening upgrades:
 
 | id | Display name | Effect | First reveal |
 |---|---|---|---|
-| `audience_reach` | Audience Reach | Adds Followers per quick TEB tap | Studio opens |
+| `audience_reach` | Audience Reach | Raises the chance a quick TEB tap gains 1 Follower | Studio opens |
 | `engagement_rate` | Engagement Rate | Adds engagement-meter fill per quick TEB tap | Buy Audience Reach Lv1 |
 
 Every upgrade card must show:
 
 - current level and next cost;
 - a plain-language sentence describing the behavior it changes;
-- an exact current → next value (`1.0 → 1.3 Followers / tap`, for example);
+- an exact current → next value (`25% → 45% Follower chance`, for example);
 - the affected on-screen control highlighted in the purchase result;
 - a locked reason only after the card has been introduced.
 
@@ -195,8 +193,8 @@ A restrained local vignette/glow behind an individual target is allowed, with no
   inactivity without visually pretending the feature disappeared.
 - Result feedback anchors where TEB reforms; no generic full-screen result modal.
 
-In the sparse pre-video layout, the same field naturally has more room. Once video FYP unlocks, the
-field contracts around the TikTok chrome without changing chart rules or normalized scoring.
+The sparse layout naturally has more room. A later video-FYP phase may contract the field around
+TikTok chrome without changing chart rules or normalized scoring.
 
 ## §G — Special pre-video layout and FYP transition
 
@@ -209,18 +207,11 @@ field contracts around the TikTok chrome without changing chart rules or normali
 - Studio appears as a focused edge control only after its reveal.
 - No bottom nav until a journey step explicitly needs navigation.
 
-### Video FYP reveal
+### Video FYP reveal — deferred
 
-The transition is a chapter change, not several controls popping independently:
-
-1. Goal completes and tapping pauses for the reveal beat.
-2. The ambient background resolves into the first video card.
-3. Creator identity/description and social rail enter as one taught cluster.
-4. TEB remains in its established location and behavior.
-5. The player performs one highlighted FYP action before normal paging/navigation unlocks.
-
-Afterward, Home uses the existing FYP composition. Future features still follow the same ordered
-goal/reveal/first-use pattern.
+The video-FYP chapter transition is intentionally outside Phase 18. The sparse opening layout
+remains active after the first TAP THREE completion, supporting the repeatable engagement/minigame
+loop until a later design phase defines how video enters the FYP.
 
 ## §H — Persistence, reset policy, and telemetry
 
@@ -245,28 +236,28 @@ Before release, choose either the preservation path or a one-time progression re
 gameplay code remains dormant in both cases.
 
 Aggregate telemetry (no raw pointer paths): goal start/complete duration, reveal shown/acknowledged,
-first feature use, upgrade purchase/level, engagement fills, rhythm launches/completions, and time
-to video FYP. Primary pacing alarms:
+first feature use, upgrade purchase/level, engagement fills, and rhythm launches/completions.
+Primary pacing alarms:
 
 - two major reveals within three active minutes;
 - reveal acknowledged but feature unused for two minutes;
 - player cannot afford the required first Studio purchase;
 - rhythm unlocked without two prior upgrade purchases;
-- more than 30 minutes active without video FYP, or less than 10 minutes to video FYP; use the full
-  tap-rate simulation before changing thresholds.
+- failure to reach the first repeatable TAP THREE loop after the authored upgrade path.
 
 ## §I — Acceptance criteria
 
 - A fresh save can tap for five minutes without any unqueued legacy metric unlock appearing.
 - Only Followers are visible at start; only TEB, Followers, and the current goal are interactive.
 - Studio arrives alone, points directly to its control, and contains one affordable upgrade.
-- Buying the first upgrade visibly changes Followers/tap and reveals exactly the second upgrade plus
+- Buying the first upgrade visibly changes Follower chance and reveals exactly the second upgrade plus
   the next level of the first.
 - The rhythm unlock cannot occur before the required prior goal and upgrade progression.
 - TAP THREE is the only opening chart and is the first repeatable Coin source.
 - During TAP THREE, TEB disappears but every unlocked non-TEB FYP visual remains visible at normal
   brightness; chrome cannot steal rhythm input.
-- The video FYP appears as one taught chapter transition, not a burst of independent metric flags.
+- Video FYP, social rail, captions, navigation, and legacy HUD remain dormant after the first
+  minigame loop until their later chapter is designed.
 - Reload during any goal, reveal, teach, Studio purchase, meter fill, or rhythm result resumes safely.
 - Typecheck, pure progression tests, economy simulation, 320×640 and 390×844 browser QA, reduced
   motion, keyboard fallback, and console-error checks pass.

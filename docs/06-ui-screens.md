@@ -322,7 +322,7 @@ SOFTWARE. No "OWNED" state — repeatables are always levelable until maxed.
 
 ### 11.1 Creator Studio screen (`screens/CreatorStudio/`)
 
-> **Phase 18 opening override:** before the video FYP chapter, use §13.3's one-tab/one-card Studio.
+> **Phase 18 opening override:** use §13.3's one-tab/one-card Studio until a later chapter is authored.
 > The full three-pillar surface below remains dormant for later progression.
 
 Full-screen hub opened via:
@@ -406,7 +406,7 @@ Audience Reach card. The card's hierarchy is:
 - large exact `current → next` value;
 - cost and one primary `UPGRADE` action.
 
-After Lv1 purchase, animate the changed Followers/tap value first, then reveal Engagement Rate
+After Lv1 purchase, animate the changed Follower-chance value first, then reveal Engagement Rate
 below it and enable Audience Reach's next level. Do not show locked future categories or cards.
 
 ### 13.4 Engagement-ready TEB
@@ -430,12 +430,11 @@ chrome remains above/beside it visually and is temporarily pointer-inert. On 390
 top stat strip, right rail, lower caption block, and nav. On 320×640, reduce target spread/spacing
 before reducing hit areas. Result feedback reforms into TEB at center.
 
-### 13.6 Video FYP chapter transition
+### 13.6 Video FYP chapter transition — deferred
 
-The first video unlock introduces the existing FYP layout as a single cluster: video backdrop,
-creator identity/description, and social rail. Teach one highlighted social action before paging or
-new navigation becomes active. TEB and the goal chip retain their learned positions where possible,
-so the new chapter feels additive rather than like a different application.
+Do not restore the video feed, social rail, captions, or bottom navigation in Phase 18. After the
+first TAP THREE completion, retain the sparse opening composition and its repeatable engagement
+loop until a later phase defines the authored video-FYP chapter transition.
 
 ## 9. Visual language rules
 

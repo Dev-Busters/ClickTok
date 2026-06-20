@@ -724,14 +724,14 @@ export type MetricDef = {
 
 ```ts
 // store/slices/meta.ts
-export const SAVE_VERSION = 14; // current before Phase 18; Phase 18 implementation bumps to 15
+export const SAVE_VERSION = 16; // Phase 18 reset/deferred-video correction
 // v1 → base shape; v2 → wallet/skills/videos; v3 → inbox/milestones;
 // v4 → ownedElements (7.3); v5 → upgradeLevels + tebTeachSeen (9.1)
 // v6 → metricsReached + lifetime counters (9.2); v7 → affordableNotifiedPillars (10.2)
 // v8 → metricsReached id rename follower_100→follower_200 (11.2)
 // v9 → elementsTeachSeen (11.3); v10 → metric-id re-derive; v11 → modTeachSeen;
 // v12 → catalog activation marker; v13 → tebChargeTeachSeen;
-// v14 → tebSequenceTeachSeen
+// v14 → tebSequenceTeachSeen; v15 → staged onboarding; v16 → reset/cloud parity + deferred video
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
 //   multiplier, followerConversion, boonMultiplier, lastSeenAt,

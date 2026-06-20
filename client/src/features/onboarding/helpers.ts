@@ -44,8 +44,12 @@ export function isOnboardingFeatureAvailable(feature: OnboardingFeatureId, compl
   return ONBOARDING_GOALS.some(goal => goal.reveals === feature && completed.includes(goal.id));
 }
 
-export function followersPerTap(level: number): number {
-  return BALANCE.onboarding.baseFollowersPerTap + level * BALANCE.onboarding.audienceReach.followerAddPerLevel;
+export function followerChance(level: number): number {
+  return Math.min(1, BALANCE.onboarding.baseFollowerChance + level * BALANCE.onboarding.audienceReach.followerChanceAddPerLevel);
+}
+
+export function rollOpeningFollower(level: number, random: () => number = Math.random): number {
+  return random() < followerChance(level) ? 1 : 0;
 }
 
 export function engagementPerTap(level: number): number {

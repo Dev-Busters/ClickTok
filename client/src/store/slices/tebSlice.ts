@@ -64,7 +64,7 @@ function resolveSession(set: (patch: Partial<FullState>) => void, get: () => Ful
   const performanceQuality = totalWeight ? judged.reduce((sum, j) => sum + j.quality * interactionWeight(j.kind), 0) / totalWeight : 0;
   const completion = session.chart.nodes.length ? judged.filter(j => j.quality > 0).length / session.chart.nodes.length : 0;
   const state = get();
-  const opening = !isOnboardingFeatureAvailable("video_fyp", state.completedOnboardingGoals);
+  const opening = state.onboardingTeachesSeen.legacy_preserved !== true;
   const normalReward = computeRhythmReward({ chargeQuality: session.chargeQuality, performanceQuality, completion,
     maxRhythmCombo: session.maxRhythmCombo, feedCombo: state.combo, viralUntil: state.viralUntil,
     tapPower: state.tapPower, multiplier: state.multiplier, followerConversion: state.followerConversion, now });
@@ -102,7 +102,7 @@ export const createTebSlice: StateCreator<FullState, [], [], TebSlice> = (set, g
 
   beginCharge: () => {
     const s = get();
-    const opening = !isOnboardingFeatureAvailable("video_fyp", s.completedOnboardingGoals);
+    const opening = s.onboardingTeachesSeen.legacy_preserved !== true;
     if (opening && (!isOnboardingFeatureAvailable("engagement_meter", s.completedOnboardingGoals) || s.engagementFill < BALANCE.onboarding.engagement.cap)) return;
     if (opening && s.activeOnboardingReveal?.feature === "engagement_meter" && !s.activeOnboardingReveal.dismissed) return;
     if (!opening && !isFeatureUnlocked("element_stage", s.metricsReached)) return;
@@ -117,7 +117,7 @@ export const createTebSlice: StateCreator<FullState, [], [], TebSlice> = (set, g
     const session = get().session;
     if (!session || session.phase !== "charging") return;
     const now = Date.now();
-    const opening = !isOnboardingFeatureAvailable("video_fyp", get().completedOnboardingGoals);
+    const opening = get().onboardingTeachesSeen.legacy_preserved !== true;
     if (opening && !get().consumeEngagementForRhythm()) {
       set({ session: null });
       return;

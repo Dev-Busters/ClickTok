@@ -55,7 +55,7 @@ export const BALANCE = {
 
 ## 1. Posting (active clicker)
 
-> **Phase 18 opening override:** before the video FYP chapter, use §17. Quick TEB taps grant
+> **Phase 18 opening override:** throughout the staged opening, use §17. Quick TEB taps grant
 > Followers only; legacy multi-currency post rewards must not leak into the staged opening.
 
 ```
@@ -888,11 +888,11 @@ onboarding: {
   rhythmFollowers: 2400,
   videoFypFollowers: 10000,
 
-  baseFollowersPerTap: 1,
+  baseFollowerChance: 0.25,
   audienceReach: {
     baseCost: 10,
     costGrowth: 1.8,
-    followerAddPerLevel: 0.5,
+    followerChanceAddPerLevel: 0.20,
   },
   engagementRate: {
     baseCost: 18,
@@ -924,8 +924,11 @@ coherent table in docs/code/simulation; do not lower thresholds piecemeal to mak
 ### 17.2 TEB and upgrade formulas
 
 ```text
-followersPerTap = baseFollowersPerTap
-                + audienceReachLevel × audienceReach.followerAddPerLevel
+followerChance = min(1,
+                 baseFollowerChance
+                 + audienceReachLevel × audienceReach.followerChanceAddPerLevel)
+
+followerGain = random() < followerChance ? 1 : 0
 
 engagementPerTap = engagement mechanic unlocked
                   ? engagement.baseFillPerTap
@@ -939,7 +942,7 @@ openingUpgradeCost(baseCost, growth, currentLevel)
 ```
 
 Opening taps do not apply `postCoinConversion`, `postLikeConversion`, feed combo, VIRAL, catalog,
-or passive-income modifiers. `audience_reach` must change Followers/tap only;
+or passive-income modifiers. `audience_reach` must change Follower chance only;
 `engagement_rate` must change engagement fill/tap only. This separation is what makes each purchase
 legible.
 
@@ -955,7 +958,6 @@ legible.
 | `reach_1200` | 1,200 total Followers | 40 | — |
 | `unlock_rhythm` | 2,400 total Followers and prior goals complete | 0 | engagement meter + TAP THREE |
 | `complete_first_rhythm` | 1 TAP THREE completion | chart payout | repeatable Coin loop |
-| `unlock_video_fyp` | 10,000 total Followers and prior goals complete | 0 | video FYP chapter |
 
 The ordered requirement is mandatory: a player above 10,000 Followers cannot resolve every row in
 one check. Resolve one goal, complete any reveal/teach, then activate the next.
@@ -979,5 +981,4 @@ rhythm quality. The median 3 taps/second route must land inside `14` §A's time 
 - unlock Studio without being able to buy Audience Reach Lv1;
 - reach rhythm before buying at least three total FYP-upgrade levels;
 - depend on random drops, idle income, legacy milestone rewards, or LIVE;
-- reach video FYP before 10 active minutes at 5 taps/second;
-- require more than 30 active minutes at 2 taps/second with reasonable upgrades/rhythm play.
+- fail to reach and complete the first TAP THREE loop after the authored upgrade path.

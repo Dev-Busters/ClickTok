@@ -23,7 +23,6 @@ import {
 } from "../../features/metrics/unlocks";
 import type { MetricDef } from "../../features/metrics/types";
 import type { VideoCard, ReactionKind, FeedModId } from "../../party/types";
-import { isOnboardingFeatureAvailable } from "../../features/onboarding/helpers";
 import { OpeningHome } from "./OpeningHome";
 
 // 06 §3 Phase 8: canned comment one-liner pool — cosmetic only, moderation-safe.
@@ -47,9 +46,8 @@ const cardVariants = {
 };
 
 export function HomeFeed() {
-  const completed = useGameStore(state => state.completedOnboardingGoals);
-  if (!isOnboardingFeatureAvailable("video_fyp", completed)) return <OpeningHome />;
-  return <VideoHomeFeed />;
+  const legacyPreserved = useGameStore(state => state.onboardingTeachesSeen.legacy_preserved === true);
+  return legacyPreserved ? <VideoHomeFeed /> : <OpeningHome />;
 }
 
 function VideoHomeFeed() {

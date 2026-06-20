@@ -13,7 +13,6 @@ import { JudgementBurst } from "./JudgementBurst";
 import { RhythmHud } from "./RhythmHud";
 import { RhythmPerfOverlay } from "./RhythmPerfOverlay";
 import { chartCompleteFeedback, playRhythmFeedback } from "../../../features/teb/feedback";
-import { isOnboardingFeatureAvailable } from "../../../features/onboarding/helpers";
 
 function grade(q: number): string { return q >= .9 ? "PERFECT" : q >= .65 ? "GREAT" : q > 0 ? "GOOD" : "MISS"; }
 
@@ -29,7 +28,7 @@ export function RhythmPlayfield() {
   const pauseRhythm = useGameStore(s => s.pauseRhythm);
   const muted = useGameStore(s => s.rhythmMuted);
   const reducedFeedback = useGameStore(s => s.reducedFeedback);
-  const completedGoals = useGameStore(s => s.completedOnboardingGoals);
+  const legacyPreserved = useGameStore(s => s.onboardingTeachesSeen.legacy_preserved === true);
   const ref = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(Date.now());
   const lastJudgementAt = useRef(0);
@@ -92,7 +91,7 @@ export function RhythmPlayfield() {
   const firstTeach = !teachSeen[sequence];
   const playing = session.phase === "playing";
   const quality = playing && session.judgements.length ? session.judgements.reduce((s, j) => s + j.quality, 0) / session.judgements.length : 1;
-  const videoFyp = isOnboardingFeatureAvailable("video_fyp", completedGoals);
+  const videoFyp = legacyPreserved;
 
   return <motion.div ref={ref} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .14 }}
     onPointerDown={e => { if (!playing) return; e.currentTarget.setPointerCapture(e.pointerId); down(normalize(e)); }}
