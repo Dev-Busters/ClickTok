@@ -6,6 +6,7 @@ import { pickSequence } from "../src/features/teb/chartCatalog";
 import { persistedStatePatch } from "../src/store/slices/cloudSlice";
 import type { PersistedState } from "../src/store/slices/meta";
 import { migrate } from "../src/store/slices/meta";
+import { flushPendingReset, RESET_PENDING_KEY } from "../src/features/cloud/reset";
 
 const richProgress = {
   viewsTotal: 10_000,
@@ -57,5 +58,15 @@ assert.equal(deferredVideoMigration.version, 16);
 assert.equal(deferredVideoMigration.onboardingStep, "complete_first_rhythm");
 assert.deepEqual(deferredVideoMigration.completedOnboardingGoals, ["complete_first_rhythm"]);
 assert.equal(deferredVideoMigration.activeOnboardingReveal, null);
+
+const resetStorageData = new Map([[RESET_PENDING_KEY, "1"]]);
+const resetStorage = {
+  getItem: (key: string) => resetStorageData.get(key) ?? null,
+  removeItem: (key: string) => { resetStorageData.delete(key); },
+};
+assert.equal(await flushPendingReset(resetStorage, async () => false), true);
+assert.equal(resetStorageData.has(RESET_PENDING_KEY), true, "failed cloud reset must keep its durable marker");
+assert.equal(await flushPendingReset(resetStorage, async () => true), true);
+assert.equal(resetStorageData.has(RESET_PENDING_KEY), false, "successful cloud reset clears its marker");
 
 console.log("Onboarding tests passed: ordered resolution, formulas, rewards, feature gates, and chart eligibility.");

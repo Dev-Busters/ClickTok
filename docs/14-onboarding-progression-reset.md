@@ -232,6 +232,10 @@ progress without an explicit release decision**. Build both paths:
 1. a development `RESET ONBOARDING` action that preserves handle/settings and starts revision 1;
 2. a migration path that preserves an existing save and marks the new opening complete.
 
+The live `RESET PROGRESS` flow must write a durable local reset marker before reload. Cloud sync
+must replace the remote row with the fresh v16 state and clear that marker only after the upsert
+succeeds; while the marker exists, an older cloud save may never be pulled over the reset.
+
 Before release, choose either the preservation path or a one-time progression reset. Existing
 gameplay code remains dormant in both cases.
 

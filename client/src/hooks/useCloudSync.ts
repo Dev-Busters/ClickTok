@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { toPersistedState } from "../store/slices/meta";
 import { pullCloudSave, pushCloudSave } from "../features/cloud/sync";
 import type { User } from "@supabase/supabase-js";
+import { flushPendingReset, RESET_PENDING_KEY } from "../features/cloud/reset";
 
 const PUSH_INTERVAL_MS = 30_000;
 // Tracks "the last cloud version this device has synced" — separate from the
@@ -19,10 +20,9 @@ function setSyncedAt(ms: number) {
   localStorage.setItem(SYNCED_AT_KEY, String(ms));
 }
 
-// Set before a reload to skip the cloud pull on next init — otherwise the
-// old cloud save would just get pulled back down over the fresh local state.
-const RESET_PENDING_KEY = "clicktok-reset-pending";
-
+// Durable across reloads and mobile tab suspension. It is cleared only after
+// the fresh save has replaced the cloud row, so an old cloud save can never
+// win the reset race on a later mount.
 function applyAuthUser(user: User | null | undefined) {
   useGameStore.getState().setCloudAuth({
     userId: user?.id ?? null,
@@ -46,7 +46,7 @@ function applyAuthUser(user: User | null | undefined) {
 // fresh defaults into the live store first means any such trailing tick just
 // re-persists near-zero values instead.
 export function resetProgress(): void {
-  sessionStorage.setItem(RESET_PENDING_KEY, "1");
+  localStorage.setItem(RESET_PENDING_KEY, "1");
   useGameStore.getState().loadPersistedState(createFreshPersistedState());
   localStorage.removeItem(SYNCED_AT_KEY);
   window.location.reload();
@@ -64,17 +64,18 @@ export function useCloudSync() {
     const client = supabase;
     let cancelled = false;
 
-    const push = () => {
+    const push = async (): Promise<boolean> => {
       const { cloudUserId, handle } = useGameStore.getState();
-      if (!cloudUserId) return;
-      pushCloudSave(cloudUserId, handle, toPersistedState(useGameStore.getState()))
-        .then((updatedAtMs) => {
-          setSyncedAt(updatedAtMs);
-          if (!cancelled) useGameStore.getState().setCloudSyncStatus("synced");
-        })
-        .catch(() => {
-          if (!cancelled) useGameStore.getState().setCloudSyncStatus("error");
-        });
+      if (!cloudUserId) return false;
+      try {
+        const updatedAtMs = await pushCloudSave(cloudUserId, handle, toPersistedState(useGameStore.getState()));
+        setSyncedAt(updatedAtMs);
+        if (!cancelled) useGameStore.getState().setCloudSyncStatus("synced");
+        return true;
+      } catch {
+        if (!cancelled) useGameStore.getState().setCloudSyncStatus("error");
+        return false;
+      }
     };
 
     const init = async () => {
@@ -95,11 +96,7 @@ export function useCloudSync() {
 
       useGameStore.getState().setCloudSyncStatus("syncing");
 
-      if (sessionStorage.getItem(RESET_PENDING_KEY)) {
-        sessionStorage.removeItem(RESET_PENDING_KEY);
-        push();
-        return;
-      }
+      if (await flushPendingReset(localStorage, push)) return;
 
       const cloud = await pullCloudSave(user.id);
       if (cancelled) return;

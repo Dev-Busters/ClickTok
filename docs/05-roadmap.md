@@ -2193,7 +2193,8 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   > note: tuned `rhythmFollowers` 2,000→2,400 after the five-route pacing sim put the 3 taps/sec
   > rhythm reveal at 27.1m after the chance-based opening revision. Save v16 preserves legacy
   > players while migrating staged v15 saves away from the deferred video reveal. No automatic
-  > live wipe ships; reset remains user-triggered. Legacy sim targets
+  > live wipe ships; reset remains user-triggered. The live reset uses a durable marker and awaits
+  > the fresh cloud upsert before allowing future pulls, preventing old progress restoration. Legacy sim targets
   > (a)/(f) remain historical red while the active run-primary and Phase 18 pacing checks pass.
 
 **Phase 18 exit criteria:** a fresh player always understands the one current goal, encounters only
