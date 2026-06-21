@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, requirementValue } from "../../features/onboarding/helpers";
+import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, requirementValue } from "../../features/onboarding/helpers";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
@@ -20,8 +20,9 @@ function OpeningTeb() {
   const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const nextReactionId = useRef(0);
   const [tapReactions, setTapReactions] = useState<Array<{ id: number; success: boolean; drift: number; glyph: string }>>([]);
-  const meterUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
-  const ready = meterUnlocked && fill >= BALANCE.onboarding.engagement.cap;
+  const meterVisible = isOpeningEngagementAvailable(completed);
+  const rhythmUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
+  const ready = rhythmUnlocked && fill >= BALANCE.onboarding.engagement.cap;
 
   const start = useCallback(() => {
     const followersBefore = useGameStore.getState().wallet.totalFollowers;
@@ -88,7 +89,7 @@ function OpeningTeb() {
           position: "relative", overflow: "hidden",
         }}
       >
-        {meterUnlocked && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
+        {meterVisible && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
         <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: ready ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>THE</span>
         <span style={{ display: "block", margin: "2px 0", fontFamily: "var(--font-display)", fontSize: 34, lineHeight: 1, letterSpacing: ".06em", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>ENGAGEMENT</span>
         <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: ready ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>BUTTON</span>
@@ -106,7 +107,7 @@ function OpeningTeb() {
           {reaction.success ? "+1 FOLLOWER" : reaction.glyph}
         </motion.div>)}
       </AnimatePresence>
-      {meterUnlocked && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".12em", color: ready ? "var(--gold)" : "var(--dim)" }}>ENGAGEMENT {Math.round(fill)} / 100</div>}
+      {meterVisible && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: ".1em", color: ready ? "var(--gold)" : "rgba(255,255,255,.72)" }}>ENGAGEMENT {Math.round(fill)} / 100{!rhythmUnlocked ? " · BUILDING FOR TAP THREE" : ""}</div>}
     </div>
   );
 }

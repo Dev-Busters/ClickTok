@@ -22,21 +22,22 @@ function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
   const wallet = useGameStore(state => state.wallet);
   const levels = useGameStore(state => state.openingUpgradeLevels);
   const levelUpgrade = useGameStore(state => state.levelOpeningUpgrade);
-  const [changed, setChanged] = useState<OpeningUpgradeId | null>(null);
+  const [changed, setChanged] = useState<{ id: OpeningUpgradeId; kind: "unlocked" | "leveled" } | null>(null);
   const cards: OpeningUpgradeId[] = levels.audience_reach >= 1 ? ["audience_reach", "engagement_rate"] : ["audience_reach"];
   const buy = (id: OpeningUpgradeId) => {
+    const kind = levels[id] === 0 ? "unlocked" : "leveled";
     if (!levelUpgrade(id)) return;
-    setChanged(id);
+    setChanged({ id, kind });
     window.setTimeout(() => setChanged(null), 900);
   };
   return <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} style={{ position: "fixed", inset: 0, zIndex: 400, background: "var(--bg)", overflowY: "auto" }}>
     <header style={{ position: "sticky", top: 0, zIndex: 2, padding: "14px 16px 10px", background: "rgba(7,8,12,.96)", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button onClick={onClose} aria-label="Back to Home" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.06)", color: "white" }}>←</button>
-        <div><div style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: ".06em" }}>CREATOR STUDIO</div><div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>MAKE YOUR NEXT TAP STRONGER</div></div>
+        <div><div style={{ fontFamily: "var(--font-display)", fontSize: 28, letterSpacing: ".06em" }}>CREATOR STUDIO</div><div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.4, color: "rgba(255,255,255,.72)" }}>MAKE YOUR NEXT TAP STRONGER</div></div>
         <strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 25 }}>🪙 {formatCount(wallet.coins)}</strong>
       </div>
-      <div style={{ marginTop: 12, width: 56, paddingBottom: 7, borderBottom: "2px solid var(--cyan)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 10, textAlign: "center" }}>FYP</div>
+      <div style={{ marginTop: 14, width: 64, paddingBottom: 8, borderBottom: "3px solid var(--cyan)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 800, textAlign: "center" }}>FYP</div>
     </header>
     <div style={{ padding: "22px 16px 40px", maxWidth: 420, margin: "0 auto" }}>
       <AnimatePresence initial={false}>
@@ -44,13 +45,16 @@ function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
           const level = levels[id];
           const cost = openingUpgradeCost(id, level);
           const audience = id === "audience_reach";
+          const isNew = level === 0;
+          const justChanged = changed?.id === id;
+          const accent = (isNew || (justChanged && changed.kind === "unlocked")) ? "var(--gold)" : "var(--cyan)";
           const current = audience ? followerChance(level) : engagementPerTap(level);
           const next = audience ? followerChance(level + 1) : engagementPerTap(level + 1);
-          return <motion.section key={id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0, boxShadow: changed === id ? "0 0 26px rgba(37,244,238,.3)" : "0 0 0 rgba(0,0,0,0)" }} style={{ marginBottom: 14, padding: 18, borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.045)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><strong style={{ fontFamily: "var(--font-display)", fontSize: 24 }}>{audience ? "AUDIENCE REACH" : "ENGAGEMENT RATE"}</strong><span style={{ fontFamily: "var(--font-mono)", color: "var(--cyan)", fontSize: 10 }}>LV {level}</span></div>
-            <p style={{ margin: "6px 0 14px", color: "var(--dim)", fontFamily: "var(--font-mono)", fontSize: 10 }}>{audience ? "Raises the chance that a TEB tap gains 1 Follower." : "Fills the Engagement meter faster per tap."}</p>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: changed === id ? "var(--cyan)" : "white" }}>{audience ? `${Math.round(current * 100)}% → ${Math.round(next * 100)}%` : `${current.toFixed(2)} → ${next.toFixed(2)}`} <small style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>{audience ? "FOLLOWER CHANCE" : "ENGAGEMENT / TAP"}</small></div>
-            <button disabled={wallet.coins < cost} onClick={() => buy(id)} style={{ width: "100%", marginTop: 16, padding: 12, border: 0, borderRadius: 999, background: wallet.coins >= cost ? "var(--cyan)" : "rgba(255,255,255,.08)", color: wallet.coins >= cost ? "#040608" : "var(--dim)", fontFamily: "var(--font-mono)", fontWeight: 800, letterSpacing: ".12em" }}>UPGRADE · 🪙 {cost}</button>
+          return <motion.section key={id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0, boxShadow: justChanged ? (changed.kind === "unlocked" ? "0 0 34px rgba(255,210,0,.42)" : "0 0 28px rgba(37,244,238,.34)") : isNew ? "0 0 22px rgba(255,210,0,.12)" : "0 0 0 rgba(0,0,0,0)" }} style={{ marginBottom: 16, padding: 20, borderRadius: 16, border: `1px solid ${isNew ? "rgba(255,210,0,.58)" : "rgba(37,244,238,.3)"}`, background: "linear-gradient(145deg,rgba(26,29,38,.98),rgba(14,16,22,.98))" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}><strong style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1 }}>{audience ? "AUDIENCE REACH" : "ENGAGEMENT RATE"}</strong><span style={{ flexShrink: 0, padding: "5px 7px", borderRadius: 999, border: `1px solid ${accent}`, background: isNew ? "rgba(255,210,0,.12)" : "rgba(37,244,238,.1)", fontFamily: "var(--font-mono)", color: accent, fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{justChanged ? (changed.kind === "unlocked" ? "BONUS UNLOCKED" : `LEVEL ${level}`) : isNew ? "NEW BONUS" : `LEVEL ${level}`}</span></div>
+            <p style={{ margin: "10px 0 18px", color: "rgba(255,255,255,.78)", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.55 }}>{audience ? "Raises the chance that a TEB tap gains 1 Follower." : "Fills the visible Engagement meter faster with every tap."}</p>
+            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 7px", fontFamily: "var(--font-display)", fontSize: 34, color: justChanged ? accent : "white" }}>{audience ? `${Math.round(current * 100)}% → ${Math.round(next * 100)}%` : `${current.toFixed(2)} → ${next.toFixed(2)}`} <small style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 800, letterSpacing: ".08em", color: "rgba(255,255,255,.68)" }}>{audience ? "FOLLOWER CHANCE" : "ENGAGEMENT / TAP"}</small></div>
+            <button disabled={wallet.coins < cost} onClick={() => buy(id)} style={{ width: "100%", marginTop: 18, padding: 14, border: 0, borderRadius: 999, background: wallet.coins >= cost ? (isNew ? "var(--gold)" : "var(--cyan)") : "rgba(255,255,255,.1)", color: wallet.coins >= cost ? "#040608" : "rgba(255,255,255,.48)", fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 900, letterSpacing: ".12em" }}>{isNew ? "UNLOCK BONUS" : "LEVEL UP"} · 🪙 {cost}</button>
           </motion.section>;
         })}
       </AnimatePresence>

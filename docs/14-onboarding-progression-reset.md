@@ -59,7 +59,7 @@ upgrade level without adding HUD.
 
 Tune thresholds and costs from measured human tap rate, not arbitrary round-number ladders:
 
-- Creator Studio reveal: **about 1–2 minutes** at an ordinary first-time tap rate (25 Followers at the starting 25% roll chance).
+- Creator Studio reveal: **about 1 minute** at an ordinary first-time tap rate (20 Followers at the starting 25% roll chance).
 - First Studio purchase: within **30–60 seconds** of opening Studio; its goal reward guarantees it.
 - First rhythm reveal: **22–32 minutes total**, after at least two meaningful upgrade purchases.
 - Major reveals: never closer than **three active minutes** apart in the target first session.
@@ -150,7 +150,9 @@ does not tell a new player what will change.
 
 ## §E — Engagement meter and first rhythm loop
 
-The engagement meter is hidden until `unlock_rhythm`. Once revealed:
+The engagement meter appears as soon as Audience Reach Lv1 introduces Engagement Rate. It fills
+immediately so the second bonus has visible meaning, but it cannot launch a chart until
+`unlock_rhythm`. Once TAP THREE is revealed:
 
 1. Quick TEB taps pay Followers and add engagement fill.
 2. At full charge, TEB enters a clear `READY — HOLD` state.

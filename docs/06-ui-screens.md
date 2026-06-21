@@ -410,13 +410,17 @@ Audience Reach card. The card's hierarchy is:
 
 Do not print the current Follower-chance percentage on the TEB; the button always reads
 **"THE / ENGAGEMENT / BUTTON"**. After Lv1 purchase, animate the Studio's changed
-Follower-chance value first, then reveal Engagement Rate
-below it and enable Audience Reach's next level. Do not show locked future categories or cards.
+Follower-chance value first, then reveal Engagement Rate below it and enable Audience Reach's next
+level. A level-zero card uses a gold `NEW BONUS` badge and `UNLOCK BONUS` action; an owned card
+uses cyan `LEVEL N` and `LEVEL UP`. Supporting copy is at least 13px on phone with high-contrast
+text and an opaque card backing. Do not show locked future categories or cards.
 
 ### 13.4 Engagement-ready TEB
 
-When rhythm unlocks, a thin engagement ring/meter becomes part of TEB's existing visual anatomy.
-It fills on quick taps without competing with the Followers float text. At full:
+When Engagement Rate is introduced, a thin engagement ring/meter becomes part of TEB's existing
+visual anatomy and begins filling on quick taps without competing with the Followers float text.
+Before rhythm unlocks it reads as progress being built for TAP THREE but cannot launch a chart. At
+full after rhythm unlocks:
 
 - the ring closes and holds a stable gold edge;
 - idle copy changes to `READY — HOLD`;

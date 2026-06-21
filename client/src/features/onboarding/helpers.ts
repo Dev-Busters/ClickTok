@@ -44,6 +44,10 @@ export function isOnboardingFeatureAvailable(feature: OnboardingFeatureId, compl
   return ONBOARDING_GOALS.some(goal => goal.reveals === feature && completed.includes(goal.id));
 }
 
+export function isOpeningEngagementAvailable(completed: readonly OnboardingStepId[]): boolean {
+  return completed.includes("buy_audience_reach");
+}
+
 export function followerChance(level: number): number {
   return Math.min(1, BALANCE.onboarding.baseFollowerChance + level * BALANCE.onboarding.audienceReach.followerChanceAddPerLevel);
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { BALANCE } from "../src/features/economy/balance";
 import { ONBOARDING_GOALS } from "../src/features/onboarding/catalog";
-import { engagementPerTap, followerChance, isOnboardingFeatureAvailable, openingUpgradeCost, resolvableGoal, rollOpeningFollower } from "../src/features/onboarding/helpers";
+import { engagementPerTap, followerChance, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, openingUpgradeCost, resolvableGoal, rollOpeningFollower } from "../src/features/onboarding/helpers";
 import { pickSequence } from "../src/features/teb/chartCatalog";
 import { persistedStatePatch } from "../src/store/slices/cloudSlice";
 import type { PersistedState } from "../src/store/slices/meta";
@@ -19,6 +19,8 @@ assert.equal(resolvableGoal("meet_teb", [], false, richProgress), "meet_teb", "o
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], true, richProgress), null, "reveal/teach blocks a later resolution");
 assert.equal(isOnboardingFeatureAvailable("creator_studio", ["meet_teb"]), false, "legacy-like progress does not expose opening UI");
 assert.equal(isOnboardingFeatureAvailable("creator_studio", ["meet_teb", "unlock_studio"]), true);
+assert.equal(isOpeningEngagementAvailable(["meet_teb", "unlock_studio"]), false, "meter stays hidden before Audience Reach Lv1");
+assert.equal(isOpeningEngagementAvailable(["meet_teb", "unlock_studio", "buy_audience_reach"]), true, "meter appears with Engagement Rate");
 
 assert.equal(followerChance(0), 0.25);
 assert.equal(followerChance(1), 0.45);
