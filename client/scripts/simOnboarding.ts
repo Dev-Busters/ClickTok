@@ -10,8 +10,8 @@ function simulate(tapsPerSecond: number): Result {
   while (completions < 1 && seconds < 60 * 45) {
     seconds += 1;
     followers += followerChance(audience) * tapsPerSecond;
-    if (!studioRewarded && followers >= 400) { studioRewarded = true; studioAt = seconds; coins += 10; }
-    if (studioRewarded && audience === 0 && coins >= openingUpgradeCost("audience_reach", audience)) { coins -= openingUpgradeCost("audience_reach", audience++); audienceRewarded = true; coins += 18; }
+    if (!studioRewarded && followers >= BALANCE.onboarding.studioFollowers) { studioRewarded = true; studioAt = seconds; coins += BALANCE.onboarding.goalCoins.unlockStudio; }
+    if (studioRewarded && audience === 0 && coins >= openingUpgradeCost("audience_reach", audience)) { coins -= openingUpgradeCost("audience_reach", audience++); audienceRewarded = true; coins += BALANCE.onboarding.goalCoins.buyAudienceReach; }
     if (audienceRewarded && rate === 0 && coins >= openingUpgradeCost("engagement_rate", rate)) coins -= openingUpgradeCost("engagement_rate", rate++);
     if (!reach700Rewarded && followers >= 700) { reach700Rewarded = true; coins += 20; }
     if (audience + rate < 3 && coins >= openingUpgradeCost("audience_reach", audience)) audience++, coins -= openingUpgradeCost("audience_reach", audience - 1);
@@ -34,5 +34,5 @@ function simulate(tapsPerSecond: number): Result {
 const results = [2, 2.5, 3, 4, 5].map(simulate);
 for (const result of results) console.log(`${result.tapsPerSecond} tps: Studio ${result.studioMin.toFixed(1)}m, rhythm ${result.rhythmMin.toFixed(1)}m, first completion ${result.firstCompletionMin.toFixed(1)}m`);
 const median = results.find(result => result.tapsPerSecond === 3)!;
-if (median.studioMin < 7 || median.studioMin > 12 || median.rhythmMin < 22 || median.rhythmMin > 32) throw new Error("Median onboarding route misses a pacing band");
+if (median.studioMin < 0.4 || median.studioMin > 2 || median.rhythmMin < 22 || median.rhythmMin > 32) throw new Error("Median onboarding route misses a pacing band");
 if (results.some(result => result.upgradeLevelsAtRhythm < 3 || result.firstCompletionMin >= 45)) throw new Error("Opening route failed to reach the repeatable minigame loop");

@@ -408,7 +408,9 @@ Audience Reach card. The card's hierarchy is:
 - large exact `current → next` value;
 - cost and one primary `UPGRADE` action.
 
-After Lv1 purchase, animate the changed Follower-chance value first, then reveal Engagement Rate
+Do not print the current Follower-chance percentage on the TEB; the button always reads
+**"THE / ENGAGEMENT / BUTTON"**. After Lv1 purchase, animate the Studio's changed
+Follower-chance value first, then reveal Engagement Rate
 below it and enable Audience Reach's next level. Do not show locked future categories or cards.
 
 ### 13.4 Engagement-ready TEB

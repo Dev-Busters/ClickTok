@@ -50,8 +50,8 @@ export function Shell() {
     const onboardingQa = params.get("onboardingQa");
     if (onboardingQa === "fresh") useGameStore.getState().resetOnboardingRevision();
     if (onboardingQa === "studio") useGameStore.setState({
-      wallet: { followers: 400, totalFollowers: 400, coins: 10, likes: 0, diamonds: 0 },
-      viewsTotal: 400,
+      wallet: { followers: 25, totalFollowers: 25, coins: 10, likes: 0, diamonds: 0 },
+      viewsTotal: 25,
       onboardingStep: "unlock_studio",
       completedOnboardingGoals: ["meet_teb", "unlock_studio"],
       activeOnboardingReveal: { feature: "creator_studio", shownAt: Date.now(), dismissed: false },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, requirementValue, followerChance } from "../../features/onboarding/helpers";
+import { goalById, isOnboardingFeatureAvailable, requirementValue } from "../../features/onboarding/helpers";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
@@ -16,7 +16,6 @@ function OpeningTeb() {
   const teaches = useGameStore(state => state.onboardingTeachesSeen);
   const reveal = useGameStore(state => state.activeOnboardingReveal);
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
-  const level = useGameStore(state => state.openingUpgradeLevels.audience_reach);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const nextReactionId = useRef(0);
@@ -90,20 +89,19 @@ function OpeningTeb() {
         }}
       >
         {meterUnlocked && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 34, letterSpacing: ".06em", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>ENGAGEMENT</span>
-        <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".14em", color: ready ? "var(--gold)" : "var(--dim)" }}>
-          {ready ? "READY — HOLD" : `${Math.round(followerChance(level) * 100)}% FOLLOWER CHANCE`}
-        </span>
+        <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: ready ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>THE</span>
+        <span style={{ display: "block", margin: "2px 0", fontFamily: "var(--font-display)", fontSize: 34, lineHeight: 1, letterSpacing: ".06em", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>ENGAGEMENT</span>
+        <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: ready ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>BUTTON</span>
       </motion.button>
       <AnimatePresence>
         {tapReactions.map(reaction => <motion.div
           key={`reaction-${reaction.id}`}
           data-tap-reaction={reaction.success ? "follower" : "engaged"}
-          initial={{ opacity: 0, scale: .55, x: reaction.drift * .25, y: -104 }}
-          animate={{ opacity: [0, 1, 1, 0], scale: [0.55, 1.2, 1, .9], x: reaction.drift, y: -190 }}
+          initial={{ opacity: 0, scale: .45, x: reaction.drift * .2, y: -92 }}
+          animate={{ opacity: [0, 1, 1, 0], scale: [.45, 1.35, 1.12, 1], x: reaction.drift, y: -218 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: .8, ease: "easeOut" }}
-          style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%", zIndex: 8, pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: reaction.success ? 11 : 22, fontWeight: 800, letterSpacing: ".1em", color: reaction.success ? "var(--gold)" : "var(--cyan)", textShadow: "0 0 12px currentColor" }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%", zIndex: 8, pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: reaction.success ? 18 : 36, fontWeight: 900, letterSpacing: ".1em", color: reaction.success ? "var(--gold)" : "var(--cyan)", textShadow: "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)" }}
         >
           {reaction.success ? "+1 FOLLOWER" : reaction.glyph}
         </motion.div>)}

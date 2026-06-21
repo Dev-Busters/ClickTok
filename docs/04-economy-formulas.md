@@ -882,7 +882,7 @@ sources explicitly; they must never appear merely because legacy §1 code still 
 
 ```ts
 onboarding: {
-  studioFollowers: 400,
+  studioFollowers: 25,
   minorFollowerGoal1: 700,
   minorFollowerGoal2: 1200,
   rhythmFollowers: 2400,
@@ -951,7 +951,7 @@ legible.
 | Goal | Requirement | Coins | Reveal |
 |---|---:|---:|---|
 | `meet_teb` | 10 taps | 0 | — |
-| `unlock_studio` | 400 total Followers | 10 | Creator Studio + Coins |
+| `unlock_studio` | 25 total Followers | 10 | Creator Studio + Coins |
 | `buy_audience_reach` | Audience Reach Lv1 | 18 | Engagement Rate + Audience Reach Lv2+ |
 | `reach_700` | 700 total Followers | 20 | — |
 | `own_three_fyp_levels` | 3 total opening-upgrade levels | 35 | — |

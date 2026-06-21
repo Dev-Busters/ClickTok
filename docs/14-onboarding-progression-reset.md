@@ -59,7 +59,7 @@ upgrade level without adding HUD.
 
 Tune thresholds and costs from measured human tap rate, not arbitrary round-number ladders:
 
-- Creator Studio reveal: **7–12 minutes** at an ordinary first-time tap rate.
+- Creator Studio reveal: **about 1–2 minutes** at an ordinary first-time tap rate (25 Followers at the starting 25% roll chance).
 - First Studio purchase: within **30–60 seconds** of opening Studio; its goal reward guarantees it.
 - First rhythm reveal: **22–32 minutes total**, after at least two meaningful upgrade purchases.
 - Major reveals: never closer than **three active minutes** apart in the target first session.
