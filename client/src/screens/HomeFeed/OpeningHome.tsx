@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
 import { goalById, isOnboardingFeatureAvailable, requirementValue, followerChance } from "../../features/onboarding/helpers";
@@ -18,22 +18,35 @@ function OpeningTeb() {
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const level = useGameStore(state => state.openingUpgradeLevels.audience_reach);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const nextReactionId = useRef(0);
+  const [tapReactions, setTapReactions] = useState<Array<{ id: number; success: boolean; drift: number; glyph: string }>>([]);
   const meterUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
   const ready = meterUnlocked && fill >= BALANCE.onboarding.engagement.cap;
 
-  const start = () => {
+  const start = useCallback(() => {
+    const followersBefore = useGameStore.getState().wallet.totalFollowers;
     openingTap();
+    const success = useGameStore.getState().wallet.totalFollowers > followersBefore;
+    const id = nextReactionId.current++;
+    const glyphs = ["♥", "💬", "↗", "✦"];
+    setTapReactions(current => [...current.slice(-5), { id, success, drift: (Math.random() - .5) * 72, glyph: glyphs[id % glyphs.length] }]);
+    const timer = setTimeout(() => {
+      setTapReactions(current => current.filter(reaction => reaction.id !== id));
+      reactionTimers.current.delete(id);
+    }, 850);
+    reactionTimers.current.set(id, timer);
     if (!ready || session) return;
     holdTimer.current = setTimeout(() => {
       beginCharge();
       if (reveal?.feature === "engagement_meter" && reveal.dismissed && !teaches.rhythm_first_hold) completeTeach("rhythm_first_hold");
     }, BALANCE.teb.holdLaunchThresholdMs);
-  };
-  const end = () => {
+  }, [beginCharge, completeTeach, openingTap, ready, reveal, session, teaches.rhythm_first_hold]);
+  const end = useCallback(() => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = null;
     if (useGameStore.getState().session?.phase === "charging") releaseCharge({ width: window.innerWidth, height: window.innerHeight });
-  };
+  }, [releaseCharge]);
 
   useEffect(() => {
     const keyDown = (event: KeyboardEvent) => {
@@ -55,12 +68,17 @@ function OpeningTeb() {
       window.removeEventListener("pointercancel", end);
       if (holdTimer.current) clearTimeout(holdTimer.current);
     };
-  });
+  }, [end, start]);
+
+  useEffect(() => () => {
+    reactionTimers.current.forEach(clearTimeout);
+    reactionTimers.current.clear();
+  }, []);
 
   return (
     <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
       <motion.button
-        aria-label={ready ? "Ready. Hold to launch TAP THREE" : "Tap TEB to gain Followers"}
+        aria-label={ready ? "Ready. Hold Engagement to launch TAP THREE" : "Tap Engagement to roll for a Follower"}
         onPointerDown={event => { event.stopPropagation(); start(); }}
         whileTap={{ scale: .96 }}
         style={{
@@ -72,11 +90,24 @@ function OpeningTeb() {
         }}
       >
         {meterUnlocked && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 48, letterSpacing: ".08em", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>TEB</span>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 34, letterSpacing: ".06em", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>ENGAGEMENT</span>
         <span style={{ display: "block", marginTop: 4, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".14em", color: ready ? "var(--gold)" : "var(--dim)" }}>
           {ready ? "READY — HOLD" : `${Math.round(followerChance(level) * 100)}% FOLLOWER CHANCE`}
         </span>
       </motion.button>
+      <AnimatePresence>
+        {tapReactions.map(reaction => <motion.div
+          key={`reaction-${reaction.id}`}
+          data-tap-reaction={reaction.success ? "follower" : "engaged"}
+          initial={{ opacity: 0, scale: .55, x: reaction.drift * .25, y: -104 }}
+          animate={{ opacity: [0, 1, 1, 0], scale: [0.55, 1.2, 1, .9], x: reaction.drift, y: -190 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: .8, ease: "easeOut" }}
+          style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%", zIndex: 8, pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: reaction.success ? 11 : 22, fontWeight: 800, letterSpacing: ".1em", color: reaction.success ? "var(--gold)" : "var(--cyan)", textShadow: "0 0 12px currentColor" }}
+        >
+          {reaction.success ? "+1 FOLLOWER" : reaction.glyph}
+        </motion.div>)}
+      </AnimatePresence>
       {meterUnlocked && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".12em", color: ready ? "var(--gold)" : "var(--dim)" }}>ENGAGEMENT {Math.round(fill)} / 100</div>}
     </div>
   );
@@ -88,7 +119,7 @@ function RevealCard() {
   const reduced = useReducedMotion();
   if (!reveal || reveal.dismissed) return null;
   const copy = reveal.feature === "creator_studio" ? ["CREATOR STUDIO UNLOCKED", "Turn Coins into stronger taps"]
-    : reveal.feature === "engagement_meter" ? ["TAP THREE UNLOCKED", "Fill Engagement, then hold TEB"]
+    : reveal.feature === "engagement_meter" ? ["TAP THREE UNLOCKED", "Fill Engagement, then hold the button"]
     : ["YOUR FYP IS READY", "Meet your audience"];
   return <motion.div initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} style={{ position: "absolute", top: 76, right: 14, zIndex: 30, width: 238, padding: 14, borderRadius: 14, background: "rgba(8,10,15,.96)", border: "1px solid var(--cyan)", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
     <strong style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: ".06em" }}>{copy[0]}</strong>

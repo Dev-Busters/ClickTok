@@ -12,7 +12,8 @@ Phase 18.
 
 ## Locked goals
 
-1. **The opening stays sparse.** A fresh player sees TEB, a Followers readout, and one current goal.
+1. **The opening stays sparse.** A fresh player sees the central **ENGAGEMENT** button (the TEB
+   system), a Followers readout, and one current goal.
    No video, engagement rail, captions, navigation, Coins, Likes, Diamonds, or unavailable feature
    previews appear before they become useful.
 2. **One major reveal at a time.** Unlocks are an ordered journey, not independent thresholds that
@@ -41,7 +42,7 @@ Follower requirements read monotonic `wallet.totalFollowers`, never the spendabl
 
 | Order | Step | Player objective | Reward / reveal |
 |---:|---|---|---|
-| 1 | `meet_teb` | Tap TEB and watch Followers grow | Teach TEB; no new surface |
+| 1 | `meet_teb` | Tap ENGAGEMENT and watch reactions/Follower rolls | Teach the core button; no new surface |
 | 2 | `unlock_studio` | Reach the first tuned Follower goal | Reveal Creator Studio and Coins; grant exactly enough Coins for `audience_reach` Lv1 |
 | 3 | `buy_audience_reach` | Open Studio and buy the only visible upgrade | Unlock `engagement_rate` Lv1 and `audience_reach` Lv2+ |
 | 4 | `reach_700` | Use the stronger TEB to reach 700 Followers | Award Coins for another FYP upgrade |
@@ -98,6 +99,7 @@ progress fills → goal complete → reward lands → reveal ceremony (if any)
 
 - Every quick TEB tap rolls the displayed Follower chance, grants exactly 1 Follower on success,
   and increments lifetime taps whether it succeeds or not.
+- Every tap emits a short reaction burst; successful rolls use a distinct `+1 FOLLOWER` treatment.
 - Followers are the headline growth number and unlock gate. They are not spent in Phase 18.
 - `audience_reach` increases the exact displayed Follower success chance.
 

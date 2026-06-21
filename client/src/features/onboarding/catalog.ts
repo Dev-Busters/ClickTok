@@ -2,7 +2,7 @@ import { BALANCE } from "../economy/balance";
 import type { OnboardingGoalDef } from "./types";
 
 export const ONBOARDING_GOALS: readonly OnboardingGoalDef[] = [
-  { id: "meet_teb", label: "TAP TEB 10 TIMES", benefit: "Grow your first audience", requirement: { kind: "tap_count", amount: 10 } },
+  { id: "meet_teb", label: "TAP ENGAGEMENT 10 TIMES", benefit: "Grow your first audience", requirement: { kind: "tap_count", amount: 10 } },
   { id: "unlock_studio", label: "REACH 400 FOLLOWERS", benefit: "Open Creator Studio", requirement: { kind: "total_followers", amount: BALANCE.onboarding.studioFollowers }, reward: { coins: BALANCE.onboarding.goalCoins.unlockStudio }, reveals: "creator_studio", teachId: "studio_first_use" },
   { id: "buy_audience_reach", label: "BUY AUDIENCE REACH", benefit: "Make every tap more likely to land", requirement: { kind: "upgrade_level", id: "audience_reach", amount: 1 }, reward: { coins: BALANCE.onboarding.goalCoins.buyAudienceReach } },
   { id: "reach_700", label: "REACH 700 FOLLOWERS", benefit: "Earn your next upgrade", requirement: { kind: "total_followers", amount: BALANCE.onboarding.minorFollowerGoal1 }, reward: { coins: BALANCE.onboarding.goalCoins.reach700 } },

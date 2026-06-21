@@ -373,7 +373,9 @@ feed. Render only:
 
 1. Followers hero at the top; add the Coin pill only when Studio reveals it.
 2. One compact current-goal chip with action, progress, and reward.
-3. TEB centered in the large free interaction field.
+3. The TEB system centered in the large free interaction field, labeled **ENGAGEMENT** during the
+   staged opening. Every press emits an animated reaction; successful Follower rolls explicitly
+   call out `+1 FOLLOWER`.
 4. Ambient background motion with no fake video metadata.
 5. A Studio edge button only after its reveal.
 
