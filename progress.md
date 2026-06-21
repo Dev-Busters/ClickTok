@@ -6,4 +6,5 @@ Original prompt: Restore "The Engagement Button", remove the displayed follower-
 - Verified: rhythm/onboarding tests pass through the direct Node loader fallback; typecheck and production build pass.
 - Verified at 390x844: fresh-player button visibly reads THE / ENGAGEMENT / BUTTON, enlarged reaction is legible, the post-teach goal reads REACH 25 FOLLOWERS, and browser console has no warnings/errors.
 - Onboarding simulation: Studio reveal is 0.6m at 3 taps/sec; rhythm remains inside its 22–32m median target.
-- Remaining: commit, push, production deploy, and live alias verification.
+- Release verified: GitHub `main` and the Vercel production alias were updated after gameplay QA.
+- TODO: none for this request.
