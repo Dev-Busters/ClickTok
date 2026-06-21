@@ -209,7 +209,9 @@ TikTok chrome without changing chart rules or normalized scoring.
 - One compact current-goal chip near an edge, never over TEB.
 - TEB is the sole central interaction.
 - Studio appears as a focused edge control only after its reveal.
-- No bottom nav until a journey step explicitly needs navigation.
+- Bottom nav is visible immediately. Only Profile is enabled during the sparse opening; its compact
+  early layout exposes available channel stats and the reset control, with a Back to Engagement
+  action returning to TEB.
 
 ### Video FYP reveal — deferred
 

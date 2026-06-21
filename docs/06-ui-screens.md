@@ -379,9 +379,11 @@ feed. Render only:
 4. Ambient background motion with no fake video metadata.
 5. A Studio edge button only after its reveal.
 
-Do not render hidden feature placeholders, bottom navigation, social rail, video caption, creator
-avatar, currency pills at zero, passive-income copy, or a scrollable milestone list. The current
-goal chip must stay clear of TEB and be no taller than two short lines at 320px width.
+Do not render hidden feature placeholders, social rail, video caption, creator avatar, currency
+pills at zero, passive-income copy, or a scrollable milestone list. Keep BottomNav visible from the
+start, but only Profile is enabled during the sparse opening; its early layout shows available
+channel stats, account/reset controls, and an explicit Back to Engagement action. The current goal
+chip must stay clear of TEB and be no taller than two short lines at 320px width.
 
 ### 13.2 Reveal and teaching pattern
 
@@ -440,7 +442,7 @@ before reducing hit areas. Result feedback reforms into TEB at center.
 
 ### 13.6 Video FYP chapter transition — deferred
 
-Do not restore the video feed, social rail, captions, or bottom navigation in Phase 18. After the
+Do not restore the video feed, social rail, or captions in Phase 18. After the
 first TAP THREE completion, retain the sparse opening composition and its repeatable engagement
 loop until a later phase defines the authored video-FYP chapter transition.
 

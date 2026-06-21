@@ -17,3 +17,12 @@ Follow-up prompt: Improve Creator Studio legibility, distinguish unlocking a new
 - Verified at 390x844: both Studio card states are legible and distinct; returning Home shows 0 / 100 and one TEB tap advances it to 1 / 100; no browser warnings/errors.
 - Verified: typecheck, production build, rhythm/onboarding tests, and onboarding pacing simulation pass.
 - TODO: none for this follow-up.
+
+Follow-up prompt: Show the footer navigation from the start, enable only Profile initially, and expose the reset button there for testing.
+
+- Implemented: persistent opening footer with Profile as the sole enabled nav destination.
+- Implemented: compact early Profile with available stats, account/reset controls, and Back to Engagement.
+- Implemented: Profile remains visually bright before selection while all four unavailable destinations are dimmed and disabled.
+- Verified at 390x844: fresh Home shows the footer; Profile opens; reset is visible; Back to Engagement returns to TEB; no browser warnings/errors.
+- Verification gates: typecheck, build, rhythm tests, and onboarding tests pass.
+- TODO: none for this follow-up.

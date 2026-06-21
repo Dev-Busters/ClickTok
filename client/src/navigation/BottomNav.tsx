@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { isFeatureUnlocked } from "../features/metrics/unlocks";
 
-export function BottomNav() {
+export function BottomNav({ opening = false }: { opening?: boolean }) {
   const activeTab = useGameStore(s => s.activeTab);
   const setTab = useGameStore(s => s.setTab);
   const setSheet = useGameStore(s => s.setSheet);
@@ -28,25 +28,27 @@ export function BottomNav() {
       <NavButton
         active={activeTab === 'home'}
         label="Home"
-        onClick={() => setTab('home')}
+        onClick={opening ? undefined : () => setTab('home')}
         icon={HomeIcon}
+        locked={opening}
       />
       <NavButton
         active={activeTab === 'discover'}
         label="Discover"
-        onClick={discoverUnlocked ? () => setTab('discover') : undefined}
+        onClick={!opening && discoverUnlocked ? () => setTab('discover') : undefined}
         icon={DiscoverIcon}
-        locked={!discoverUnlocked}
+        locked={opening || !discoverUnlocked}
       />
 
       {/* Center "+" — opens the Create sheet; unlocked at posting pillar (~100f) */}
       <motion.button
-        onClick={postingUnlocked ? () => setSheet('create') : undefined}
+        onClick={!opening && postingUnlocked ? () => setSheet('create') : undefined}
         aria-label="Create"
-        whileHover={postingUnlocked ? { scale: 1.12, y: -2 } : {}}
-        whileTap={postingUnlocked ? { scale: 0.88 } : {}}
+        disabled={opening || !postingUnlocked}
+        whileHover={!opening && postingUnlocked ? { scale: 1.12, y: -2 } : {}}
+        whileTap={!opening && postingUnlocked ? { scale: 0.88 } : {}}
         transition={{ type: "spring", stiffness: 520, damping: 22 }}
-        style={{ ...createButtonStyle, opacity: postingUnlocked ? 1 : 0.25, cursor: postingUnlocked ? 'pointer' : 'default' }}
+        style={{ ...createButtonStyle, opacity: !opening && postingUnlocked ? 1 : 0.25, cursor: !opening && postingUnlocked ? 'pointer' : 'default' }}
       >
         <CreateIcon />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em', color: 'var(--dim)', marginTop: '4px' }}>
@@ -57,15 +59,16 @@ export function BottomNav() {
       <NavButton
         active={activeTab === 'inbox'}
         label="Inbox"
-        onClick={inboxUnlocked ? () => setTab('inbox') : undefined}
+        onClick={!opening && inboxUnlocked ? () => setTab('inbox') : undefined}
         icon={InboxIcon}
-        locked={!inboxUnlocked}
+        locked={opening || !inboxUnlocked}
       />
       <NavButton
         active={activeTab === 'profile'}
         label="Profile"
         onClick={() => setTab('profile')}
         icon={ProfileIcon}
+        highlighted={opening}
       />
     </nav>
   );
@@ -77,18 +80,21 @@ function NavButton({
   onClick,
   icon: Icon,
   locked,
+  highlighted,
 }: {
   active: boolean;
   label: string;
   onClick: (() => void) | undefined;
   icon: (props: { color: string }) => ReactElement;
   locked?: boolean;
+  highlighted?: boolean;
 }) {
-  const color = active ? 'var(--text)' : 'var(--dim)';
+  const color = active || highlighted ? 'var(--text)' : 'var(--dim)';
   return (
     <motion.button
       onClick={onClick}
       aria-label={label}
+      disabled={locked}
       whileHover={locked ? {} : { scale: 1.1, y: -2 }}
       whileTap={locked ? {} : { scale: 0.88 }}
       transition={{ type: "spring", stiffness: 520, damping: 22 }}

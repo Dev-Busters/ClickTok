@@ -129,16 +129,14 @@ export function Shell() {
             {activeTab === 'profile' && <Profile />}
           </div>
 
-          {navUnlocked && (
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              style={{ flexShrink: 0 }}
-            >
-              <BottomNav />
-            </motion.div>
-          )}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            style={{ flexShrink: 0 }}
+          >
+            <BottomNav opening={!navUnlocked} />
+          </motion.div>
 
           {openSheet === 'create' && (
             <CreateSheet onClose={() => setSheet(null)} />
