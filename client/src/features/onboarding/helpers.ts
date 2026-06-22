@@ -35,9 +35,13 @@ export function requirementMet(requirement: GoalRequirement, progress: Onboardin
 }
 
 export function resolvableGoal(step: OnboardingStepId, completed: readonly OnboardingStepId[], blocked: boolean, progress: OnboardingProgress): OnboardingStepId | null {
-  if (blocked || completed.includes(step)) return null;
+  if (blocked || completed.includes(step) || step === "unlock_studio") return null;
   const goal = goalById(step);
   return requirementMet(goal.requirement, progress) ? goal.id : null;
+}
+
+export function canClaimCreatorStudioAnalytics(step: OnboardingStepId, completed: readonly OnboardingStepId[], totalFollowers: number): boolean {
+  return step === "unlock_studio" && !completed.includes("unlock_studio") && totalFollowers >= BALANCE.onboarding.studioFollowers;
 }
 
 export function isOnboardingFeatureAvailable(feature: OnboardingFeatureId, completed: readonly OnboardingStepId[]): boolean {

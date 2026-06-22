@@ -882,7 +882,7 @@ sources explicitly; they must never appear merely because legacy §1 code still 
 
 ```ts
 onboarding: {
-  studioFollowers: 20,
+  studioFollowers: 25,
   minorFollowerGoal1: 700,
   minorFollowerGoal2: 1200,
   rhythmFollowers: 2400,
@@ -890,9 +890,9 @@ onboarding: {
 
   baseFollowerChance: 0.25,
   audienceReach: {
-    baseCost: 10,
-    costGrowth: 1.8,
-    followerChanceAddPerLevel: 0.20,
+    baseCost: 5,
+    costGrowth: 1.4,
+    followerChanceAddPerLevel: 0.05,
   },
   engagementRate: {
     baseCost: 18,
@@ -905,9 +905,9 @@ onboarding: {
   },
 
   goalCoins: {
-    unlockStudio: 10,          // exactly Audience Reach Lv1
+    unlockStudio: 5,           // exactly Audience Reach Lv1
     buyAudienceReach: 0,       // first purchase must not fund the second immediately
-    reach700: 36,              // funds Audience Reach Lv2 + Engagement Rate Lv1 after active play
+    reach700: 25,              // funds Audience Reach Lv2 + Engagement Rate Lv1 after active play
     ownThreeFypLevels: 35,
     reach1200: 40,
   },
@@ -951,16 +951,16 @@ legible.
 | Goal | Requirement | Coins | Reveal |
 |---|---:|---:|---|
 | `meet_teb` | 10 taps | 0 | — |
-| `unlock_studio` | 20 total Followers | 10 | Creator Studio + Coins |
+| `unlock_studio` | claim in Analytics at 25 total Followers | 5 | Creator Studio + Gold |
 | `buy_audience_reach` | Audience Reach Lv1 | 0 | Engagement Rate + Audience Reach Lv2+ |
-| `reach_700` | 700 total Followers | 36 | funds the two newly available purchases |
+| `reach_700` | 700 total Followers | 25 | funds the two newly available purchases |
 | `own_three_fyp_levels` | 3 total opening-upgrade levels | 35 | — |
 | `reach_1200` | 1,200 total Followers | 40 | — |
 | `unlock_rhythm` | 2,400 total Followers and prior goals complete | 0 | engagement meter + TAP THREE |
 | `complete_first_rhythm` | 1 TAP THREE completion | chart payout | repeatable Coin loop |
 
-The ordered requirement is mandatory: a player above 10,000 Followers cannot resolve every row in
-one check. Resolve one goal, complete any reveal/teach, then activate the next.
+The ordered requirement is mandatory. `unlock_studio` never auto-resolves from wallet totals:
+Analytics owns its explicit obtain action, reward, feature animation, and post-claim Studio link.
 
 ### 17.4 First rhythm reward
 

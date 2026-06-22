@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, nextGoal, resolvableGoal, rollOpeningFollower, engagementPerTap, openingUpgradeCost, isOpeningEngagementAvailable } from "../../features/onboarding/helpers";
+import { canClaimCreatorStudioAnalytics, goalById, nextGoal, resolvableGoal, rollOpeningFollower, engagementPerTap, openingUpgradeCost, isOpeningEngagementAvailable } from "../../features/onboarding/helpers";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import { track } from "../../lib/telemetry";
 import type { FullState } from "../index";
@@ -19,6 +19,7 @@ export type OnboardingSlice = {
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
   openingTap: () => void;
+  claimCreatorStudioAnalytics: () => boolean;
   levelOpeningUpgrade: (id: OpeningUpgradeId) => boolean;
   addEngagement: (amount: number) => void;
   consumeEngagementForRhythm: () => boolean;
@@ -104,6 +105,25 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       track("onboarding_engagement_filled");
     }
     get().checkOnboardingGoal();
+  },
+
+  claimCreatorStudioAnalytics: () => {
+    const state = get();
+    const goal = goalById("unlock_studio");
+    if (!canClaimCreatorStudioAnalytics(state.onboardingStep, state.completedOnboardingGoals, state.wallet.totalFollowers)) return false;
+    const gold = goal.reward?.coins ?? 0;
+    set({
+      completedOnboardingGoals: [...state.completedOnboardingGoals, "unlock_studio"],
+      wallet: { ...state.wallet, coins: state.wallet.coins + gold },
+      coinsEarned: state.coinsEarned + gold,
+      onboardingTeachesSeen: { ...state.onboardingTeachesSeen, studio_first_use: true },
+      activeOnboardingReveal: null,
+    });
+    track("analytics_unlock_claimed", { id: "creator_studio", type: "feature", rewardGold: gold });
+    track("onboarding_goal_complete", { goal: "unlock_studio", durationMs: Date.now() - state.onboardingStepStartedAt });
+    advance(set, get);
+    queueMicrotask(() => get().checkOnboardingGoal());
+    return true;
   },
 
   levelOpeningUpgrade: id => {

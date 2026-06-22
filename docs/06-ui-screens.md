@@ -178,9 +178,11 @@ Trends + leaderboard (and the future multiplayer surface).
   (`computeRunParams`), a trend picker shortcut, and a big red **GO LIVE** button → `startRun` →
   Live screen. (Wired in Phase 2.1.)
 
-**Inbox (`screens/Inbox/`)** — TikTok activity feed style: a list of notifications (run results,
-milestone unlocks, daily reward, later: raids/gifts from other players). Daily reward claim button
-at top (Phase 3.2).
+**Inbox (`screens/Inbox/`)** contains **Analytics**, the achievements and unlock system. Unlock
+types have distinct cards and obtain animations: feature (cyan/chromatic), resource (gold), and
+achievement (red/star). The opening list contains only Creator Studio: 25-Follower progress,
+`OBTAIN UNLOCK · +5 GOLD`, then `OPEN CREATOR STUDIO →` after claiming. During the sparse opening,
+hide daily rewards and legacy notifications so they cannot bypass the authored Gold economy.
 
 ## 6. Profile (`screens/Profile/`) — channel analytics hub
 
@@ -189,7 +191,7 @@ at top (Phase 3.2).
 TikTok profile layout, repurposed as a **read-only analytics hub**. Top to bottom:
 
 - **Opening override:** before the legacy/full profile chapter, consolidate the header to one row:
-  `Followers · Taps · Coins`. Do not stack Followers and Total Followers when they are identical.
+  `Followers · Taps · Gold`. Do not stack Followers and Total Followers when they are identical.
   Show account/reset controls immediately and defer later analytics sections.
 
 - **`ProfileHeader`:** circular avatar (generated from handle), `@handle`, bio line ("becoming the
@@ -385,9 +387,9 @@ feed. Render only:
 
 Do not render hidden feature placeholders, social rail, video caption, creator avatar, currency
 pills at zero, passive-income copy, or a scrollable milestone list. Keep BottomNav visible from the
-start, but only Profile is enabled during the sparse opening; its early layout shows available
-channel stats, account/reset controls, and an explicit Back to Engagement action. The current goal
-chip must stay clear of TEB and be no taller than two short lines at 320px width.
+start. Home always returns to the FYP; Inbox opens Analytics; Profile exposes available channel
+stats and reset controls. Discover and Create remain disabled. The current goal chip must stay
+clear of TEB and be no taller than two short lines at 320px width.
 
 ### 13.2 Reveal and teaching pattern
 
@@ -408,7 +410,7 @@ goal completes → compact celebration names the feature → TAKE ME THERE / SHO
 
 ### 13.3 Creator Studio onboarding mode
 
-Studio initially shows a header/back button, a single **FYP** tab, Coin balance, and one full-width
+Studio initially shows a header/back button, a single **FYP** tab, Gold balance, and one full-width
 Audience Reach card. The card's hierarchy is:
 
 - name + `LV N`;
@@ -425,6 +427,8 @@ text and an opaque card backing. Do not show locked future categories or cards.
 Audience Reach copy spells out `Engagement Button`; never render the redundant phrase `a TEB tap`.
 Buying Audience Reach reveals the second card but grants no Coins. The player earns its purchase
 budget from the subsequent 700-Follower goal by using the improved tap chance.
+Audience Reach starts at `25% → 30%` for 5 Gold. Each level adds 5 percentage points; initial
+costs rise `5 → 7 → 10` Gold.
 
 ### 13.4 Engagement-ready TEB
 

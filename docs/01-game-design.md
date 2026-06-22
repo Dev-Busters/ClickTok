@@ -474,12 +474,12 @@ Full design: `docs/13-teb-rhythm-canvas.md`. Types: `03` §6.6. Formulas: `04` �
 ## 13. Staged onboarding & progression reset (Phase 18; design LOCKED 2026-06-19)
 
 Phase 18 replaces the rapid independent metric cascade with an authored opening journey. A fresh
-player begins with only TEB, Followers, and one current goal. TEB taps award Followers only. Creator
-Studio is the first major reveal; it opens with one affordable FYP upgrade, and buying that upgrade
-reveals the second upgrade plus further levels of the first. Deterministic Creator Goal rewards fund
-these opening purchases until TAP THREE becomes the first repeatable Coin source.
+player begins with TEB, Followers, and one current goal. TEB taps award Followers only. Inbox →
+Analytics is the achievements and unlock surface: its first feature card lets the player explicitly
+obtain Creator Studio at 25 Followers and awards 5 Gold. Studio opens with one +5 percentage-point
+Follower Chance upgrade costing 5 Gold; later levels repeat +5 points at rising costs.
 
-Major systems are introduced one at a time through `goal → reveal → SHOW ME → first use`. Existing
+Major systems are introduced one at a time through `goal → Analytics claim → unlock animation → feature link`. Existing
 later-game content remains dormant rather than being deleted. The first-video unlock changes the
 sparse onboarding Home into the existing FYP composition as one taught chapter transition.
 

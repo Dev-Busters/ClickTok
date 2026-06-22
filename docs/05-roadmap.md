@@ -2136,7 +2136,9 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   reveal Coins/Studio only when authored. Build the reusable anchored celebration, `SHOW ME` focus,
   first-use coach mark, queued-unlock guard, and reduced-motion variant. Remove all unavailable HUD,
   fake video metadata, and locked previews from this state. **Post-phase UX correction:** keep the
-  footer visible immediately with only Profile enabled so early testing/reset remains reachable.
+  footer visible immediately. **Post-phase Analytics correction:** Home, Inbox, and Profile are
+  enabled; Home always returns to FYP, Inbox owns explicit achievement/unlock claims, and Profile
+  keeps testing/reset reachable.
   **Refs:** `14` §B/§G, `06` §13.1–13.2. **DoD:** fresh 320×640 and 390×844 saves show only the
   contracted surfaces; Studio reveal points to the real button and blocks later reveals until first
   use; dismiss/reload/focus behavior works; no relevant console warnings; browser screenshots.

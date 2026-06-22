@@ -28,9 +28,8 @@ export function BottomNav({ opening = false }: { opening?: boolean }) {
       <NavButton
         active={activeTab === 'home'}
         label="Home"
-        onClick={opening ? undefined : () => setTab('home')}
+        onClick={() => setTab('home')}
         icon={HomeIcon}
-        locked={opening}
       />
       <NavButton
         active={activeTab === 'discover'}
@@ -59,16 +58,15 @@ export function BottomNav({ opening = false }: { opening?: boolean }) {
       <NavButton
         active={activeTab === 'inbox'}
         label="Inbox"
-        onClick={!opening && inboxUnlocked ? () => setTab('inbox') : undefined}
+        onClick={opening || inboxUnlocked ? () => setTab('inbox') : undefined}
         icon={InboxIcon}
-        locked={opening || !inboxUnlocked}
+        locked={!opening && !inboxUnlocked}
       />
       <NavButton
         active={activeTab === 'profile'}
         label="Profile"
         onClick={() => setTab('profile')}
         icon={ProfileIcon}
-        highlighted={opening}
       />
     </nav>
   );

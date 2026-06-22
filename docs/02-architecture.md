@@ -77,9 +77,10 @@ DOM nodes, browser PointerEvents, SVG path instances, Framer controls, or timer 
 
 Phase 18 onboarding boundary (`14`): `features/onboarding/` owns the ordered goal catalog and pure
 requirement/progress checks. `onboardingSlice` owns durable journey/reveal/teach state and is the sole
-authority for fresh-opening feature availability. Screens render that state and report semantic
-actions (`studio_opened`, `upgrade_bought`, `teach_completed`); they never infer unlocks directly
-from wallet totals. Legacy metrics remain achievement data and may not mutate onboarding state.
+authority for fresh-opening feature availability. Inbox Analytics reads progress but calls the
+semantic `claimCreatorStudioAnalytics` action to obtain the first unlock; wallet totals alone never
+complete it. Claimed Analytics entries derive from completed ordered goals, so no parallel persisted
+achievement array is needed. Legacy metrics remain dormant data and may not mutate onboarding state.
 
 Phase 18 rhythm layout (`14` §F): `HomeFeed` measures visible chrome rectangles and passes one
 `RhythmInteractionField` rectangle to the chart builder. Rhythm renderers do not query or hide feed

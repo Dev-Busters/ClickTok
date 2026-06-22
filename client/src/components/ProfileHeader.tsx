@@ -45,7 +45,7 @@ export function ProfileHeader({ opening = false }: { opening?: boolean }) {
           <StatDivider />
           <ProfileStat label="Taps" value={formatCount(viewsTotal)} />
           <StatDivider />
-          <ProfileStat label="Coins" value={formatCount(wallet.coins)} />
+          <ProfileStat label="Gold" value={formatCount(wallet.coins)} />
         </div>
       ) : (
         <>

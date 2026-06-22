@@ -816,6 +816,7 @@ export type OnboardingSlice = {
   checkOnboardingGoal: () => void;
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
+  claimCreatorStudioAnalytics: () => boolean; // explicit 25-Follower Analytics obtain action
   addEngagement: (amount: number) => void;
   consumeEngagementForRhythm: () => boolean;
   resetOnboardingRevision: () => void; // development/release-controlled action

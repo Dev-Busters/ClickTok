@@ -5,7 +5,7 @@ Original prompt: Restore "The Engagement Button", remove the displayed follower-
 - Fixed the onboarding simulator to consume the shared Studio threshold/rewards instead of retaining a hard-coded 400-Follower gate.
 - Verified: rhythm/onboarding tests pass through the direct Node loader fallback; typecheck and production build pass.
 - Verified at 390x844: fresh-player button visibly reads THE / ENGAGEMENT / BUTTON, enlarged reaction is legible, the post-teach goal reads REACH 25 FOLLOWERS, and browser console has no warnings/errors.
-- Onboarding simulation: Studio reveal is 0.6m at 3 taps/sec; rhythm remains inside its 22–32m median target.
+- Previous calibration: Studio reveal was 0.6m at 3 taps/sec; later rhythm timing has since become provisional under the smaller +5-point Analytics-era upgrade curve.
 - Release verified: GitHub `main` and the Vercel production alias were updated after gameplay QA.
 - TODO: none for this request.
 
@@ -17,6 +17,16 @@ Follow-up prompt: Improve Creator Studio legibility, distinguish unlocking a new
 - Verified at 390x844: both Studio card states are legible and distinct; returning Home shows 0 / 100 and one TEB tap advances it to 1 / 100; no browser warnings/errors.
 - Verified: typecheck, production build, rhythm/onboarding tests, and onboarding pacing simulation pass.
 - TODO: none for this follow-up.
+
+Follow-up prompt: Add Inbox Analytics as achievements/unlocks, make Creator Studio an explicit 25-Follower obtain worth 5 Gold, change the claimed button into a Studio link, retune Audience Reach to +5% for 5/7/10... Gold, and keep Home returning to FYP.
+
+- Implemented: Analytics feature-unlock card, explicit claim action/animation, +5 Gold reward, and post-claim Studio link.
+- Implemented: Home/Inbox/Profile enabled in the opening footer; Home always returns to FYP; opening Inbox suppresses daily rewards and legacy activity.
+- Implemented: Audience Reach adds 5 percentage points per level with 5, 7, 10... Gold costs.
+- Verified at 390x844: opening Inbox contains exactly one Analytics entry; ready state shows 25 / 25 and +5 Gold; obtain plays the feature-specific animation and changes the action to OPEN CREATOR STUDIO.
+- Verified end to end: Studio link opens the feature with 5 Gold; Audience Reach shows 25% → 30% for 5, then 30% → 35% for 7; Home returns from Inbox to the FYP.
+- Verified: opening Inbox suppresses daily rewards/activity, no browser warnings/errors, and typecheck/build/tests/no-deadlock simulation pass.
+- TODO: later Analytics entries can reuse the prepared resource and achievement visual/animation variants.
 
 Follow-up prompt: Consolidate duplicated early Profile stats, fix Engagement Button wording and Creator Studio reveal navigation, require play before the second upgrade purchase, and make full Engagement visually unmistakable.
 

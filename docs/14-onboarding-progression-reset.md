@@ -43,7 +43,7 @@ Follower requirements read monotonic `wallet.totalFollowers`, never the spendabl
 | Order | Step | Player objective | Reward / reveal |
 |---:|---|---|---|
 | 1 | `meet_teb` | Tap ENGAGEMENT and watch reactions/Follower rolls | Teach the core button; no new surface |
-| 2 | `unlock_studio` | Reach the first tuned Follower goal | Reveal Creator Studio and Coins; grant exactly enough Coins for `audience_reach` Lv1 |
+| 2 | `unlock_studio` | Reach 25 Followers, then obtain the Analytics entry | Feature-unlock animation; Creator Studio + 5 Gold; card becomes a Studio link |
 | 3 | `buy_audience_reach` | Open Studio and buy the only visible upgrade | Unlock `engagement_rate` Lv1 and `audience_reach` Lv2+ |
 | 4 | `reach_700` | Use the stronger TEB to reach 700 Followers | Award Coins for another FYP upgrade |
 | 5 | `own_three_fyp_levels` | Buy three total levels across the two FYP upgrades | Award Coins and reinforce upgrade comparison |
@@ -59,9 +59,11 @@ upgrade level without adding HUD.
 
 Tune thresholds and costs from measured human tap rate, not arbitrary round-number ladders:
 
-- Creator Studio reveal: **about 1 minute** at an ordinary first-time tap rate (20 Followers at the starting 25% roll chance).
+- Creator Studio obtain: **about 1 minute** at an ordinary first-time tap rate (25 Followers at the starting 25% roll chance), followed by one explicit Analytics claim.
 - First Studio purchase: within **30–60 seconds** of opening Studio; its goal reward guarantees it.
-- First rhythm reveal: **22–32 minutes total**, after at least two meaningful upgrade purchases.
+- First rhythm reveal timing is **provisional** while later Analytics entries are authored. The new
+  +5-point Audience Reach curve currently reaches it at ~40 minutes at 3 taps/sec; this pass only
+  requires every tested route to remain non-deadlocked.
 - Major reveals: never closer than **three active minutes** apart in the target first session.
 
 These are experience budgets, not AFK timers. Faster tapping and sensible purchases should matter,
@@ -69,8 +71,8 @@ but no realistic burst should skip a teach or reveal two systems at once.
 
 ## §B — Creator Goal chain
 
-The old global metric list remains available for later achievements, but it no longer drives the
-fresh opening. `ONBOARDING_GOALS` is an ordered authored catalog. Each goal has:
+Inbox → Analytics replaces the old global metric list as the player-facing achievements and unlock
+surface. `ONBOARDING_GOALS` remains the ordered authored backing catalog. Each entry has:
 
 - one requirement (`tap_count`, `total_followers`, `upgrade_level`, `rhythm_completions`, or
   `acknowledge_reveal`);
@@ -150,6 +152,9 @@ Every upgrade card must show:
 
 Do not use the current generic `postPower` copy in opening UI: it bundles unrelated outputs and
 does not tell a new player what will change.
+
+Audience Reach begins at 25% chance. Every level adds exactly 5 percentage points. Its first costs
+are 5, 7, and 10 Gold (`round(5 × 1.4^level)`), so the Analytics reward buys Lv1 immediately.
 
 ## §E — Engagement meter and first rhythm loop
 

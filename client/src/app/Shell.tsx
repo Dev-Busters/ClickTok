@@ -50,13 +50,23 @@ export function Shell() {
     const onboardingQa = params.get("onboardingQa");
     if (onboardingQa === "fresh") useGameStore.getState().resetOnboardingRevision();
     if (onboardingQa === "studio") useGameStore.setState({
-      wallet: { followers: 20, totalFollowers: 20, coins: 10, likes: 0, diamonds: 0 },
-      viewsTotal: 20,
-      onboardingStep: "unlock_studio",
+      wallet: { followers: 25, totalFollowers: 25, coins: 5, likes: 0, diamonds: 0 },
+      viewsTotal: 100,
+      onboardingStep: "buy_audience_reach",
       completedOnboardingGoals: ["meet_teb", "unlock_studio"],
-      activeOnboardingReveal: { feature: "creator_studio", shownAt: Date.now(), dismissed: false },
+      activeOnboardingReveal: null,
+      onboardingTeachesSeen: { studio_first_use: true },
+      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
+    });
+    if (onboardingQa === "analyticsReady") useGameStore.setState({
+      wallet: { followers: 25, totalFollowers: 25, coins: 0, likes: 0, diamonds: 0 },
+      viewsTotal: 100,
+      onboardingStep: "unlock_studio",
+      completedOnboardingGoals: ["meet_teb"],
+      activeOnboardingReveal: null,
       onboardingTeachesSeen: {},
       openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
+      activeTab: "inbox",
     });
     if (onboardingQa === "rhythm") useGameStore.setState({
       wallet: { followers: 2400, totalFollowers: 2400, coins: 40, likes: 0, diamonds: 0 },

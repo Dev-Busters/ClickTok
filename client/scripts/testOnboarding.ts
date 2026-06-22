@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { BALANCE } from "../src/features/economy/balance";
 import { ONBOARDING_GOALS } from "../src/features/onboarding/catalog";
-import { engagementPerTap, followerChance, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, openingUpgradeCost, resolvableGoal, rollOpeningFollower } from "../src/features/onboarding/helpers";
+import { canClaimCreatorStudioAnalytics, engagementPerTap, followerChance, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, openingUpgradeCost, resolvableGoal, rollOpeningFollower } from "../src/features/onboarding/helpers";
 import { pickSequence } from "../src/features/teb/chartCatalog";
 import { persistedStatePatch } from "../src/store/slices/cloudSlice";
 import type { PersistedState } from "../src/store/slices/meta";
@@ -17,19 +17,24 @@ const richProgress = {
 
 assert.equal(resolvableGoal("meet_teb", [], false, richProgress), "meet_teb", "only the active goal resolves");
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], true, richProgress), null, "reveal/teach blocks a later resolution");
+assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], false, richProgress), null, "Studio waits for an explicit Analytics claim");
+assert.equal(canClaimCreatorStudioAnalytics("unlock_studio", ["meet_teb"], 24), false);
+assert.equal(canClaimCreatorStudioAnalytics("unlock_studio", ["meet_teb"], 25), true);
+assert.equal(canClaimCreatorStudioAnalytics("unlock_studio", ["meet_teb", "unlock_studio"], 25), false);
 assert.equal(isOnboardingFeatureAvailable("creator_studio", ["meet_teb"]), false, "legacy-like progress does not expose opening UI");
 assert.equal(isOnboardingFeatureAvailable("creator_studio", ["meet_teb", "unlock_studio"]), true);
 assert.equal(isOpeningEngagementAvailable(["meet_teb", "unlock_studio"]), false, "meter stays hidden before Audience Reach Lv1");
 assert.equal(isOpeningEngagementAvailable(["meet_teb", "unlock_studio", "buy_audience_reach"]), true, "meter appears with Engagement Rate");
 
 assert.equal(followerChance(0), 0.25);
-assert.equal(followerChance(1), 0.45);
+assert.equal(followerChance(1), 0.30);
 assert.equal(rollOpeningFollower(0, () => 0.24), 1);
 assert.equal(rollOpeningFollower(0, () => 0.25), 0);
 assert.equal(engagementPerTap(0), 1);
 assert.equal(engagementPerTap(1), 1.25);
-assert.equal(openingUpgradeCost("audience_reach", 0), 10);
-assert.equal(openingUpgradeCost("audience_reach", 1), 18);
+assert.equal(openingUpgradeCost("audience_reach", 0), 5);
+assert.equal(openingUpgradeCost("audience_reach", 1), 7);
+assert.equal(openingUpgradeCost("audience_reach", 2), 10);
 assert.equal(openingUpgradeCost("engagement_rate", 0), 18);
 assert.equal(ONBOARDING_GOALS.find(goal => goal.id === "unlock_studio")?.reward?.coins, BALANCE.onboarding.audienceReach.baseCost, "Studio funds Audience Reach Lv1 exactly");
 assert.equal(ONBOARDING_GOALS.find(goal => goal.id === "buy_audience_reach")?.reward?.coins ?? 0, 0, "Audience Reach purchase does not fund Engagement Rate immediately");
