@@ -31,6 +31,7 @@ function timeAgo(ts: number): string {
 
 export function Inbox() {
   const opening = useGameStore(s => s.onboardingTeachesSeen.legacy_preserved !== true);
+  const followers = useGameStore(s => s.wallet.totalFollowers);
   const notifications = useGameStore(s => s.notifications);
   const lastDailyClaimAt = useGameStore(s => s.lastDailyClaimAt);
   const passiveCoinsPerSec = useGameStore(s => s.passiveCoinsPerSec);
@@ -57,7 +58,9 @@ export function Inbox() {
         <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, var(--dim), transparent)' }} />
       </div>
 
-      <AnalyticsSection />
+      {!opening || followers >= BALANCE.onboarding.analyticsFollowers
+        ? <AnalyticsSection />
+        : <AnalyticsLocked followers={followers} />}
 
       {!opening && <>
       <div style={{ width: '100%', maxWidth: '384px', padding: '0 16px', marginBottom: '20px' }}>
@@ -118,6 +121,22 @@ export function Inbox() {
       </div>
       </>}
     </div>
+  );
+}
+
+function AnalyticsLocked({ followers }: { followers: number }) {
+  const target = BALANCE.onboarding.analyticsFollowers;
+  return (
+    <section data-analytics-locked aria-label="Analytics locked" style={{ width: "100%", maxWidth: 384, padding: "0 16px", marginBottom: 22 }}>
+      <div style={{ padding: 16, borderRadius: 14, border: "1px solid rgba(255,255,255,.12)", background: "linear-gradient(145deg,rgba(18,20,27,.92),rgba(9,10,14,.98))" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div><strong style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: ".08em", color: "rgba(255,255,255,.68)" }}>ANALYTICS</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)", letterSpacing: ".1em" }}>UNLOCKS AT {target} FOLLOWERS</span></div>
+          <span style={{ fontSize: 22, opacity: .46 }}>◈</span>
+        </div>
+        <div style={{ height: 5, marginTop: 13, overflow: "hidden", borderRadius: 999, background: "rgba(255,255,255,.08)" }}><motion.div animate={{ width: `${Math.min(100, followers / target * 100)}%` }} style={{ height: "100%", borderRadius: 999, background: "var(--cyan)" }} /></div>
+        <div style={{ marginTop: 6, textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 8, color: "rgba(255,255,255,.5)" }}>{Math.min(followers, target)} / {target}</div>
+      </div>
+    </section>
   );
 }
 

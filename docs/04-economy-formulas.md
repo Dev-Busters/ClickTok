@@ -882,6 +882,8 @@ sources explicitly; they must never appear merely because legacy §1 code still 
 
 ```ts
 onboarding: {
+  analyticsFollowers: 5,
+  firstGoalFollowers: 10,
   studioFollowers: 25,
   minorFollowerGoal1: 700,
   minorFollowerGoal2: 1200,
@@ -926,10 +928,15 @@ coherent table in docs/code/simulation; do not lower thresholds piecemeal to mak
 pulseCycleMs = 1800
 greenArc = 36 degrees total, centered at 12 o'clock
 yellowArc = 24 degrees on each side of green
+bonusGreenArc = 24 degrees, initially centered at 180 degrees
+bonusPlacementGap = 4 degrees
 
 greenFollowerGain = 1 + audienceReachLevel × audienceReach.followerAmountAddPerLevel
 yellowFollowerGain = ceil(greenFollowerGain / 2)
 redFollowerGain = 0
+
+bonus placement is valid when its arc plus the 4-degree gap does not overlap the authored
+top green/yellow scoring arc or another placed modifier. A placed bonus arc grades as green.
 
 engagementPerTap = engagement mechanic unlocked
                   ? engagement.baseFillPerTap
@@ -951,7 +958,8 @@ legible.
 
 | Goal | Requirement | Coins | Reveal |
 |---|---:|---:|---|
-| `meet_teb` | 10 taps | 0 | — |
+| Analytics surface | 5 total Followers | 0 | Inbox Analytics becomes available |
+| `meet_teb` | 10 total Followers | 0 | second green zone + placement teach |
 | `unlock_studio` | claim in Analytics at 25 total Followers | 5 | Creator Studio + Gold |
 | `buy_audience_reach` | Audience Reach Lv1 | 0 | Engagement Rate + Audience Reach Lv2+ |
 | `reach_700` | 700 total Followers | 25 | funds the two newly available purchases |

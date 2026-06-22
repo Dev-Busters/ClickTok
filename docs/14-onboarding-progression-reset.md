@@ -42,7 +42,8 @@ Follower requirements read monotonic `wallet.totalFollowers`, never the spendabl
 
 | Order | Step | Player objective | Reward / reveal |
 |---:|---|---|---|
-| 1 | `meet_teb` | Tap ENGAGEMENT and watch reactions/Follower rolls | Teach the core button; no new surface |
+| — | Analytics gate | Reach 5 Followers | Inbox Analytics becomes available; Studio entry remains a 25-Follower target |
+| 1 | `meet_teb` | Reach 10 Followers | Add a 24° green modifier opposite the crest and teach drag/place editing |
 | 2 | `unlock_studio` | Reach 25 Followers, then obtain the Analytics entry | Feature-unlock animation; Creator Studio + 5 Gold; card becomes a Studio link |
 | 3 | `buy_audience_reach` | Open Studio and buy the only visible upgrade | Unlock `engagement_rate` Lv1 and `audience_reach` Lv2+ |
 | 4 | `reach_700` | Use the stronger TEB to reach 700 Followers | Award Coins for another FYP upgrade |
@@ -59,7 +60,8 @@ upgrade level without adding HUD.
 
 Tune thresholds and costs from measured human tap rate, not arbitrary round-number ladders:
 
-- Creator Studio obtain: **about 1 minute** at an ordinary first-time tap rate (25 Followers at the starting 25% roll chance), followed by one explicit Analytics claim.
+- Analytics opens at 5 Followers. The first goal lands at 10 Followers and adds a second green timing
+  zone; Creator Studio remains an explicit Analytics obtain at 25 Followers.
 - First Studio purchase: within **30–60 seconds** of opening Studio; its goal reward guarantees it.
 - First rhythm reveal timing is **provisional** while later Analytics entries are authored. The new
   +5-point Audience Reach curve currently reaches it at ~40 minutes at 3 taps/sec; this pass only
@@ -87,6 +89,14 @@ Completion flow:
 progress fills → goal complete → reward lands → reveal ceremony (if any)
 → TAKE ME THERE / SHOW ME focus → first-use teach → next goal becomes active
 ```
+
+### TEB pulse modifiers
+
+The first goal installs `bonus_green_1` at `180°`, exactly opposite the authored top crest. During
+its inline teach, the placed arc becomes a translucent selected ghost. Dragging anywhere on the dial
+updates its circular center; keyboard arrows move it by 3° (Shift = 12°). The preview turns red and
+cannot be placed when its 24° arc plus a 4° visual gap overlaps the top green/yellow band or another
+modifier. Confirmed positions persist; edit drafts and active pointers do not.
 
 - While a reveal is active, further progress may accumulate but no later goal resolves.
 - `TAKE ME THERE` opens Creator Studio immediately; `SHOW ME` moves focus to the exact new
@@ -134,7 +144,7 @@ Creator Studio first opens in a special onboarding mode:
 - Exactly one card is initially rendered: `audience_reach`.
 - Buying `audience_reach` Lv1 reveals `engagement_rate` Lv1 and Lv2 of `audience_reach` in one
   coordinated transition, but pays no Coins. The next Coin budget arrives only after the player
-  uses the improved tap chance to reach 700 Followers. Later levels reveal through explicit
+  uses the improved timed-hit payout to reach 700 Followers. Later levels reveal through explicit
   requirements, not all at once.
 
 Canonical opening upgrades:
@@ -239,6 +249,7 @@ Persist:
 - completed goal IDs;
 - active/dismissed reveal and completed teach IDs;
 - opening upgrade levels and normal wallet totals.
+- confirmed opening TEB pulse modifiers;
 - engagement-meter fill and TAP THREE completion count.
 
 Do not infer the active opening step solely from wallet totals: that recreates cascading unlocks.
@@ -250,7 +261,7 @@ progress without an explicit release decision**. Build both paths:
 2. a migration path that preserves an existing save and marks the new opening complete.
 
 The live `RESET PROGRESS` flow must write a durable local reset marker before reload. Cloud sync
-must replace the remote row with the fresh v16 state and clear that marker only after the upsert
+must replace the remote row with the fresh v17 state and clear that marker only after the upsert
 succeeds; while the marker exists, an older cloud save may never be pulled over the reset.
 
 Before release, choose either the preservation path or a one-time progression reset. Existing

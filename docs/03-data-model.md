@@ -724,14 +724,15 @@ export type MetricDef = {
 
 ```ts
 // store/slices/meta.ts
-export const SAVE_VERSION = 16; // Phase 18 reset/deferred-video correction
+export const SAVE_VERSION = 17; // opening TEB pulse modifiers
 // v1 → base shape; v2 → wallet/skills/videos; v3 → inbox/milestones;
 // v4 → ownedElements (7.3); v5 → upgradeLevels + tebTeachSeen (9.1)
 // v6 → metricsReached + lifetime counters (9.2); v7 → affordableNotifiedPillars (10.2)
 // v8 → metricsReached id rename follower_100→follower_200 (11.2)
 // v9 → elementsTeachSeen (11.3); v10 → metric-id re-derive; v11 → modTeachSeen;
 // v12 → catalog activation marker; v13 → tebChargeTeachSeen;
-// v14 → tebSequenceTeachSeen; v15 → staged onboarding; v16 → reset/cloud parity + deferred video
+// v14 → tebSequenceTeachSeen; v15 → staged onboarding; v16 → reset/cloud parity + deferred video;
+// v17 → openingPulseModifiers
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
 //   multiplier, followerConversion, boonMultiplier, lastSeenAt,
@@ -772,12 +773,16 @@ export type OnboardingStepId =
   | "unlock_video_fyp";
 
 export type OnboardingFeatureId =
+  | "pulse_modifier"
   | "creator_studio"
   | "engagement_meter"
   | "tap_three"
   | "video_fyp";
 
 export type OpeningUpgradeId = "audience_reach" | "engagement_rate";
+
+export type OpeningPulseModifierId = "bonus_green_1";
+export type OpeningPulseModifier = { id: OpeningPulseModifierId; centerDeg: number };
 
 export type GoalRequirement =
   | { kind: "tap_count"; amount: number }
@@ -810,6 +815,7 @@ export type OnboardingSlice = {
   completedOnboardingGoals: OnboardingStepId[];
   activeOnboardingReveal: OnboardingReveal | null;
   onboardingTeachesSeen: Record<string, true>;
+  openingPulseModifiers: OpeningPulseModifier[]; // persisted; non-overlapping circular arc centers
   engagementFill: number; // persisted; clamp 0..BALANCE.onboarding.engagement.cap
   tapThreeCompletions: number;
 
@@ -817,6 +823,7 @@ export type OnboardingSlice = {
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
   claimCreatorStudioAnalytics: () => boolean; // explicit 25-Follower Analytics obtain action
+  setOpeningPulseModifier: (id: OpeningPulseModifierId, centerDeg: number) => boolean;
   addEngagement: (amount: number) => void;
   consumeEngagementForRhythm: () => boolean;
   resetOnboardingRevision: () => void; // development/release-controlled action
@@ -827,5 +834,6 @@ Opening feature availability derives from completed ordered goals, not `metricsR
 metric flags must not unlock fresh-opening UI in parallel. Once `video_fyp` is complete, later
 chapters may bridge back into authored metrics or additional ordered goal catalogs.
 
-Phase 18 implementation bumps the current code save version **14 → 15** and persists the fields
-above. TEB rhythm session geometry, active pointers, and judgement state remain ephemeral.
+Phase 18 originally bumped the save through v16. The post-phase TEB modifier pass bumps **16 → 17**
+and persists `openingPulseModifiers`; editor drafts, active pointers, and judgement state remain
+ephemeral.

@@ -12,12 +12,20 @@ export type OnboardingStepId =
   | "unlock_video_fyp";
 
 export type OnboardingFeatureId =
+  | "pulse_modifier"
   | "creator_studio"
   | "engagement_meter"
   | "tap_three"
   | "video_fyp";
 
 export type OpeningUpgradeId = "audience_reach" | "engagement_rate";
+
+export type OpeningPulseModifierId = "bonus_green_1";
+
+export type OpeningPulseModifier = {
+  id: OpeningPulseModifierId;
+  centerDeg: number;
+};
 
 export type GoalRequirement =
   | { kind: "tap_count"; amount: number }
@@ -42,4 +50,3 @@ export type OnboardingReveal = {
   shownAt: number;
   dismissed: boolean;
 };
-

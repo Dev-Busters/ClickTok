@@ -3,16 +3,20 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   OPENING_PULSE_CYCLE_MS,
   OPENING_PULSE_GREEN_DEG,
+  OPENING_PULSE_MODIFIER_DEG,
   OPENING_PULSE_YELLOW_DEG,
   openingPulseProgress,
   openingPulseZone,
   type OpeningPulseZone,
 } from "../../features/onboarding/helpers";
+import type { OpeningPulseModifier, OpeningPulseModifierId } from "../../features/onboarding/types";
 
 type PulseFeedback = { id: number; zone: OpeningPulseZone } | null;
 
 type OpeningPulseDialProps = {
   feedback: PulseFeedback;
+  modifiers: readonly OpeningPulseModifier[];
+  editing?: { id: OpeningPulseModifierId; centerDeg: number; valid: boolean };
 };
 
 const SIZE = 226;
@@ -29,7 +33,11 @@ function wavePath(radius: number, amplitude: number, frequency: number, phase: n
   return `${points.join(" ")} Z`;
 }
 
-export function OpeningPulseDial({ feedback }: OpeningPulseDialProps) {
+const MODIFIER_RADIUS = 110;
+const MODIFIER_CIRCUMFERENCE = Math.PI * 2 * MODIFIER_RADIUS;
+const MODIFIER_ARC_LENGTH = MODIFIER_CIRCUMFERENCE * OPENING_PULSE_MODIFIER_DEG / 360;
+
+export function OpeningPulseDial({ feedback, modifiers, editing }: OpeningPulseDialProps) {
   const travelerRef = useRef<HTMLDivElement>(null);
   const waveRef = useRef<SVGGElement>(null);
   const reducedMotion = useReducedMotion();
@@ -45,7 +53,7 @@ export function OpeningPulseDial({ feedback }: OpeningPulseDialProps) {
       const now = Date.now();
       const progress = openingPulseProgress(now);
       const angle = progress * 360;
-      const zone = openingPulseZone(now);
+      const zone = openingPulseZone(now, modifiers);
       const color = zone === "green" ? "#4dff9a" : zone === "yellow" ? "#ffd84d" : "#ff315d";
       const traveler = travelerRef.current;
       if (traveler) {
@@ -63,7 +71,7 @@ export function OpeningPulseDial({ feedback }: OpeningPulseDialProps) {
     };
     update();
     return () => cancelAnimationFrame(frame);
-  }, [reducedMotion]);
+  }, [modifiers, reducedMotion]);
 
   const greenHalf = OPENING_PULSE_GREEN_DEG / 2;
   const yellowEnd = greenHalf + OPENING_PULSE_YELLOW_DEG;
@@ -101,6 +109,39 @@ export function OpeningPulseDial({ feedback }: OpeningPulseDialProps) {
           <path d={paths[1]} fill="none" stroke="url(#opening-wave-b)" strokeWidth="1.6" opacity=".64" />
           <path d={paths[2]} fill="none" stroke="#fff" strokeWidth=".8" opacity=".25" />
         </g>
+        {modifiers.filter(modifier => modifier.id !== editing?.id).map(modifier => (
+          <circle
+            key={modifier.id}
+            data-pulse-modifier={modifier.id}
+            cx={CENTER}
+            cy={CENTER}
+            r={MODIFIER_RADIUS}
+            fill="none"
+            stroke="#49ff9a"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={`${MODIFIER_ARC_LENGTH} ${MODIFIER_CIRCUMFERENCE - MODIFIER_ARC_LENGTH}`}
+            transform={`rotate(${modifier.centerDeg - OPENING_PULSE_MODIFIER_DEG / 2 - 90} ${CENTER} ${CENTER})`}
+            style={{ filter: "drop-shadow(0 0 7px rgba(73,255,154,.88))" }}
+          />
+        ))}
+        {editing && (
+          <circle
+            data-pulse-modifier-preview
+            data-placement-valid={editing.valid ? "true" : "false"}
+            cx={CENTER}
+            cy={CENTER}
+            r={MODIFIER_RADIUS}
+            fill="none"
+            stroke={editing.valid ? "#75ffb5" : "#ff315d"}
+            strokeWidth="11"
+            strokeLinecap="round"
+            strokeDasharray={`${MODIFIER_ARC_LENGTH} ${MODIFIER_CIRCUMFERENCE - MODIFIER_ARC_LENGTH}`}
+            transform={`rotate(${editing.centerDeg - OPENING_PULSE_MODIFIER_DEG / 2 - 90} ${CENTER} ${CENTER})`}
+            opacity=".72"
+            style={{ filter: `drop-shadow(0 0 10px ${editing.valid ? "rgba(73,255,154,.95)" : "rgba(255,49,93,.95)"})` }}
+          />
+        )}
       </motion.svg>
 
       <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: zoneGradient, mask: "radial-gradient(farthest-side,transparent calc(100% - 7px),#000 0)", WebkitMask: "radial-gradient(farthest-side,transparent calc(100% - 7px),#000 0)", filter: "drop-shadow(0 0 8px rgba(255,31,75,.38))" }} />

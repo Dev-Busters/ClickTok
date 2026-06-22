@@ -4,10 +4,10 @@ import type { SkillId } from "../../features/skills/types";
 import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { SequenceId } from "../../features/teb/types";
-import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
+import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningPulseModifier, type OpeningUpgradeId } from "../../features/onboarding/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -128,8 +128,12 @@ export type PersistedV15 = Omit<PersistedV14, "version"> & {
 };
 
 export type PersistedV16 = Omit<PersistedV15, "version"> & { version: 16 };
+export type PersistedV17 = Omit<PersistedV16, "version"> & {
+  version: 17;
+  openingPulseModifiers: OpeningPulseModifier[];
+};
 
-export type PersistedState = PersistedV16;
+export type PersistedState = PersistedV17;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -170,6 +174,7 @@ export function toPersistedState(state: FullState): PersistedState {
     activeOnboardingReveal: state.activeOnboardingReveal,
     onboardingTeachesSeen: state.onboardingTeachesSeen,
     openingUpgradeLevels: state.openingUpgradeLevels,
+    openingPulseModifiers: state.openingPulseModifiers,
     engagementFill: state.engagementFill,
     tapThreeCompletions: state.tapThreeCompletions,
     onboardingStepStartedAt: state.onboardingStepStartedAt,
@@ -201,7 +206,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -409,6 +414,17 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       completedOnboardingGoals: v15.completedOnboardingGoals.filter(goal => goal !== "unlock_video_fyp"),
       activeOnboardingReveal: v15.activeOnboardingReveal?.feature === "video_fyp" ? null : v15.activeOnboardingReveal,
       onboardingTeachesSeen: teachesWithoutVideo,
+    };
+  }
+
+  if (version < 17) {
+    const v16 = state as PersistedV16;
+    state = {
+      ...v16,
+      version: 17,
+      openingPulseModifiers: v16.completedOnboardingGoals?.includes("meet_teb")
+        ? [{ id: "bonus_green_1", centerDeg: 180 }]
+        : [],
     };
   }
 

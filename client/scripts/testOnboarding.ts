@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { BALANCE } from "../src/features/economy/balance";
 import { ONBOARDING_GOALS } from "../src/features/onboarding/catalog";
-import { OPENING_PULSE_CYCLE_MS, OPENING_PULSE_GREEN_DEG, OPENING_PULSE_YELLOW_DEG, canClaimCreatorStudioAnalytics, engagementPerTap, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, openingFollowerAmount, openingFollowersPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, resolvableGoal, rollOpeningFollowers } from "../src/features/onboarding/helpers";
+import { OPENING_PULSE_CYCLE_MS, OPENING_PULSE_GREEN_DEG, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_YELLOW_DEG, canClaimCreatorStudioAnalytics, engagementPerTap, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, openingFollowerAmount, openingFollowersPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, resolvableGoal, rollOpeningFollowers } from "../src/features/onboarding/helpers";
 import { pickSequence } from "../src/features/teb/chartCatalog";
 import { persistedStatePatch } from "../src/store/slices/cloudSlice";
 import type { PersistedState } from "../src/store/slices/meta";
@@ -16,6 +16,9 @@ const richProgress = {
 };
 
 assert.equal(resolvableGoal("meet_teb", [], false, richProgress), "meet_teb", "only the active goal resolves");
+assert.deepEqual(ONBOARDING_GOALS[0].requirement, { kind: "total_followers", amount: 10 }, "first goal is 10 Followers");
+assert.equal(ONBOARDING_GOALS[0].reveals, "pulse_modifier");
+assert.equal(BALANCE.onboarding.analyticsFollowers, 5);
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], true, richProgress), null, "reveal/teach blocks a later resolution");
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], false, richProgress), null, "Studio waits for an explicit Analytics claim");
 assert.equal(canClaimCreatorStudioAnalytics("unlock_studio", ["meet_teb"], 24), false);
@@ -35,6 +38,13 @@ assert.equal(openingPulseZone(msAtDegrees(greenEdge + 0.01)), "yellow");
 assert.equal(openingPulseZone(msAtDegrees(yellowEdge)), "yellow");
 assert.equal(openingPulseZone(msAtDegrees(yellowEdge + 0.01)), "red");
 assert.equal(openingPulseZone(OPENING_PULSE_CYCLE_MS - msAtDegrees(greenEdge)), "green", "zones are symmetrical around the crest");
+const bonusModifier = [{ id: "bonus_green_1" as const, centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG }];
+assert.equal(openingPulseZone(msAtDegrees(180)), "red", "the opposite side starts unscored");
+assert.equal(openingPulseZone(msAtDegrees(180), bonusModifier), "green", "the placed modifier adds a green scoring zone");
+assert.equal(isOpeningPulseModifierPlacementValid(180, bonusModifier), true, "default placement is valid");
+assert.equal(isOpeningPulseModifierPlacementValid(0, bonusModifier), false, "modifier cannot overlap the top scoring zones");
+assert.equal(isOpeningPulseModifierPlacementValid(52, bonusModifier), false, "collision includes yellow plus a visible gap");
+assert.equal(isOpeningPulseModifierPlacementValid(60, bonusModifier), true, "modifier can move around the remaining circle");
 assert.equal(openingFollowerAmount(0), 1);
 assert.equal(openingFollowerAmount(2), 3);
 assert.equal(openingPulseReward(2, "green"), 3);
@@ -42,6 +52,7 @@ assert.equal(openingPulseReward(2, "yellow"), 2);
 assert.equal(openingPulseReward(2, "red"), 0);
 assert.equal(rollOpeningFollowers(2, 0), 3);
 assert.ok(Math.abs(openingFollowersPerTap(0) - 7 / 30) < 1e-10, "random timing earns on the 84-degree scoring arc");
+assert.ok(openingFollowersPerTap(0, 1) > openingFollowersPerTap(0), "a bonus zone increases the expected timed-hit rate");
 assert.equal(engagementPerTap(0), 1);
 assert.equal(engagementPerTap(1), 1.25);
 assert.equal(openingUpgradeCost("audience_reach", 0), 5);
@@ -61,6 +72,7 @@ const resetPatch = persistedStatePatch({
   activeOnboardingReveal: null,
   onboardingTeachesSeen: {},
   openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
+  openingPulseModifiers: [],
   engagementFill: 0,
   tapThreeCompletions: 0,
   onboardingStepStartedAt: 123,
@@ -68,6 +80,7 @@ const resetPatch = persistedStatePatch({
 assert.deepEqual(resetPatch.completedOnboardingGoals, [], "reset loader must replace completed onboarding goals");
 assert.deepEqual(resetPatch.onboardingTeachesSeen, {}, "reset loader must replace onboarding teach flags");
 assert.deepEqual(resetPatch.openingUpgradeLevels, { audience_reach: 0, engagement_rate: 0 }, "reset loader must replace opening upgrades");
+assert.deepEqual(resetPatch.openingPulseModifiers, [], "reset loader must replace pulse modifiers");
 
 const deferredVideoMigration = migrate({
   onboardingStep: "unlock_video_fyp",
@@ -75,10 +88,16 @@ const deferredVideoMigration = migrate({
   activeOnboardingReveal: { feature: "video_fyp", shownAt: 1, dismissed: false },
   onboardingTeachesSeen: { video_fyp_first_action: true },
 } as PersistedState, 15);
-assert.equal(deferredVideoMigration.version, 16);
+assert.equal(deferredVideoMigration.version, 17);
 assert.equal(deferredVideoMigration.onboardingStep, "complete_first_rhythm");
 assert.deepEqual(deferredVideoMigration.completedOnboardingGoals, ["complete_first_rhythm"]);
 assert.equal(deferredVideoMigration.activeOnboardingReveal, null);
+
+const pulseModifierMigration = migrate({
+  completedOnboardingGoals: ["meet_teb"],
+} as PersistedState, 16);
+assert.equal(pulseModifierMigration.version, 17);
+assert.deepEqual(pulseModifierMigration.openingPulseModifiers, [{ id: "bonus_green_1", centerDeg: 180 }], "v16 progress receives the opposite-side default zone");
 
 const resetStorageData = new Map([[RESET_PENDING_KEY, "1"]]);
 const resetStorage = {

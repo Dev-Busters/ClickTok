@@ -380,8 +380,8 @@ feed. Render only:
 1. Followers hero at the top; add the Coin pill only when Studio reveals it.
 2. One compact current-goal chip with action, progress, and reward.
 3. The TEB system centered in the large free interaction field, labeled **ENGAGEMENT** during the
-   staged opening. Every press emits an animated reaction; successful Follower rolls explicitly
-   call out `+1 FOLLOWER`.
+   staged opening. Its waveform dial shows the authored top green/yellow timing zones, the orbiting
+   burst, and any earned green modifiers. Every press emits PERFECT / GOOD / OFF BEAT feedback.
 4. Ambient background motion with no fake video metadata.
 5. A Studio edge button only after its reveal.
 
@@ -390,6 +390,12 @@ pills at zero, passive-income copy, or a scrollable milestone list. Keep BottomN
 start. Home always returns to the FYP; Inbox opens Analytics; Profile exposes available channel
 stats and reset controls. Discover and Create remain disabled. The current goal chip must stay
 clear of TEB and be no taller than two short lines at 320px width.
+
+Analytics uses a compact locked progress card before 5 Followers and becomes the normal Inbox
+surface at 5. At 10 Followers, Home enters an inline modifier teach: a translucent 24° ghost arc
+starts at 6 o'clock, follows pointer drag or arrow keys around the dial, turns red over occupied
+zones, and exposes a disabled placement action until valid. After placement, a restrained
+`TUNE BONUS ZONE` control reopens the same editor without a modal.
 
 ### 13.2 Reveal and teaching pattern
 
@@ -418,16 +424,16 @@ Audience Reach card. The card's hierarchy is:
 - large exact `current → next` value;
 - cost and one primary `UPGRADE` action.
 
-Do not print the current Follower-chance percentage on the TEB; the button always reads
+Do not print the current Follower payout on the TEB; the button always reads
 **"THE / ENGAGEMENT / BUTTON"**. After Lv1 purchase, animate the Studio's changed
-Follower-chance value first, then reveal Engagement Rate below it and enable Audience Reach's next
+Follower-payout value first, then reveal Engagement Rate below it and enable Audience Reach's next
 level. A level-zero card uses a gold `NEW BONUS` badge and `UNLOCK BONUS` action; an owned card
 uses cyan `LEVEL N` and `LEVEL UP`. Supporting copy is at least 13px on phone with high-contrast
 text and an opaque card backing. Do not show locked future categories or cards.
 Audience Reach copy spells out `Engagement Button`; never render the redundant phrase `a TEB tap`.
 Buying Audience Reach reveals the second card but grants no Coins. The player earns its purchase
-budget from the subsequent 700-Follower goal by using the improved tap chance.
-Audience Reach starts at `25% → 30%` for 5 Gold. Each level adds 5 percentage points; initial
+budget from the subsequent 700-Follower goal by using the improved timed-hit payout.
+Audience Reach starts at `1 → 2 Followers / green hit` for 5 Gold. Each level adds 1; initial
 costs rise `5 → 7 → 10` Gold.
 
 ### 13.4 Engagement-ready TEB

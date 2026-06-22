@@ -2123,7 +2123,7 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   intact but cannot expose opening UI; development reset preserves handle/settings; typecheck.
 
 - [x] **18.2 — Followers-only opening economy + FYP upgrade catalog (`14` §C/§D, `04` §17).** Gate
-  the opening TEB payout to a displayed Follower-chance roll and add the dedicated `audience_reach` and
+  the opening TEB payout to a displayed timed-pulse grade and add the dedicated `audience_reach` and
   `engagement_rate` upgrades/formulas. Add ordered goal Coin rewards exactly from `04` §17; hide
   Coins before Studio and suppress Likes/Diamonds/passive/catalog/feed bonuses throughout the
   opening. Opening upgrade effects must not reuse bundled `postPower` behavior.
@@ -2165,6 +2165,9 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   > waveform dial and orbiting burst, centered the crest at 12 o'clock, widened green/yellow to
   > 36°/24° per side, made yellow payout deterministic, and added pointer capture + local keyboard
   > handling for consistent press/hold/release behavior.
+  > note: Follow-up progression pass gates Analytics at 5 Followers, changes the opening goal to
+  > 10 Followers, and unlocks a persisted 24° draggable green-zone modifier at 180°. Placement uses
+  > ghost/red collision previews, pointer + keyboard controls, and a v16→v17 migration.
 
 - [x] **18.6 — Rhythm interaction-field correction (`14` §F, `06` §13.5).** Remove Phase 17's
   global blackout/chrome-hide behavior. Measure visible chrome rectangles and mount rhythm in the

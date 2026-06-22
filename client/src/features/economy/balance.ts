@@ -267,6 +267,8 @@ export const BALANCE = {
     },
   },
   onboarding: {
+    analyticsFollowers: 5,
+    firstGoalFollowers: 10,
     studioFollowers: 25,
     minorFollowerGoal1: 700,
     minorFollowerGoal2: 1200,
