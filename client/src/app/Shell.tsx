@@ -68,6 +68,17 @@ export function Shell() {
       openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1 },
       engagementFill: 100,
     });
+    if (onboardingQa === "meterFull") useGameStore.setState({
+      wallet: { followers: 82, totalFollowers: 82, coins: 0, likes: 0, diamonds: 0 },
+      viewsTotal: 216,
+      onboardingStep: "reach_700",
+      completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach"],
+      activeOnboardingReveal: null,
+      onboardingTeachesSeen: { studio_first_use: true },
+      openingUpgradeLevels: { audience_reach: 1, engagement_rate: 1 },
+      engagementFill: 100,
+      session: null,
+    });
     if (onboardingQa === "complete") useGameStore.setState({
       wallet: { followers: 2600, totalFollowers: 2600, coins: 60, likes: 0, diamonds: 0 },
       viewsTotal: 2600,

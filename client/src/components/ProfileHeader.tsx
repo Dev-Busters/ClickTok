@@ -3,7 +3,7 @@ import { avatarGradient } from "../lib/avatar";
 import { formatCount } from "../lib/format";
 import { CurrencyPill } from "./CurrencyBar";
 
-export function ProfileHeader() {
+export function ProfileHeader({ opening = false }: { opening?: boolean }) {
   const handle               = useGameStore(s => s.handle);
   const wallet               = useGameStore(s => s.wallet);
   const viewsTotal           = useGameStore(s => s.viewsTotal);
@@ -39,29 +39,36 @@ export function ProfileHeader() {
         @{handle}
       </span>
 
-      {/* Primary TikTok 3-stat row */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0', marginTop: '4px' }}>
-        <ProfileStat label="Following" value="0" />
-        <StatDivider />
-        <ProfileStat label="Followers" value={formatCount(wallet.followers)} />
-        <StatDivider />
-        <ProfileStat label="Likes" value={formatCount(wallet.likes)} />
-      </div>
-
-      {/* Secondary lifetime row */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0' }}>
-        <ProfileStat label="Views" value={formatCount(viewsTotal)} small />
-        <StatDivider />
-        <ProfileStat label="Total Followers" value={formatCount(wallet.totalFollowers)} small />
-        <StatDivider />
-        <ProfileStat label="Streams" value={formatCount(streams)} small />
-      </div>
-
-      {/* Currency pills */}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
-        <CurrencyPill color="var(--gold)" label="coins" value={formatCount(wallet.coins)} shape="coin" />
-        <CurrencyPill color="var(--cyan)" label="diamonds" value={formatCount(wallet.diamonds)} shape="diamond" />
-      </div>
+      {opening ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0, marginTop: 4 }}>
+          <ProfileStat label="Followers" value={formatCount(wallet.followers)} />
+          <StatDivider />
+          <ProfileStat label="Taps" value={formatCount(viewsTotal)} />
+          <StatDivider />
+          <ProfileStat label="Coins" value={formatCount(wallet.coins)} />
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0', marginTop: '4px' }}>
+            <ProfileStat label="Following" value="0" />
+            <StatDivider />
+            <ProfileStat label="Followers" value={formatCount(wallet.followers)} />
+            <StatDivider />
+            <ProfileStat label="Likes" value={formatCount(wallet.likes)} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0' }}>
+            <ProfileStat label="Views" value={formatCount(viewsTotal)} small />
+            <StatDivider />
+            <ProfileStat label="Total Followers" value={formatCount(wallet.totalFollowers)} small />
+            <StatDivider />
+            <ProfileStat label="Streams" value={formatCount(streams)} small />
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+            <CurrencyPill color="var(--gold)" label="coins" value={formatCount(wallet.coins)} shape="coin" />
+            <CurrencyPill color="var(--cyan)" label="diamonds" value={formatCount(wallet.diamonds)} shape="diamond" />
+          </div>
+        </>
+      )}
 
       {/* Passive income pill */}
       {hasPassive && (

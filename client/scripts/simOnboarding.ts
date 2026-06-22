@@ -13,10 +13,10 @@ function simulate(tapsPerSecond: number): Result {
     if (!studioRewarded && followers >= BALANCE.onboarding.studioFollowers) { studioRewarded = true; studioAt = seconds; coins += BALANCE.onboarding.goalCoins.unlockStudio; }
     if (studioRewarded && audience === 0 && coins >= openingUpgradeCost("audience_reach", audience)) { coins -= openingUpgradeCost("audience_reach", audience++); audienceRewarded = true; coins += BALANCE.onboarding.goalCoins.buyAudienceReach; }
     if (audienceRewarded && rate === 0 && coins >= openingUpgradeCost("engagement_rate", rate)) coins -= openingUpgradeCost("engagement_rate", rate++);
-    if (!reach700Rewarded && followers >= 700) { reach700Rewarded = true; coins += 20; }
+    if (!reach700Rewarded && followers >= BALANCE.onboarding.minorFollowerGoal1) { reach700Rewarded = true; coins += BALANCE.onboarding.goalCoins.reach700; }
     if (audience + rate < 3 && coins >= openingUpgradeCost("audience_reach", audience)) audience++, coins -= openingUpgradeCost("audience_reach", audience - 1);
-    if (!threeRewarded && audience + rate >= 3) { threeRewarded = true; coins += 35; }
-    if (!reach1200Rewarded && followers >= 1200) { reach1200Rewarded = true; coins += 40; }
+    if (!threeRewarded && audience + rate >= 3) { threeRewarded = true; coins += BALANCE.onboarding.goalCoins.ownThreeFypLevels; }
+    if (!reach1200Rewarded && followers >= BALANCE.onboarding.minorFollowerGoal2) { reach1200Rewarded = true; coins += BALANCE.onboarding.goalCoins.reach1200; }
     if (followers >= BALANCE.onboarding.rhythmFollowers && audience + rate >= 3) {
       if (!rhythmAt) rhythmAt = seconds;
       engagement = Math.min(100, engagement + engagementPerTap(rate) * tapsPerSecond);

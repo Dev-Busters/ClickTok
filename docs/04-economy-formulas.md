@@ -906,8 +906,8 @@ onboarding: {
 
   goalCoins: {
     unlockStudio: 10,          // exactly Audience Reach Lv1
-    buyAudienceReach: 18,      // exactly Engagement Rate Lv1
-    reach700: 20,
+    buyAudienceReach: 0,       // first purchase must not fund the second immediately
+    reach700: 36,              // funds Audience Reach Lv2 + Engagement Rate Lv1 after active play
     ownThreeFypLevels: 35,
     reach1200: 40,
   },
@@ -952,8 +952,8 @@ legible.
 |---|---:|---:|---|
 | `meet_teb` | 10 taps | 0 | — |
 | `unlock_studio` | 20 total Followers | 10 | Creator Studio + Coins |
-| `buy_audience_reach` | Audience Reach Lv1 | 18 | Engagement Rate + Audience Reach Lv2+ |
-| `reach_700` | 700 total Followers | 20 | — |
+| `buy_audience_reach` | Audience Reach Lv1 | 0 | Engagement Rate + Audience Reach Lv2+ |
+| `reach_700` | 700 total Followers | 36 | funds the two newly available purchases |
 | `own_three_fyp_levels` | 3 total opening-upgrade levels | 35 | — |
 | `reach_1200` | 1,200 total Followers | 40 | — |
 | `unlock_rhythm` | 2,400 total Followers and prior goals complete | 0 | engagement meter + TAP THREE |

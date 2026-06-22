@@ -53,7 +53,7 @@ export function Profile() {
         <div style={{ position: 'sticky', top: 0, zIndex: 2, width: '100%', padding: '12px 16px', background: 'rgba(7,8,12,.96)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
           <button onClick={() => setTab('home')} style={{ padding: '9px 12px', borderRadius: 999, border: '1px solid rgba(37,244,238,.35)', background: 'rgba(37,244,238,.08)', color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 800, letterSpacing: '.1em' }}>← BACK TO ENGAGEMENT</button>
         </div>
-        <ProfileHeader />
+        <ProfileHeader opening />
         <div style={{ width: '100%', maxWidth: 384, padding: '0 16px 4px' }}>
           <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(37,244,238,.2)', background: 'rgba(37,244,238,.06)', color: 'rgba(255,255,255,.76)', fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.5 }}>
             YOUR CHANNEL IS JUST GETTING STARTED. NEW PROFILE SECTIONS WILL APPEAR AS THEY BECOME USEFUL.

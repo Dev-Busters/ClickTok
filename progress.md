@@ -18,6 +18,18 @@ Follow-up prompt: Improve Creator Studio legibility, distinguish unlocking a new
 - Verified: typecheck, production build, rhythm/onboarding tests, and onboarding pacing simulation pass.
 - TODO: none for this follow-up.
 
+Follow-up prompt: Consolidate duplicated early Profile stats, fix Engagement Button wording and Creator Studio reveal navigation, require play before the second upgrade purchase, and make full Engagement visually unmistakable.
+
+- Implemented: early Profile uses one Followers / Taps / Coins row.
+- Implemented: Audience Reach copy spells out Engagement Button; TAKE ME THERE opens Studio and completes the focus step.
+- Implemented: Audience Reach grants no immediate Coins; the 700-Follower goal now awards the 36-Coin purchase budget.
+- Implemented: full meter adds an ENGAGEMENT FULL badge, continuous gold TEB pulse, gold full-state typography, and enhanced FULL tap reactions.
+- Added a deterministic `onboardingQa=meterFull` browser state for the pre-rhythm full-meter presentation.
+- Verified in browser: one-row opening Profile; TAKE ME THERE opens the real Studio; Audience Reach purchase leaves 0 Coins and both 18-Coin choices disabled; 700-Follower goal advertises +36 Coins.
+- Verified in browser: pre-rhythm full meter shows the gold pulse/badge/typography and gold FULL reactions; reaction bounds remain inside the phone viewport; no console warnings/errors.
+- Verified: typecheck, production build, rhythm/onboarding tests, and onboarding pacing simulation pass.
+- TODO: none for this follow-up.
+
 Follow-up prompt: Show the footer navigation from the start, enable only Profile initially, and expose the reset button there for testing.
 
 - Implemented: persistent opening footer with Profile as the sole enabled nav destination.

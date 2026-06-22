@@ -32,6 +32,8 @@ assert.equal(openingUpgradeCost("audience_reach", 0), 10);
 assert.equal(openingUpgradeCost("audience_reach", 1), 18);
 assert.equal(openingUpgradeCost("engagement_rate", 0), 18);
 assert.equal(ONBOARDING_GOALS.find(goal => goal.id === "unlock_studio")?.reward?.coins, BALANCE.onboarding.audienceReach.baseCost, "Studio funds Audience Reach Lv1 exactly");
+assert.equal(ONBOARDING_GOALS.find(goal => goal.id === "buy_audience_reach")?.reward?.coins ?? 0, 0, "Audience Reach purchase does not fund Engagement Rate immediately");
+assert.equal(BALANCE.onboarding.goalCoins.reach700, openingUpgradeCost("audience_reach", 1) + openingUpgradeCost("engagement_rate", 0), "700-Follower play funds both newly available purchases");
 assert.deepEqual(pickSequence([], null, ["tap_three"]), { sequence: "tap_three", bag: [] }, "opening chart eligibility is TAP THREE only");
 assert.equal(ONBOARDING_GOALS.some(goal => goal.id === "unlock_video_fyp"), false, "video FYP remains deferred after the first minigame loop");
 

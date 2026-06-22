@@ -83,11 +83,12 @@ Completion flow:
 
 ```text
 progress fills → goal complete → reward lands → reveal ceremony (if any)
-→ SHOW ME focus → first-use teach → next goal becomes active
+→ TAKE ME THERE / SHOW ME focus → first-use teach → next goal becomes active
 ```
 
 - While a reveal is active, further progress may accumulate but no later goal resolves.
-- `SHOW ME` moves focus to the exact new control. It never merely closes a generic modal.
+- `TAKE ME THERE` opens Creator Studio immediately; `SHOW ME` moves focus to the exact new
+  control. Neither action may merely close a generic modal.
 - If the player dismisses a reveal, the new control pulses gently and the goal chip becomes
   `TRY <FEATURE>` until the first use.
 - First-use teaches are one or two actions long and never cover the control being taught.
@@ -128,7 +129,9 @@ Creator Studio first opens in a special onboarding mode:
 - No VIEWER/POSTING/LIVE tabs, gear, software, skills, locked cards, silhouettes, or `???` rows.
 - Exactly one card is initially rendered: `audience_reach`.
 - Buying `audience_reach` Lv1 reveals `engagement_rate` Lv1 and Lv2 of `audience_reach` in one
-  coordinated transition. Later levels reveal through explicit requirements, not all at once.
+  coordinated transition, but pays no Coins. The next Coin budget arrives only after the player
+  uses the improved tap chance to reach 700 Followers. Later levels reveal through explicit
+  requirements, not all at once.
 
 Canonical opening upgrades:
 
@@ -152,7 +155,8 @@ does not tell a new player what will change.
 
 The engagement meter appears as soon as Audience Reach Lv1 introduces Engagement Rate. It fills
 immediately so the second bonus has visible meaning, but it cannot launch a chart until
-`unlock_rhythm`. Once TAP THREE is revealed:
+`unlock_rhythm`. At full charge it pulses gold, displays `ENGAGEMENT FULL`, and changes every tap
+reaction to a gold `FULL` treatment even while TAP THREE remains locked. Once TAP THREE is revealed:
 
 1. Quick TEB taps pay Followers and add engagement fill.
 2. At full charge, TEB enters a clear `READY — HOLD` state.

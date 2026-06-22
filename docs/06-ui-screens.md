@@ -188,6 +188,10 @@ at top (Phase 3.2).
 
 TikTok profile layout, repurposed as a **read-only analytics hub**. Top to bottom:
 
+- **Opening override:** before the legacy/full profile chapter, consolidate the header to one row:
+  `Followers · Taps · Coins`. Do not stack Followers and Total Followers when they are identical.
+  Show account/reset controls immediately and defer later analytics sections.
+
 - **`ProfileHeader`:** circular avatar (generated from handle), `@handle`, bio line ("becoming the
   algorithm").
   - **Primary stat row** (TikTok-faithful): `Following · Followers · Likes`.
@@ -390,11 +394,13 @@ chip must stay clear of TEB and be no taller than two short lines at 320px width
 Major unlocks use one consistent four-beat interaction:
 
 ```text
-goal completes → compact celebration names the feature → SHOW ME
+goal completes → compact celebration names the feature → TAKE ME THERE / SHOW ME
 → camera/focus travels to the new control → one-action coach mark → normal play
 ```
 
 - Celebration is anchored near the unlocked control, not a generic center modal.
+- Creator Studio's `TAKE ME THERE` action opens the real Studio immediately and completes its
+  first-use focus step; it must never only dismiss the card.
 - Other unlock checks pause until the first-use teach resolves.
 - Dismissed teaches leave a gentle cyan/red pulse and change the goal chip to `TRY <FEATURE>`.
 - Use strong motion only for the reveal; normal available/affordable states use restrained glow.
@@ -416,13 +422,17 @@ Follower-chance value first, then reveal Engagement Rate below it and enable Aud
 level. A level-zero card uses a gold `NEW BONUS` badge and `UNLOCK BONUS` action; an owned card
 uses cyan `LEVEL N` and `LEVEL UP`. Supporting copy is at least 13px on phone with high-contrast
 text and an opaque card backing. Do not show locked future categories or cards.
+Audience Reach copy spells out `Engagement Button`; never render the redundant phrase `a TEB tap`.
+Buying Audience Reach reveals the second card but grants no Coins. The player earns its purchase
+budget from the subsequent 700-Follower goal by using the improved tap chance.
 
 ### 13.4 Engagement-ready TEB
 
 When Engagement Rate is introduced, a thin engagement ring/meter becomes part of TEB's existing
 visual anatomy and begins filling on quick taps without competing with the Followers float text.
-Before rhythm unlocks it reads as progress being built for TAP THREE but cannot launch a chart. At
-full after rhythm unlocks:
+Before rhythm unlocks it reads as progress being built for TAP THREE but cannot launch a chart. A
+full meter always triggers a prominent `ENGAGEMENT FULL` badge, a repeating gold TEB pulse, and
+gold `FULL` tap reactions. After rhythm unlocks, full charge additionally means:
 
 - the ring closes and holds a stable gold edge;
 - idle copy changes to `READY — HOLD`;

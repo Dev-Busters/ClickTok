@@ -276,7 +276,7 @@ export const BALANCE = {
     audienceReach: { baseCost: 10, costGrowth: 1.8, followerChanceAddPerLevel: 0.20 },
     engagementRate: { baseCost: 18, costGrowth: 1.9, fillAddPerLevel: 0.25 },
     engagement: { cap: 100, baseFillPerTap: 1 },
-    goalCoins: { unlockStudio: 10, buyAudienceReach: 18, reach700: 20, ownThreeFypLevels: 35, reach1200: 40 },
+    goalCoins: { unlockStudio: 10, buyAudienceReach: 0, reach700: 36, ownThreeFypLevels: 35, reach1200: 40 },
     tapThreeCoins: { completionBase: 12, qualityBonusMax: 8 },
   },
 } as const;
