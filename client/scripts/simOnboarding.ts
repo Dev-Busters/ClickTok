@@ -1,5 +1,5 @@
 import { BALANCE } from "../src/features/economy/balance";
-import { engagementPerTap, followerChance, openingUpgradeCost } from "../src/features/onboarding/helpers";
+import { engagementPerTap, openingFollowersPerTap, openingUpgradeCost } from "../src/features/onboarding/helpers";
 
 type Result = { tapsPerSecond: number; studioMin: number; rhythmMin: number; firstCompletionMin: number; upgradeLevelsAtRhythm: number };
 
@@ -9,7 +9,7 @@ function simulate(tapsPerSecond: number): Result {
   let studioRewarded = false, audienceRewarded = false, reach700Rewarded = false, threeRewarded = false, reach1200Rewarded = false;
   while (completions < 1 && seconds < 60 * 75) {
     seconds += 1;
-    followers += followerChance(audience) * tapsPerSecond;
+    followers += openingFollowersPerTap(audience) * tapsPerSecond;
     if (!studioRewarded && followers >= BALANCE.onboarding.studioFollowers) { studioRewarded = true; studioAt = seconds; coins += BALANCE.onboarding.goalCoins.unlockStudio; }
     if (studioRewarded && audience === 0 && coins >= openingUpgradeCost("audience_reach", audience)) { coins -= openingUpgradeCost("audience_reach", audience++); audienceRewarded = true; coins += BALANCE.onboarding.goalCoins.buyAudienceReach; }
     if (audienceRewarded && rate === 0 && coins >= openingUpgradeCost("engagement_rate", rate)) coins -= openingUpgradeCost("engagement_rate", rate++);

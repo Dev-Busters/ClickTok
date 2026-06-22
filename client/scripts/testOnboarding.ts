@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { BALANCE } from "../src/features/economy/balance";
 import { ONBOARDING_GOALS } from "../src/features/onboarding/catalog";
-import { canClaimCreatorStudioAnalytics, engagementPerTap, followerChance, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, openingUpgradeCost, resolvableGoal, rollOpeningFollower } from "../src/features/onboarding/helpers";
+import { OPENING_PULSE_CYCLE_MS, OPENING_PULSE_GREEN_DEG, OPENING_PULSE_YELLOW_DEG, canClaimCreatorStudioAnalytics, engagementPerTap, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, openingFollowerAmount, openingFollowersPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, resolvableGoal, rollOpeningFollowers } from "../src/features/onboarding/helpers";
 import { pickSequence } from "../src/features/teb/chartCatalog";
 import { persistedStatePatch } from "../src/store/slices/cloudSlice";
 import type { PersistedState } from "../src/store/slices/meta";
@@ -26,10 +26,22 @@ assert.equal(isOnboardingFeatureAvailable("creator_studio", ["meet_teb", "unlock
 assert.equal(isOpeningEngagementAvailable(["meet_teb", "unlock_studio"]), false, "meter stays hidden before Audience Reach Lv1");
 assert.equal(isOpeningEngagementAvailable(["meet_teb", "unlock_studio", "buy_audience_reach"]), true, "meter appears with Engagement Rate");
 
-assert.equal(followerChance(0), 0.25);
-assert.equal(followerChance(1), 0.30);
-assert.equal(rollOpeningFollower(0, () => 0.24), 1);
-assert.equal(rollOpeningFollower(0, () => 0.25), 0);
+const msAtDegrees = (degrees: number) => degrees / 360 * OPENING_PULSE_CYCLE_MS;
+const greenEdge = OPENING_PULSE_GREEN_DEG / 2;
+const yellowEdge = greenEdge + OPENING_PULSE_YELLOW_DEG;
+assert.equal(openingPulseZone(0), "green", "the scoring crest is at 12 o'clock");
+assert.equal(openingPulseZone(msAtDegrees(greenEdge)), "green");
+assert.equal(openingPulseZone(msAtDegrees(greenEdge + 0.01)), "yellow");
+assert.equal(openingPulseZone(msAtDegrees(yellowEdge)), "yellow");
+assert.equal(openingPulseZone(msAtDegrees(yellowEdge + 0.01)), "red");
+assert.equal(openingPulseZone(OPENING_PULSE_CYCLE_MS - msAtDegrees(greenEdge)), "green", "zones are symmetrical around the crest");
+assert.equal(openingFollowerAmount(0), 1);
+assert.equal(openingFollowerAmount(2), 3);
+assert.equal(openingPulseReward(2, "green"), 3);
+assert.equal(openingPulseReward(2, "yellow"), 2);
+assert.equal(openingPulseReward(2, "red"), 0);
+assert.equal(rollOpeningFollowers(2, 0), 3);
+assert.ok(Math.abs(openingFollowersPerTap(0) - 7 / 30) < 1e-10, "random timing earns on the 84-degree scoring arc");
 assert.equal(engagementPerTap(0), 1);
 assert.equal(engagementPerTap(1), 1.25);
 assert.equal(openingUpgradeCost("audience_reach", 0), 5);

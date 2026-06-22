@@ -100,11 +100,13 @@ progress fills → goal complete → reward lands → reveal ceremony (if any)
 
 ### Followers
 
-- Every quick TEB tap rolls the displayed Follower chance, grants exactly 1 Follower on success,
-  and increments lifetime taps whether it succeeds or not.
-- Every tap emits a short reaction burst; successful rolls use a distinct `+1 FOLLOWER` treatment.
+- Every quick TEB tap grades the orbiting pulse at the 12 o'clock crest and increments lifetime
+  taps whether it scores or not. The 36° green zone grants the full Audience Reach amount; either
+  adjacent 24° yellow zone grants half, rounded up; red grants zero.
+- The orbiting burst and scoring use the same wall-clock phase so the visible hit location is the
+  scored location. Every tap emits immediate PERFECT / GOOD / OFF BEAT ring and text feedback.
 - Followers are the headline growth number and unlock gate. They are not spent in Phase 18.
-- `audience_reach` increases the exact displayed Follower success chance.
+- `audience_reach` increases the full green-hit Follower amount by 1 per level.
 
 ### Coins
 
@@ -139,21 +141,21 @@ Canonical opening upgrades:
 
 | id | Display name | Effect | First reveal |
 |---|---|---|---|
-| `audience_reach` | Audience Reach | Raises the chance a quick TEB tap gains 1 Follower | Studio opens |
+| `audience_reach` | Audience Reach | Adds 1 Follower to perfect green hits; yellow pays half rounded up | Studio opens |
 | `engagement_rate` | Engagement Rate | Adds engagement-meter fill per quick TEB tap | Buy Audience Reach Lv1 |
 
 Every upgrade card must show:
 
 - current level and next cost;
 - a plain-language sentence describing the behavior it changes;
-- an exact current → next value (`25% → 45% Follower chance`, for example);
+- an exact current → next value (`1 → 2 Followers / green hit`, for example);
 - the affected on-screen control highlighted in the purchase result;
 - a locked reason only after the card has been introduced.
 
 Do not use the current generic `postPower` copy in opening UI: it bundles unrelated outputs and
 does not tell a new player what will change.
 
-Audience Reach begins at 25% chance. Every level adds exactly 5 percentage points. Its first costs
+Audience Reach begins at 1 Follower per green hit. Every level adds exactly 1 Follower. Its first costs
 are 5, 7, and 10 Gold (`round(5 × 1.4^level)`), so the Analytics reward buys Lv1 immediately.
 
 ## §E — Engagement meter and first rhythm loop
@@ -269,7 +271,7 @@ Primary pacing alarms:
 - A fresh save can tap for five minutes without any unqueued legacy metric unlock appearing.
 - Only Followers are visible at start; only TEB, Followers, and the current goal are interactive.
 - Studio arrives alone, points directly to its control, and contains one affordable upgrade.
-- Buying the first upgrade visibly changes Follower chance and reveals exactly the second upgrade plus
+- Buying the first upgrade visibly changes timed-hit Follower payout and reveals exactly the second upgrade plus
   the next level of the first.
 - The rhythm unlock cannot occur before the required prior goal and upgrade progression.
 - TAP THREE is the only opening chart and is the first repeatable Coin source.

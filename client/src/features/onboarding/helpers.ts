@@ -53,27 +53,42 @@ export function isOpeningEngagementAvailable(completed: readonly OnboardingStepI
 }
 
 export const OPENING_PULSE_CYCLE_MS = 1800;
-const OPENING_PULSE_GREEN_DEG = 18;
-const OPENING_PULSE_YELLOW_DEG = 12;
+export const OPENING_PULSE_GREEN_DEG = 36;
+export const OPENING_PULSE_YELLOW_DEG = 24;
+export type OpeningPulseZone = "green" | "yellow" | "red";
 
 export function openingFollowerAmount(level: number): number {
   return Math.max(1, Math.round(1 + level * BALANCE.onboarding.audienceReach.followerAmountAddPerLevel));
 }
 
-export function openingPulseZone(now: number = Date.now()): "green" | "yellow" | "red" {
-  const progress = (now % OPENING_PULSE_CYCLE_MS) / OPENING_PULSE_CYCLE_MS;
+export function openingPulseProgress(now: number = Date.now()): number {
+  return (now % OPENING_PULSE_CYCLE_MS) / OPENING_PULSE_CYCLE_MS;
+}
+
+export function openingPulseZone(now: number = Date.now()): OpeningPulseZone {
+  const progress = openingPulseProgress(now);
   const distanceFromTop = Math.min(progress * 360, 360 - progress * 360);
   if (distanceFromTop <= OPENING_PULSE_GREEN_DEG / 2) return "green";
   if (distanceFromTop <= OPENING_PULSE_GREEN_DEG / 2 + OPENING_PULSE_YELLOW_DEG) return "yellow";
   return "red";
 }
 
-export function rollOpeningFollowers(level: number, random: () => number = Math.random, now: number = Date.now()): number {
+export function openingPulseReward(level: number, zone: OpeningPulseZone, random: () => number = Math.random): number {
   const amount = openingFollowerAmount(level);
-  const zone = openingPulseZone(now);
   if (zone === "green") return amount;
   if (zone === "yellow") return random() < 0.5 ? amount : 0;
   return 0;
+}
+
+export function rollOpeningFollowers(level: number, now: number = Date.now(), random: () => number = Math.random): number {
+  return openingPulseReward(level, openingPulseZone(now), random);
+}
+
+export function openingFollowersPerTap(level: number): number {
+  const greenShare = OPENING_PULSE_GREEN_DEG / 360;
+  const yellowShare = (OPENING_PULSE_YELLOW_DEG * 2) / 360;
+  return openingPulseReward(level, "green") * greenShare
+    + openingPulseReward(level, "yellow") * yellowShare;
 }
 
 export function engagementPerTap(level: number): number {

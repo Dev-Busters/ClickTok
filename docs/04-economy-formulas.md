@@ -888,11 +888,10 @@ onboarding: {
   rhythmFollowers: 2400,
   videoFypFollowers: 10000,
 
-  baseFollowerChance: 0.25,
   audienceReach: {
     baseCost: 5,
     costGrowth: 1.4,
-    followerChanceAddPerLevel: 0.05,
+    followerAmountAddPerLevel: 1,
   },
   engagementRate: {
     baseCost: 18,
@@ -924,11 +923,13 @@ coherent table in docs/code/simulation; do not lower thresholds piecemeal to mak
 ### 17.2 TEB and upgrade formulas
 
 ```text
-followerChance = min(1,
-                 baseFollowerChance
-                 + audienceReachLevel × audienceReach.followerChanceAddPerLevel)
+pulseCycleMs = 1800
+greenArc = 36 degrees total, centered at 12 o'clock
+yellowArc = 24 degrees on each side of green
 
-followerGain = random() < followerChance ? 1 : 0
+greenFollowerGain = 1 + audienceReachLevel × audienceReach.followerAmountAddPerLevel
+yellowFollowerGain = ceil(greenFollowerGain / 2)
+redFollowerGain = 0
 
 engagementPerTap = engagement mechanic unlocked
                   ? engagement.baseFillPerTap
@@ -942,7 +943,7 @@ openingUpgradeCost(baseCost, growth, currentLevel)
 ```
 
 Opening taps do not apply `postCoinConversion`, `postLikeConversion`, feed combo, VIRAL, catalog,
-or passive-income modifiers. `audience_reach` must change Follower chance only;
+or passive-income modifiers. `audience_reach` must change timed-hit Follower amount only;
 `engagement_rate` must change engagement fill/tap only. This separation is what makes each purchase
 legible.
 

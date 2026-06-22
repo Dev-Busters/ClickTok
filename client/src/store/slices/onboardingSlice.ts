@@ -92,7 +92,7 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   openingTap: (now = Date.now()) => {
     const state = get();
     if (state.session) return 0;
-    const followers = rollOpeningFollowers(state.openingUpgradeLevels.audience_reach, Math.random, now);
+    const followers = rollOpeningFollowers(state.openingUpgradeLevels.audience_reach, now);
     const engagementAvailable = isOpeningEngagementAvailable(state.completedOnboardingGoals);
     const engagement = engagementAvailable ? engagementPerTap(state.openingUpgradeLevels.engagement_rate) : 0;
     set({

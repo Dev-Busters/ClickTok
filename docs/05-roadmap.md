@@ -2128,7 +2128,7 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   Coins before Studio and suppress Likes/Diamonds/passive/catalog/feed bonuses throughout the
   opening. Opening upgrade effects must not reuse bundled `postPower` behavior.
   **Refs:** `14` §C/§D, `04` §17.1–17.4, `03` §1/§2/§10. **DoD:** formula tests verify exact
-  Follower chance, engagement/tap, costs, and rewards; taps cannot change Coins/Likes/Diamonds;
+  timed-hit Follower payout, engagement/tap, costs, and rewards; taps cannot change Coins/Likes/Diamonds;
   Studio goal always funds Audience Reach Lv1; typecheck + economy simulation.
 
 - [x] **18.3 — Sparse pre-video Home + one-goal reveal system (`14` §B/§G, `06` §13.1–13.2).** Add
@@ -2145,7 +2145,7 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
 
 - [x] **18.4 — Creator Studio onboarding mode + sequential upgrade disclosure (`14` §D, `06`
   `§13.3`).** Render only the FYP tab and Audience Reach at first; buying Lv1 reveals Engagement
-  Rate and Audience Reach Lv2+. Show exact current→next values and animate the changed Follower chance
+  Rate and Audience Reach Lv2+. Show exact current→next values and animate the changed Follower payout
   result. Hide every later tab/card/category rather than rendering locks. Keep the full existing
   Studio dormant for later progression.
   **Refs:** `14` §D, `06` §13.3, `04` §17.1–17.3. **DoD:** first open has one affordable card;
@@ -2161,6 +2161,10 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   **Refs:** `14` §E, `03` §6.6/§10, `04` §17.2/§17.4, `06` §13.4. **DoD:** the meter is absent
   before reveal, survives reload, cannot overfill/double-spend, launches only at full, and refills
   immediately after result; other charts never appear; mouse/touch/keyboard paths pass; typecheck.
+  > note: Post-phase TEB feel pass replaced the unsynchronized thin timing ring with a shared-clock
+  > waveform dial and orbiting burst, centered the crest at 12 o'clock, widened green/yellow to
+  > 36°/24° per side, made yellow payout deterministic, and added pointer capture + local keyboard
+  > handling for consistent press/hold/release behavior.
 
 - [x] **18.6 — Rhythm interaction-field correction (`14` §F, `06` §13.5).** Remove Phase 17's
   global blackout/chrome-hide behavior. Measure visible chrome rectangles and mount rhythm in the
