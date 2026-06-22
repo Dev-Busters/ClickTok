@@ -6,7 +6,7 @@ import { CurrencyBar } from "../../components/CurrencyBar";
 import { UpgradeShop } from "../../components/UpgradeShop";
 import { SkillsPanel } from "../../components/SkillsPanel";
 import type { UpgradePillar } from "../../features/upgrades/types";
-import { followerChance, engagementPerTap, openingUpgradeCost } from "../../features/onboarding/helpers";
+import { openingFollowerAmount, engagementPerTap, openingUpgradeCost } from "../../features/onboarding/helpers";
 import type { OpeningUpgradeId } from "../../features/onboarding/types";
 import { formatCount } from "../../lib/format";
 
@@ -48,12 +48,12 @@ function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
           const isNew = level === 0;
           const justChanged = changed?.id === id;
           const accent = (isNew || (justChanged && changed.kind === "unlocked")) ? "var(--gold)" : "var(--cyan)";
-          const current = audience ? followerChance(level) : engagementPerTap(level);
-          const next = audience ? followerChance(level + 1) : engagementPerTap(level + 1);
+          const current = audience ? openingFollowerAmount(level) : engagementPerTap(level);
+          const next = audience ? openingFollowerAmount(level + 1) : engagementPerTap(level + 1);
           return <motion.section key={id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0, boxShadow: justChanged ? (changed.kind === "unlocked" ? "0 0 34px rgba(255,210,0,.42)" : "0 0 28px rgba(37,244,238,.34)") : isNew ? "0 0 22px rgba(255,210,0,.12)" : "0 0 0 rgba(0,0,0,0)" }} style={{ marginBottom: 16, padding: 20, borderRadius: 16, border: `1px solid ${isNew ? "rgba(255,210,0,.58)" : "rgba(37,244,238,.3)"}`, background: "linear-gradient(145deg,rgba(26,29,38,.98),rgba(14,16,22,.98))" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}><strong style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1 }}>{audience ? "AUDIENCE REACH" : "ENGAGEMENT RATE"}</strong><span style={{ flexShrink: 0, padding: "5px 7px", borderRadius: 999, border: `1px solid ${accent}`, background: isNew ? "rgba(255,210,0,.12)" : "rgba(37,244,238,.1)", fontFamily: "var(--font-mono)", color: accent, fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{justChanged ? (changed.kind === "unlocked" ? "BONUS UNLOCKED" : `LEVEL ${level}`) : isNew ? "NEW BONUS" : `LEVEL ${level}`}</span></div>
-            <p style={{ margin: "10px 0 18px", color: "rgba(255,255,255,.78)", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.55 }}>{audience ? "Raises the chance that each Engagement Button tap gains 1 Follower." : "Fills the visible Engagement meter faster with every tap."}</p>
-            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 7px", fontFamily: "var(--font-display)", fontSize: 34, color: justChanged ? accent : "white" }}>{audience ? `${Math.round(current * 100)}% → ${Math.round(next * 100)}%` : `${current.toFixed(2)} → ${next.toFixed(2)}`} <small style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 800, letterSpacing: ".08em", color: "rgba(255,255,255,.68)" }}>{audience ? "FOLLOWER CHANCE" : "ENGAGEMENT / TAP"}</small></div>
+            <p style={{ margin: "10px 0 18px", color: "rgba(255,255,255,.78)", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.55 }}>{audience ? "Green hits guarantee this many followers. Yellow hits have a 50% chance." : "Fills the visible Engagement meter faster with every tap."}</p>
+            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 7px", fontFamily: "var(--font-display)", fontSize: 34, color: justChanged ? accent : "white" }}>{audience ? `${current} → ${next}` : `${current.toFixed(2)} → ${next.toFixed(2)}`} <small style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 800, letterSpacing: ".08em", color: "rgba(255,255,255,.68)" }}>{audience ? "FOLLOWERS / GREEN HIT" : "ENGAGEMENT / TAP"}</small></div>
             <button disabled={wallet.coins < cost} onClick={() => buy(id)} style={{ width: "100%", marginTop: 18, padding: 14, border: 0, borderRadius: 999, background: wallet.coins >= cost ? (isNew ? "var(--gold)" : "var(--cyan)") : "rgba(255,255,255,.1)", color: wallet.coins >= cost ? "#040608" : "rgba(255,255,255,.48)", fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 900, letterSpacing: ".12em" }}>{isNew ? "UNLOCK BONUS" : "LEVEL UP"} · 🪙 {cost}</button>
           </motion.section>;
         })}

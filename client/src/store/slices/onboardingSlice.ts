@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
-import { canClaimCreatorStudioAnalytics, goalById, nextGoal, resolvableGoal, rollOpeningFollower, engagementPerTap, openingUpgradeCost, isOpeningEngagementAvailable } from "../../features/onboarding/helpers";
+import { canClaimCreatorStudioAnalytics, goalById, nextGoal, resolvableGoal, rollOpeningFollowers, engagementPerTap, openingUpgradeCost, isOpeningEngagementAvailable } from "../../features/onboarding/helpers";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import { track } from "../../lib/telemetry";
 import type { FullState } from "../index";
@@ -18,7 +18,7 @@ export type OnboardingSlice = {
   checkOnboardingGoal: () => void;
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
-  openingTap: () => void;
+  openingTap: (now?: number) => number;
   claimCreatorStudioAnalytics: () => boolean;
   levelOpeningUpgrade: (id: OpeningUpgradeId) => boolean;
   addEngagement: (amount: number) => void;
@@ -89,22 +89,23 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     queueMicrotask(() => get().checkOnboardingGoal());
   },
 
-  openingTap: () => {
+  openingTap: (now = Date.now()) => {
     const state = get();
-    if (state.session) return;
-    const followers = rollOpeningFollower(state.openingUpgradeLevels.audience_reach);
+    if (state.session) return 0;
+    const followers = rollOpeningFollowers(state.openingUpgradeLevels.audience_reach, Math.random, now);
     const engagementAvailable = isOpeningEngagementAvailable(state.completedOnboardingGoals);
     const engagement = engagementAvailable ? engagementPerTap(state.openingUpgradeLevels.engagement_rate) : 0;
     set({
       wallet: { ...state.wallet, followers: state.wallet.followers + followers, totalFollowers: state.wallet.totalFollowers + followers },
       viewsTotal: state.viewsTotal + 1,
-      lastTapAt: Date.now(),
+      lastTapAt: now,
       engagementFill: Math.min(BALANCE.onboarding.engagement.cap, state.engagementFill + engagement),
     });
     if (state.engagementFill < BALANCE.onboarding.engagement.cap && state.engagementFill + engagement >= BALANCE.onboarding.engagement.cap) {
       track("onboarding_engagement_filled");
     }
     get().checkOnboardingGoal();
+    return followers;
   },
 
   claimCreatorStudioAnalytics: () => {

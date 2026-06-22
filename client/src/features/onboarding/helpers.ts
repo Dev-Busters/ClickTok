@@ -52,12 +52,28 @@ export function isOpeningEngagementAvailable(completed: readonly OnboardingStepI
   return completed.includes("buy_audience_reach");
 }
 
-export function followerChance(level: number): number {
-  return Math.min(1, BALANCE.onboarding.baseFollowerChance + level * BALANCE.onboarding.audienceReach.followerChanceAddPerLevel);
+export const OPENING_PULSE_CYCLE_MS = 1800;
+const OPENING_PULSE_GREEN_DEG = 18;
+const OPENING_PULSE_YELLOW_DEG = 12;
+
+export function openingFollowerAmount(level: number): number {
+  return Math.max(1, Math.round(1 + level * BALANCE.onboarding.audienceReach.followerAmountAddPerLevel));
 }
 
-export function rollOpeningFollower(level: number, random: () => number = Math.random): number {
-  return random() < followerChance(level) ? 1 : 0;
+export function openingPulseZone(now: number = Date.now()): "green" | "yellow" | "red" {
+  const progress = (now % OPENING_PULSE_CYCLE_MS) / OPENING_PULSE_CYCLE_MS;
+  const distanceFromTop = Math.min(progress * 360, 360 - progress * 360);
+  if (distanceFromTop <= OPENING_PULSE_GREEN_DEG / 2) return "green";
+  if (distanceFromTop <= OPENING_PULSE_GREEN_DEG / 2 + OPENING_PULSE_YELLOW_DEG) return "yellow";
+  return "red";
+}
+
+export function rollOpeningFollowers(level: number, random: () => number = Math.random, now: number = Date.now()): number {
+  const amount = openingFollowerAmount(level);
+  const zone = openingPulseZone(now);
+  if (zone === "green") return amount;
+  if (zone === "yellow") return random() < 0.5 ? amount : 0;
+  return 0;
 }
 
 export function engagementPerTap(level: number): number {

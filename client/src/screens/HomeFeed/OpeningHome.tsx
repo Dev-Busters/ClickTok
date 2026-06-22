@@ -1,10 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, requirementValue } from "../../features/onboarding/helpers";
+import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, OPENING_PULSE_CYCLE_MS, openingPulseZone, requirementValue } from "../../features/onboarding/helpers";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
+
+function OpeningPulseRing() {
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        inset: -10,
+        borderRadius: "50%",
+        pointerEvents: "none",
+        background: "conic-gradient(from -90deg, rgba(0,255,123,.98) 0deg 9deg, rgba(255,210,0,.96) 9deg 21deg, rgba(255,31,75,.95) 21deg 339deg, rgba(255,210,0,.96) 339deg 351deg, rgba(0,255,123,.98) 351deg 360deg)",
+        mask: "radial-gradient(farthest-side, transparent calc(100% - 7px), #000 0)",
+        WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 7px), #000 0)",
+        filter: "drop-shadow(0 0 10px rgba(255,31,75,.45)) drop-shadow(0 0 6px rgba(0,255,123,.35))",
+      }}
+    >
+      <motion.div
+        aria-hidden
+        animate={{ rotate: 360 }}
+        transition={{ duration: OPENING_PULSE_CYCLE_MS / 1000, repeat: Infinity, ease: "linear" }}
+        style={{ position: "absolute", inset: 0 }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: -5,
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(255,255,255,.92)",
+            boxShadow: "0 0 12px rgba(255,255,255,.95), 0 0 20px rgba(0,255,123,.75), 0 0 18px rgba(255,210,0,.55)",
+          }}
+        />
+      </motion.div>
+    </div>
+  );
+}
 
 function OpeningTeb() {
   const openingTap = useGameStore(state => state.openingTap);
@@ -19,7 +58,7 @@ function OpeningTeb() {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const nextReactionId = useRef(0);
-  const [tapReactions, setTapReactions] = useState<Array<{ id: number; success: boolean; full: boolean; drift: number; glyph: string }>>([]);
+  const [tapReactions, setTapReactions] = useState<Array<{ id: number; success: boolean; full: boolean; drift: number; glyph: string; zone: "green" | "yellow" | "red"; followers: number }>>([]);
   const reduced = useReducedMotion();
   const meterVisible = isOpeningEngagementAvailable(completed);
   const rhythmUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
@@ -27,14 +66,14 @@ function OpeningTeb() {
   const ready = rhythmUnlocked && meterFull;
 
   const start = useCallback(() => {
-    const followersBefore = useGameStore.getState().wallet.totalFollowers;
-    openingTap();
-    const tapState = useGameStore.getState();
-    const success = tapState.wallet.totalFollowers > followersBefore;
-    const full = tapState.engagementFill >= BALANCE.onboarding.engagement.cap;
+    const now = Date.now();
+    const zone = openingPulseZone(now);
+    const followers = openingTap(now);
+    const success = followers > 0;
+    const full = useGameStore.getState().engagementFill >= BALANCE.onboarding.engagement.cap;
     const id = nextReactionId.current++;
     const glyphs = ["♥", "💬", "↗", "✦"];
-    setTapReactions(current => [...current.slice(-5), { id, success, full, drift: (Math.random() - .5) * 72, glyph: glyphs[id % glyphs.length] }]);
+    setTapReactions(current => [...current.slice(-5), { id, success, full, drift: (Math.random() - .5) * 72, glyph: glyphs[id % glyphs.length], zone, followers }]);
     const timer = setTimeout(() => {
       setTapReactions(current => current.filter(reaction => reaction.id !== id));
       reactionTimers.current.delete(id);
@@ -81,25 +120,39 @@ function OpeningTeb() {
 
   return (
     <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
-      <motion.button
-        aria-label={ready ? "Ready. Hold Engagement to launch TAP THREE" : "Tap Engagement to roll for a Follower"}
+      <div style={{ position: "relative", width: 206, height: 206, margin: "0 auto" }}>
+        <OpeningPulseRing />
+        <motion.button
+        aria-label={ready ? "Ready. Hold Engagement to launch TAP THREE" : "Tap Engagement on the moving pulse to earn followers"}
         onPointerDown={event => { event.stopPropagation(); start(); }}
         animate={meterFull && !reduced ? { scale: [1, 1.055, 1], boxShadow: ["0 0 38px rgba(255,210,0,.42),inset 0 0 30px rgba(255,210,0,.2)", "0 0 68px rgba(255,210,0,.78),inset 0 0 46px rgba(255,210,0,.34)", "0 0 38px rgba(255,210,0,.42),inset 0 0 30px rgba(255,210,0,.2)"] } : { scale: 1 }}
         transition={meterFull && !reduced ? { duration: 1.05, repeat: Infinity, ease: "easeInOut" } : { duration: .2 }}
         whileTap={{ scale: .96 }}
         style={{
-          width: 188, height: 188, borderRadius: "50%", cursor: "pointer", color: "white",
-          border: `3px solid ${meterFull ? "var(--gold)" : "var(--cyan)"}`,
+          position: "absolute",
+          top: 9,
+          left: 9,
+          width: 188,
+          height: 188,
+          borderRadius: "50%",
+          cursor: "pointer",
+          color: "white",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          border: "3px solid rgba(255,255,255,.12)",
           background: meterFull ? "radial-gradient(circle at 50% 45%,rgba(255,210,0,.2),rgba(7,8,12,.97) 68%)" : "radial-gradient(circle at 38% 32%,rgba(255,255,255,.15),rgba(7,8,12,.96) 66%)",
           boxShadow: meterFull ? "0 0 38px rgba(255,210,0,.42),inset 0 0 30px rgba(255,210,0,.2)" : "0 0 28px rgba(37,244,238,.18),inset 0 0 24px rgba(37,244,238,.12)",
-          position: "relative", overflow: "hidden",
+          overflow: "hidden",
         }}
       >
         {meterVisible && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
         <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: meterFull ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>THE</span>
         <span style={{ display: "block", margin: "2px 0", fontFamily: "var(--font-display)", fontSize: 34, lineHeight: 1, letterSpacing: ".06em", color: meterFull ? "var(--gold)" : "white", textShadow: meterFull ? "0 0 18px rgba(255,210,0,.9),-2px 0 var(--red),2px 0 var(--cyan)" : "-2px 0 var(--cyan),2px 0 var(--red)" }}>ENGAGEMENT</span>
         <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: meterFull ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>BUTTON</span>
-      </motion.button>
+        </motion.button>
+      </div>
       <AnimatePresence>
         {meterFull && <motion.div key="engagement-full" data-engagement-full initial={{ opacity: 0, scale: .45, y: 12 }} animate={{ opacity: 1, scale: reduced ? 1 : [.45, 1.24, 1], y: 0 }} transition={{ duration: reduced ? .2 : .7, ease: "easeOut" }} style={{ position: "absolute", left: "50%", top: -48, translate: "-50% 0", width: "max-content", padding: "7px 12px", borderRadius: 999, border: "1px solid var(--gold)", background: "rgba(35,28,2,.94)", boxShadow: "0 0 24px rgba(255,210,0,.42)", color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 900, letterSpacing: ".14em" }}>⚡ ENGAGEMENT FULL</motion.div>}
       </AnimatePresence>
@@ -111,9 +164,9 @@ function OpeningTeb() {
           animate={{ opacity: [0, 1, 1, 0], scale: reaction.full ? [.45, 1.55, 1.25, 1.05] : [.45, 1.35, 1.12, 1], x: reaction.full ? reaction.drift * .35 : reaction.drift, y: reaction.full ? -236 : -218 }}
           exit={{ opacity: 0 }}
           transition={{ duration: reaction.full ? 1.2 : 1, ease: "easeOut" }}
-          style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%", zIndex: 8, pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: reaction.full ? (reaction.success ? 16 : 30) : reaction.success ? 18 : 36, fontWeight: 900, letterSpacing: reaction.full && reaction.success ? ".06em" : ".1em", color: reaction.full || reaction.success ? "var(--gold)" : "var(--cyan)", textShadow: reaction.full ? "0 0 26px currentColor,0 0 8px white,0 2px 4px rgba(0,0,0,.9)" : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)" }}
+          style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%", zIndex: 8, pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: reaction.full ? (reaction.success ? 16 : 30) : reaction.success ? 18 : 36, fontWeight: 900, letterSpacing: reaction.full && reaction.success ? ".06em" : ".1em", color: reaction.zone === "green" ? "#23d67a" : reaction.zone === "yellow" ? "var(--gold)" : "var(--red)", textShadow: reaction.full ? "0 0 26px currentColor,0 0 8px white,0 2px 4px rgba(0,0,0,.9)" : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)" }}
         >
-          {reaction.full ? (reaction.success ? "+1 FOLLOWER · FULL" : `${reaction.glyph} FULL`) : reaction.success ? "+1 FOLLOWER" : reaction.glyph}
+          {reaction.success ? `+${formatCount(reaction.followers)} FOLLOWER${reaction.followers === 1 ? "" : "S"}` : reaction.zone === "yellow" ? "YELLOW MISS" : "RED MISS"}
         </motion.div>)}
       </AnimatePresence>
       {meterVisible && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: meterFull ? 900 : 400, letterSpacing: ".1em", color: meterFull ? "var(--gold)" : "rgba(255,255,255,.72)", textShadow: meterFull ? "0 0 12px rgba(255,210,0,.72)" : "none" }}>ENGAGEMENT {Math.round(fill)} / 100{meterFull ? (rhythmUnlocked ? " · HOLD TO LAUNCH" : " · FULL · TAP THREE LOCKED") : !rhythmUnlocked ? " · BUILDING FOR TAP THREE" : ""}</div>}
