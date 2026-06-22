@@ -391,11 +391,17 @@ start. Home always returns to the FYP; Inbox opens Analytics; Profile exposes av
 stats and reset controls. Discover and Create remain disabled. The current goal chip must stay
 clear of TEB and be no taller than two short lines at 320px width.
 
-Analytics uses a compact locked progress card before 5 Followers and becomes the normal Inbox
-surface at 5. At 10 Followers, Home enters an inline modifier teach: a translucent 24° ghost arc
-starts at 6 o'clock, follows pointer drag or arrow keys around the dial, turns red over occupied
-zones, and exposes a disabled placement action until valid. After placement, a restrained
-`TUNE BONUS ZONE` control reopens the same editor without a modal.
+Before 5 Followers the Inbox control is locked. At 5, Home announces Analytics, the Inbox control
+activates/pulses, and Analytics opens with `SECOND TIMING ZONE` as its first entry. At 10 Followers
+the entry's `CUSTOMIZE ZONE` action returns to Home and enters the inline modifier teach. A
+translucent complete zone—yellow / green / yellow—starts at 6 o'clock, follows pointer drag or arrow
+keys around the dial, turns fully red over occupied zones, and disables placement until valid.
+After placement, `EDIT TIMING ZONE` reopens the same editor without a modal.
+
+Before the first PERFECT, place `GOOD 50% / PERFECT 100% / GOOD 50%` outside and above the top
+timing zone; never overlap the ring. Remove the guide permanently after the first PERFECT. The
+orbiting indicator is an electrical pulse rather than a plain dot: bright core, short color-matched
+tail, waveform energy dashes, and trailing sparks that inherit red/yellow/green from the live grade.
 
 ### 13.2 Reveal and teaching pattern
 

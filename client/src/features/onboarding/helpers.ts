@@ -35,13 +35,17 @@ export function requirementMet(requirement: GoalRequirement, progress: Onboardin
 }
 
 export function resolvableGoal(step: OnboardingStepId, completed: readonly OnboardingStepId[], blocked: boolean, progress: OnboardingProgress): OnboardingStepId | null {
-  if (blocked || completed.includes(step) || step === "unlock_studio") return null;
+  if (blocked || completed.includes(step) || step === "meet_teb" || step === "unlock_studio") return null;
   const goal = goalById(step);
   return requirementMet(goal.requirement, progress) ? goal.id : null;
 }
 
 export function canClaimCreatorStudioAnalytics(step: OnboardingStepId, completed: readonly OnboardingStepId[], totalFollowers: number): boolean {
   return step === "unlock_studio" && !completed.includes("unlock_studio") && totalFollowers >= BALANCE.onboarding.studioFollowers;
+}
+
+export function canClaimPulseModifierAnalytics(step: OnboardingStepId, completed: readonly OnboardingStepId[], totalFollowers: number): boolean {
+  return step === "meet_teb" && !completed.includes("meet_teb") && totalFollowers >= BALANCE.onboarding.firstGoalFollowers;
 }
 
 export function isOnboardingFeatureAvailable(feature: OnboardingFeatureId, completed: readonly OnboardingStepId[]): boolean {
@@ -55,7 +59,9 @@ export function isOpeningEngagementAvailable(completed: readonly OnboardingStepI
 export const OPENING_PULSE_CYCLE_MS = 1800;
 export const OPENING_PULSE_GREEN_DEG = 36;
 export const OPENING_PULSE_YELLOW_DEG = 24;
-export const OPENING_PULSE_MODIFIER_DEG = 24;
+export const OPENING_PULSE_MODIFIER_GREEN_DEG = OPENING_PULSE_GREEN_DEG;
+export const OPENING_PULSE_MODIFIER_YELLOW_DEG = OPENING_PULSE_YELLOW_DEG;
+export const OPENING_PULSE_MODIFIER_DEG = OPENING_PULSE_MODIFIER_GREEN_DEG + OPENING_PULSE_MODIFIER_YELLOW_DEG * 2;
 export const OPENING_PULSE_MODIFIER_DEFAULT_DEG = 180;
 export const OPENING_PULSE_MODIFIER_GAP_DEG = 4;
 export type OpeningPulseZone = "green" | "yellow" | "red";
@@ -94,7 +100,11 @@ export function isOpeningPulseModifierPlacementValid(
 export function openingPulseZone(now: number = Date.now(), modifiers: readonly OpeningPulseModifier[] = []): OpeningPulseZone {
   const progress = openingPulseProgress(now);
   const angle = progress * 360;
-  if (modifiers.some(modifier => pulseAngleDistance(angle, modifier.centerDeg) <= OPENING_PULSE_MODIFIER_DEG / 2)) return "green";
+  for (const modifier of modifiers) {
+    const distance = pulseAngleDistance(angle, modifier.centerDeg);
+    if (distance <= OPENING_PULSE_MODIFIER_GREEN_DEG / 2) return "green";
+    if (distance <= OPENING_PULSE_MODIFIER_GREEN_DEG / 2 + OPENING_PULSE_MODIFIER_YELLOW_DEG) return "yellow";
+  }
   const distanceFromTop = pulseAngleDistance(angle, 0);
   if (distanceFromTop <= OPENING_PULSE_GREEN_DEG / 2) return "green";
   if (distanceFromTop <= OPENING_PULSE_GREEN_DEG / 2 + OPENING_PULSE_YELLOW_DEG) return "yellow";
@@ -113,8 +123,8 @@ export function rollOpeningFollowers(level: number, now: number = Date.now(), mo
 }
 
 export function openingFollowersPerTap(level: number, modifierCount = 0): number {
-  const greenShare = (OPENING_PULSE_GREEN_DEG + modifierCount * OPENING_PULSE_MODIFIER_DEG) / 360;
-  const yellowShare = (OPENING_PULSE_YELLOW_DEG * 2) / 360;
+  const greenShare = (OPENING_PULSE_GREEN_DEG + modifierCount * OPENING_PULSE_MODIFIER_GREEN_DEG) / 360;
+  const yellowShare = ((OPENING_PULSE_YELLOW_DEG + modifierCount * OPENING_PULSE_MODIFIER_YELLOW_DEG) * 2) / 360;
   return openingPulseReward(level, "green") * greenShare
     + openingPulseReward(level, "yellow") * yellowShare;
 }

@@ -2165,9 +2165,10 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   > waveform dial and orbiting burst, centered the crest at 12 o'clock, widened green/yellow to
   > 36°/24° per side, made yellow payout deterministic, and added pointer capture + local keyboard
   > handling for consistent press/hold/release behavior.
-  > note: Follow-up progression pass gates Analytics at 5 Followers, changes the opening goal to
-  > 10 Followers, and unlocks a persisted 24° draggable green-zone modifier at 180°. Placement uses
-  > ghost/red collision previews, pointer + keyboard controls, and a v16→v17 migration.
+  > note: Follow-up progression pass gates Analytics at 5 Followers. Its first entry is explicitly
+  > claimed at 10 Followers and opens Home's editor with a persisted full green/yellow timing zone at
+  > 180°. Placement uses ghost/red collision previews, pointer + keyboard controls, and a v16→v17
+  > migration. First-perfect labels and a color-matched electrical pulse teach and energize timing.
 
 - [x] **18.6 — Rhythm interaction-field correction (`14` §F, `06` §13.5).** Remove Phase 17's
   global blackout/chrome-hide behavior. Measure visible chrome rectangles and mount rhythm in the

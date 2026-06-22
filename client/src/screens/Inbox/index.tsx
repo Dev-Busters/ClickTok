@@ -150,13 +150,18 @@ const ANALYTICS_TYPE_STYLE: Record<AnalyticsEntryType, { label: string; obtained
 
 function AnalyticsSection() {
   const followers = useGameStore(s => s.wallet.totalFollowers);
-  const claimed = useGameStore(s => s.completedOnboardingGoals.includes("unlock_studio"));
+  const pulseClaimed = useGameStore(s => s.completedOnboardingGoals.includes("meet_teb"));
+  const studioClaimed = useGameStore(s => s.completedOnboardingGoals.includes("unlock_studio"));
+  const claimPulse = useGameStore(s => s.claimPulseModifierAnalytics);
   const claimStudio = useGameStore(s => s.claimCreatorStudioAnalytics);
   const setSheet = useGameStore(s => s.setSheet);
+  const setTab = useGameStore(s => s.setTab);
   const reduced = useReducedMotion();
   const [celebrating, setCelebrating] = useState(false);
   const target = BALANCE.onboarding.studioFollowers;
-  const ready = followers >= target;
+  const pulseTarget = BALANCE.onboarding.firstGoalFollowers;
+  const pulseReady = followers >= pulseTarget;
+  const ready = pulseClaimed && followers >= target;
   const type = ANALYTICS_TYPE_STYLE.feature;
 
   useEffect(() => {
@@ -166,7 +171,7 @@ function AnalyticsSection() {
   }, [celebrating, reduced]);
 
   const act = () => {
-    if (claimed) {
+    if (studioClaimed) {
       setSheet("creatorStudio");
       return;
     }
@@ -180,15 +185,36 @@ function AnalyticsSection() {
           <h2 id="analytics-heading" style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--text)', letterSpacing: '.08em' }}>ANALYTICS</h2>
           <div style={{ marginTop: 2, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'rgba(255,255,255,.58)', letterSpacing: '.08em' }}>ACHIEVEMENTS · UNLOCKS</div>
         </div>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: claimed ? 'var(--gold)' : 'var(--dim)' }}>{claimed ? '1 / 1' : '0 / 1'}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: studioClaimed ? 'var(--gold)' : 'var(--dim)' }}>{Number(pulseClaimed) + Number(studioClaimed)} / 2</span>
       </div>
+
+      <motion.article
+        data-analytics-entry="bonus_green_zone"
+        data-unlock-type="feature"
+        style={{ position: "relative", overflow: "hidden", padding: 16, marginBottom: 12, borderRadius: 14, border: `1px solid ${pulseClaimed || pulseReady ? "rgba(73,255,154,.62)" : "rgba(255,255,255,.13)"}`, background: "linear-gradient(145deg,rgba(12,34,27,.98),rgba(9,13,16,.98))", boxShadow: pulseReady && !pulseClaimed ? "0 0 24px rgba(73,255,154,.12)" : "none" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "5px 8px", borderRadius: 999, border: "1px solid #62ffa6", color: "#75ffb5", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900, letterSpacing: ".1em" }}>✦ TEB MODIFIER</span>
+          <span style={{ color: pulseClaimed ? "#75ffb5" : "var(--dim)", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900 }}>{pulseClaimed ? "OBTAINED" : "FIRST ENTRY"}</span>
+        </div>
+        <h3 style={{ margin: "14px 0 4px", fontFamily: "var(--font-display)", fontSize: 28, color: "white", letterSpacing: ".04em" }}>SECOND TIMING ZONE</h3>
+        <p style={{ margin: "0 0 14px", color: "rgba(255,255,255,.72)", fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5 }}>Add another complete Perfect + Good window, then position it anywhere it fits on the Engagement ring.</p>
+        <div style={{ height: 6, overflow: "hidden", borderRadius: 999, background: "rgba(255,255,255,.08)" }}><motion.div animate={{ width: `${Math.min(100, followers / pulseTarget * 100)}%` }} style={{ height: "100%", borderRadius: 999, background: pulseReady ? "#62ffa6" : "var(--cyan)", boxShadow: "0 0 10px currentColor" }} /></div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontFamily: "var(--font-mono)", fontSize: 9, color: pulseReady ? "#75ffb5" : "rgba(255,255,255,.56)" }}><span>{Math.min(followers, pulseTarget)} / {pulseTarget} FOLLOWERS</span><span>{pulseClaimed ? "PLACED" : pulseReady ? "READY" : "LOCKED"}</span></div>
+        <motion.button
+          whileTap={pulseReady || pulseClaimed ? { scale: .97 } : {}}
+          onClick={() => pulseClaimed ? setTab("home") : claimPulse()}
+          disabled={!pulseReady && !pulseClaimed}
+          style={{ width: "100%", marginTop: 14, padding: 12, border: 0, borderRadius: 999, background: pulseClaimed ? "rgba(73,255,154,.18)" : pulseReady ? "#62ffa6" : "rgba(255,255,255,.08)", color: pulseReady || pulseClaimed ? (pulseClaimed ? "#75ffb5" : "#041008") : "rgba(255,255,255,.34)", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 900, letterSpacing: ".12em", cursor: pulseReady || pulseClaimed ? "pointer" : "default" }}
+        >{pulseClaimed ? "VIEW ON HOME →" : pulseReady ? "CUSTOMIZE ZONE →" : `${pulseTarget} FOLLOWERS REQUIRED`}</motion.button>
+      </motion.article>
 
       <motion.article
         data-analytics-entry="creator_studio"
         data-unlock-type="feature"
         animate={celebrating && !reduced ? { scale: [1, 1.035, 1], boxShadow: ["0 0 0 rgba(37,244,238,0)", "0 0 42px rgba(37,244,238,.58)", "0 0 18px rgba(37,244,238,.2)"] } : { scale: 1 }}
         transition={{ duration: reduced ? .2 : 1.1, ease: 'easeOut' }}
-        style={{ position: 'relative', overflow: 'hidden', padding: 16, borderRadius: 14, border: `1px solid ${claimed || ready ? 'rgba(37,244,238,.62)' : 'rgba(255,255,255,.13)'}`, background: 'linear-gradient(145deg,rgba(15,31,36,.98),rgba(10,12,18,.98))' }}
+        style={{ position: 'relative', overflow: 'hidden', padding: 16, borderRadius: 14, border: `1px solid ${studioClaimed || ready ? 'rgba(37,244,238,.62)' : 'rgba(255,255,255,.13)'}`, background: 'linear-gradient(145deg,rgba(15,31,36,.98),rgba(10,12,18,.98))' }}
       >
         <AnimatePresence>
           {celebrating && <motion.div key="feature-unlocked" initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 1, 0] }} exit={{ opacity: 0 }} transition={{ duration: reduced ? .45 : 1.4, times: [0, .18, .72, 1] }} style={{ position: 'absolute', inset: 0, zIndex: 4, display: 'grid', placeItems: 'center', pointerEvents: 'none', background: type.celebration }}>
@@ -205,8 +231,8 @@ function AnalyticsSection() {
         <div style={{ height: 6, overflow: 'hidden', borderRadius: 999, background: 'rgba(255,255,255,.08)' }}>
           <motion.div animate={{ width: `${Math.min(100, followers / target * 100)}%` }} style={{ height: '100%', borderRadius: 999, background: ready ? 'var(--gold)' : 'var(--cyan)', boxShadow: '0 0 10px currentColor' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 9, color: ready ? 'var(--gold)' : 'rgba(255,255,255,.56)' }}><span>{Math.min(followers, target)} / {target} FOLLOWERS</span><span>{claimed ? 'OBTAINED' : ready ? 'READY' : 'LOCKED'}</span></div>
-        <motion.button whileTap={ready || claimed ? { scale: .97 } : {}} onClick={act} disabled={!ready && !claimed} style={{ width: '100%', marginTop: 14, padding: 12, border: 0, borderRadius: 999, background: claimed ? 'var(--cyan)' : ready ? 'var(--gold)' : 'rgba(255,255,255,.08)', color: ready || claimed ? '#050608' : 'rgba(255,255,255,.34)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 900, letterSpacing: '.12em', cursor: ready || claimed ? 'pointer' : 'default' }}>{claimed ? 'OPEN CREATOR STUDIO →' : ready ? 'OBTAIN UNLOCK · +5 GOLD' : `${target} FOLLOWERS REQUIRED`}</motion.button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 9, color: ready ? 'var(--gold)' : 'rgba(255,255,255,.56)' }}><span>{Math.min(followers, target)} / {target} FOLLOWERS</span><span>{studioClaimed ? 'OBTAINED' : ready ? 'READY' : 'LOCKED'}</span></div>
+        <motion.button whileTap={ready || studioClaimed ? { scale: .97 } : {}} onClick={act} disabled={!ready && !studioClaimed} style={{ width: '100%', marginTop: 14, padding: 12, border: 0, borderRadius: 999, background: studioClaimed ? 'var(--cyan)' : ready ? 'var(--gold)' : 'rgba(255,255,255,.08)', color: ready || studioClaimed ? '#050608' : 'rgba(255,255,255,.34)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 900, letterSpacing: '.12em', cursor: ready || studioClaimed ? 'pointer' : 'default' }}>{studioClaimed ? 'OPEN CREATOR STUDIO →' : ready ? 'OBTAIN UNLOCK · +5 GOLD' : !pulseClaimed ? 'COMPLETE FIRST ENTRY' : `${target} FOLLOWERS REQUIRED`}</motion.button>
       </motion.article>
     </section>
   );

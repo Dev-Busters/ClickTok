@@ -47,6 +47,66 @@ html, body {
   50%       { opacity: 0.3; }
 }
 
+@keyframes opening-electric-ripple {
+  0% { transform: scale(.45); opacity: .95; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes opening-electric-spark {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--spark-x), var(--spark-y)) scale(.1); opacity: 0; }
+}
+
+.opening-electric-core {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 5px white, 0 0 12px var(--pulse-color, white);
+}
+
+.opening-electric-tail {
+  position: absolute;
+  right: 7px;
+  top: 4px;
+  width: 34px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--pulse-color, white) 45%, transparent), var(--pulse-color, white));
+  filter: blur(.4px) drop-shadow(0 0 4px var(--pulse-color, white));
+  opacity: .9;
+}
+
+.opening-electric-ripple {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--pulse-color, white);
+  border-radius: 50%;
+  animation: opening-electric-ripple .58s ease-out infinite;
+}
+
+.opening-electric-spark {
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--pulse-color, white);
+  box-shadow: 0 0 5px var(--pulse-color, white);
+  animation: opening-electric-spark .48s ease-out infinite;
+}
+
+.opening-electric-spark-a { --spark-x: -13px; --spark-y: -7px; }
+.opening-electric-spark-b { --spark-x: -18px; --spark-y: 5px; animation-delay: -.17s; }
+.opening-electric-spark-c { --spark-x: -9px; --spark-y: 10px; animation-delay: -.32s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .opening-electric-ripple,
+  .opening-electric-spark { animation: none; opacity: 0; }
+  .opening-electric-tail { opacity: .55; }
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }

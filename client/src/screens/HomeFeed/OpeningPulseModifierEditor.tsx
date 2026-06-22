@@ -50,7 +50,7 @@ export function OpeningPulseModifierEditor({ angle, valid, firstPlacement, onAng
         data-placement-valid={valid ? "true" : "false"}
         role="slider"
         tabIndex={0}
-        aria-label="Bonus green zone position"
+        aria-label="Second timing zone position"
         aria-valuemin={0}
         aria-valuemax={359}
         aria-valuenow={Math.round(angle)}
@@ -86,7 +86,7 @@ export function OpeningPulseModifierEditor({ angle, valid, firstPlacement, onAng
         animate={{ opacity: 1, y: 0 }}
         style={{ position: "absolute", zIndex: 24, top: 226, left: "50%", translate: "-50% 0", width: 276, padding: 12, borderRadius: 13, border: `1px solid ${valid ? "rgba(73,255,154,.5)" : "rgba(255,49,93,.65)"}`, background: "rgba(6,9,13,.96)", boxShadow: "0 14px 38px rgba(0,0,0,.5)", textAlign: "center" }}
       >
-        <strong style={{ display: "block", color: valid ? "#75ffb5" : "#ff607f", fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: ".07em" }}>{valid ? "POSITION BONUS ZONE" : "ZONE OVERLAP"}</strong>
+        <strong style={{ display: "block", color: valid ? "#75ffb5" : "#ff607f", fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: ".07em" }}>{valid ? "POSITION TIMING ZONE" : "ZONE OVERLAP"}</strong>
         <span style={{ display: "block", margin: "2px 0 10px", color: "rgba(255,255,255,.62)", fontFamily: "var(--font-mono)", fontSize: 8, lineHeight: 1.45, letterSpacing: ".08em" }}>{valid ? "DRAG AROUND THE RING · ARROWS FINE-TUNE" : "MOVE THE RED GHOST AWAY FROM ACTIVE ZONES"}</span>
         <div style={{ display: "flex", gap: 8 }}>
           {!firstPlacement && <button onClick={onCancel} style={{ flex: 1, minHeight: 40, borderRadius: 999, border: "1px solid rgba(255,255,255,.14)", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.72)", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900, letterSpacing: ".1em" }}>CANCEL</button>}

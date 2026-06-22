@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
-import { canClaimCreatorStudioAnalytics, goalById, nextGoal, resolvableGoal, rollOpeningFollowers, engagementPerTap, openingUpgradeCost, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, normalizePulseAngle, OPENING_PULSE_MODIFIER_DEFAULT_DEG } from "../../features/onboarding/helpers";
+import { canClaimCreatorStudioAnalytics, canClaimPulseModifierAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, normalizePulseAngle, OPENING_PULSE_MODIFIER_DEFAULT_DEG } from "../../features/onboarding/helpers";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningPulseModifier, type OpeningPulseModifierId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import { track } from "../../lib/telemetry";
 import type { FullState } from "../index";
@@ -20,6 +20,8 @@ export type OnboardingSlice = {
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
   openingTap: (now?: number) => number;
+  openOpeningAnalytics: () => boolean;
+  claimPulseModifierAnalytics: () => boolean;
   claimCreatorStudioAnalytics: () => boolean;
   levelOpeningUpgrade: (id: OpeningUpgradeId) => boolean;
   setOpeningPulseModifier: (id: OpeningPulseModifierId, centerDeg: number) => boolean;
@@ -64,15 +66,11 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     const goal = goalById(state.onboardingStep);
     const coins = goal.reward?.coins ?? 0;
     const reveal = goal.reveals ? { feature: goal.reveals, shownAt: Date.now(), dismissed: false } : null;
-    const openingPulseModifiers = goal.id === "meet_teb" && state.openingPulseModifiers.length === 0
-      ? [{ id: "bonus_green_1" as const, centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG }]
-      : state.openingPulseModifiers;
     set({
       completedOnboardingGoals: [...state.completedOnboardingGoals, goal.id],
       wallet: { ...state.wallet, coins: state.wallet.coins + coins },
       coinsEarned: state.coinsEarned + coins,
       activeOnboardingReveal: reveal,
-      openingPulseModifiers,
     });
     track("onboarding_goal_complete", { goal: goal.id, durationMs: Date.now() - state.onboardingStepStartedAt });
     if (goal.reveals) track("onboarding_reveal_shown", { feature: goal.reveals });
@@ -99,7 +97,8 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   openingTap: (now = Date.now()) => {
     const state = get();
     if (state.session) return 0;
-    const followers = rollOpeningFollowers(state.openingUpgradeLevels.audience_reach, now, state.openingPulseModifiers);
+    const zone = openingPulseZone(now, state.openingPulseModifiers);
+    const followers = openingPulseReward(state.openingUpgradeLevels.audience_reach, zone);
     const engagementAvailable = isOpeningEngagementAvailable(state.completedOnboardingGoals);
     const engagement = engagementAvailable ? engagementPerTap(state.openingUpgradeLevels.engagement_rate) : 0;
     set({
@@ -107,12 +106,44 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       viewsTotal: state.viewsTotal + 1,
       lastTapAt: now,
       engagementFill: Math.min(BALANCE.onboarding.engagement.cap, state.engagementFill + engagement),
+      onboardingTeachesSeen: zone === "green" && !state.onboardingTeachesSeen.pulse_timing_first_perfect
+        ? { ...state.onboardingTeachesSeen, pulse_timing_first_perfect: true }
+        : state.onboardingTeachesSeen,
     });
     if (state.engagementFill < BALANCE.onboarding.engagement.cap && state.engagementFill + engagement >= BALANCE.onboarding.engagement.cap) {
       track("onboarding_engagement_filled");
     }
     get().checkOnboardingGoal();
     return followers;
+  },
+
+  openOpeningAnalytics: () => {
+    const state = get();
+    if (state.onboardingTeachesSeen.legacy_preserved !== true && state.wallet.totalFollowers < BALANCE.onboarding.analyticsFollowers) return false;
+    set({
+      activeTab: "inbox",
+      onboardingTeachesSeen: state.onboardingTeachesSeen.analytics_first_open
+        ? state.onboardingTeachesSeen
+        : { ...state.onboardingTeachesSeen, analytics_first_open: true },
+    });
+    if (!state.onboardingTeachesSeen.analytics_first_open) track("onboarding_feature_first_use", { teachId: "analytics_first_open" });
+    return true;
+  },
+
+  claimPulseModifierAnalytics: () => {
+    const state = get();
+    if (!canClaimPulseModifierAnalytics(state.onboardingStep, state.completedOnboardingGoals, state.wallet.totalFollowers)) return false;
+    const modifier: OpeningPulseModifier = { id: "bonus_green_1", centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG };
+    set({
+      completedOnboardingGoals: [...state.completedOnboardingGoals, "meet_teb"],
+      activeOnboardingReveal: { feature: "pulse_modifier", shownAt: Date.now(), dismissed: false },
+      openingPulseModifiers: [modifier],
+      activeTab: "home",
+    });
+    track("analytics_unlock_claimed", { id: "bonus_green_1", type: "feature" });
+    track("onboarding_goal_complete", { goal: "meet_teb", durationMs: Date.now() - state.onboardingStepStartedAt });
+    track("onboarding_reveal_shown", { feature: "pulse_modifier" });
+    return true;
   },
 
   claimCreatorStudioAnalytics: () => {

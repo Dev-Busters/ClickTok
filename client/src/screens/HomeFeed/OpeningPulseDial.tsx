@@ -4,6 +4,8 @@ import {
   OPENING_PULSE_CYCLE_MS,
   OPENING_PULSE_GREEN_DEG,
   OPENING_PULSE_MODIFIER_DEG,
+  OPENING_PULSE_MODIFIER_GREEN_DEG,
+  OPENING_PULSE_MODIFIER_YELLOW_DEG,
   OPENING_PULSE_YELLOW_DEG,
   openingPulseProgress,
   openingPulseZone,
@@ -16,6 +18,7 @@ type PulseFeedback = { id: number; zone: OpeningPulseZone } | null;
 type OpeningPulseDialProps = {
   feedback: PulseFeedback;
   modifiers: readonly OpeningPulseModifier[];
+  showTimingGuide: boolean;
   editing?: { id: OpeningPulseModifierId; centerDeg: number; valid: boolean };
 };
 
@@ -33,13 +36,31 @@ function wavePath(radius: number, amplitude: number, frequency: number, phase: n
   return `${points.join(" ")} Z`;
 }
 
-const MODIFIER_RADIUS = 110;
-const MODIFIER_CIRCUMFERENCE = Math.PI * 2 * MODIFIER_RADIUS;
-const MODIFIER_ARC_LENGTH = MODIFIER_CIRCUMFERENCE * OPENING_PULSE_MODIFIER_DEG / 360;
+const ZONE_RADIUS = 110;
+const ZONE_CIRCUMFERENCE = Math.PI * 2 * ZONE_RADIUS;
 
-export function OpeningPulseDial({ feedback, modifiers, editing }: OpeningPulseDialProps) {
+function RingArc({ centerDeg, widthDeg, color, strokeWidth = 8, opacity = 1 }: { centerDeg: number; widthDeg: number; color: string; strokeWidth?: number; opacity?: number }) {
+  const arcLength = ZONE_CIRCUMFERENCE * widthDeg / 360;
+  return <circle cx={CENTER} cy={CENTER} r={ZONE_RADIUS} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={`${arcLength} ${ZONE_CIRCUMFERENCE - arcLength}`} transform={`rotate(${centerDeg - widthDeg / 2 - 90} ${CENTER} ${CENTER})`} opacity={opacity} />;
+}
+
+function ModifierZone({ centerDeg, invalid = false, preview = false, id }: { centerDeg: number; invalid?: boolean; preview?: boolean; id?: OpeningPulseModifierId }) {
+  const data = preview ? { "data-pulse-modifier-preview": true, "data-placement-valid": invalid ? "false" : "true" } : { "data-pulse-modifier": id };
+  return (
+    <g {...data} style={{ filter: `drop-shadow(0 0 ${preview ? 10 : 7}px ${invalid ? "rgba(255,49,93,.95)" : "rgba(73,255,154,.72)"})` }}>
+      {invalid ? <RingArc centerDeg={centerDeg} widthDeg={OPENING_PULSE_MODIFIER_DEG} color="#ff315d" strokeWidth={11} opacity={.78} /> : <>
+        <RingArc centerDeg={centerDeg - (OPENING_PULSE_MODIFIER_GREEN_DEG / 2 + OPENING_PULSE_MODIFIER_YELLOW_DEG / 2)} widthDeg={OPENING_PULSE_MODIFIER_YELLOW_DEG} color="#ffd84d" strokeWidth={preview ? 11 : 8} opacity={preview ? .78 : 1} />
+        <RingArc centerDeg={centerDeg} widthDeg={OPENING_PULSE_MODIFIER_GREEN_DEG} color="#49ff9a" strokeWidth={preview ? 11 : 8} opacity={preview ? .78 : 1} />
+        <RingArc centerDeg={centerDeg + (OPENING_PULSE_MODIFIER_GREEN_DEG / 2 + OPENING_PULSE_MODIFIER_YELLOW_DEG / 2)} widthDeg={OPENING_PULSE_MODIFIER_YELLOW_DEG} color="#ffd84d" strokeWidth={preview ? 11 : 8} opacity={preview ? .78 : 1} />
+      </>}
+    </g>
+  );
+}
+
+export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, editing }: OpeningPulseDialProps) {
   const travelerRef = useRef<HTMLDivElement>(null);
   const waveRef = useRef<SVGGElement>(null);
+  const energyWaveRef = useRef<SVGPathElement>(null);
   const reducedMotion = useReducedMotion();
   const paths = useMemo(() => [
     wavePath(102, 4.8, 9, 0),
@@ -61,6 +82,12 @@ export function OpeningPulseDial({ feedback, modifiers, editing }: OpeningPulseD
         traveler.style.background = color;
         traveler.style.boxShadow = `0 0 7px #fff, 0 0 16px ${color}, 0 0 30px ${color}`;
         traveler.dataset.zone = zone;
+        traveler.style.setProperty("--pulse-color", color);
+      }
+      const energyWave = energyWaveRef.current;
+      if (energyWave) {
+        energyWave.setAttribute("stroke", color);
+        energyWave.style.strokeDashoffset = `${-progress * 180}px`;
       }
       const wave = waveRef.current;
       if (wave && !reducedMotion) {
@@ -108,46 +135,31 @@ export function OpeningPulseDial({ feedback, modifiers, editing }: OpeningPulseD
           <path d={paths[0]} fill="none" stroke="url(#opening-wave-a)" strokeWidth="2.8" opacity=".95" />
           <path d={paths[1]} fill="none" stroke="url(#opening-wave-b)" strokeWidth="1.6" opacity=".64" />
           <path d={paths[2]} fill="none" stroke="#fff" strokeWidth=".8" opacity=".25" />
+          <path ref={energyWaveRef} d={paths[0]} fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeDasharray="2 17" opacity=".72" style={{ filter: "drop-shadow(0 0 4px currentColor)" }} />
         </g>
-        {modifiers.filter(modifier => modifier.id !== editing?.id).map(modifier => (
-          <circle
-            key={modifier.id}
-            data-pulse-modifier={modifier.id}
-            cx={CENTER}
-            cy={CENTER}
-            r={MODIFIER_RADIUS}
-            fill="none"
-            stroke="#49ff9a"
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={`${MODIFIER_ARC_LENGTH} ${MODIFIER_CIRCUMFERENCE - MODIFIER_ARC_LENGTH}`}
-            transform={`rotate(${modifier.centerDeg - OPENING_PULSE_MODIFIER_DEG / 2 - 90} ${CENTER} ${CENTER})`}
-            style={{ filter: "drop-shadow(0 0 7px rgba(73,255,154,.88))" }}
-          />
-        ))}
-        {editing && (
-          <circle
-            data-pulse-modifier-preview
-            data-placement-valid={editing.valid ? "true" : "false"}
-            cx={CENTER}
-            cy={CENTER}
-            r={MODIFIER_RADIUS}
-            fill="none"
-            stroke={editing.valid ? "#75ffb5" : "#ff315d"}
-            strokeWidth="11"
-            strokeLinecap="round"
-            strokeDasharray={`${MODIFIER_ARC_LENGTH} ${MODIFIER_CIRCUMFERENCE - MODIFIER_ARC_LENGTH}`}
-            transform={`rotate(${editing.centerDeg - OPENING_PULSE_MODIFIER_DEG / 2 - 90} ${CENTER} ${CENTER})`}
-            opacity=".72"
-            style={{ filter: `drop-shadow(0 0 10px ${editing.valid ? "rgba(73,255,154,.95)" : "rgba(255,49,93,.95)"})` }}
-          />
-        )}
       </motion.svg>
 
-      <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: zoneGradient, mask: "radial-gradient(farthest-side,transparent calc(100% - 7px),#000 0)", WebkitMask: "radial-gradient(farthest-side,transparent calc(100% - 7px),#000 0)", filter: "drop-shadow(0 0 8px rgba(255,31,75,.38))" }} />
-      <div style={{ position: "absolute", left: "50%", top: -15, translate: "-50% 0", padding: "3px 7px", borderRadius: 999, background: "rgba(5,9,9,.9)", border: "1px solid rgba(73,255,154,.65)", color: "#6dffad", fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 900, letterSpacing: ".14em", boxShadow: "0 0 12px rgba(73,255,154,.25)" }}>HIT THE CREST</div>
-      <div data-pulse-traveler ref={travelerRef} style={{ position: "absolute", left: "calc(50% - 6px)", top: "calc(50% - 6px)", width: 12, height: 12, borderRadius: "50%", transformOrigin: "6px 6px", willChange: "transform" }}>
-        <span style={{ position: "absolute", inset: 3, borderRadius: "50%", background: "white" }} />
+      <div style={{ position: "absolute", zIndex: 1, inset: 0, borderRadius: "50%", background: zoneGradient, mask: "radial-gradient(farthest-side,transparent calc(100% - 7px),#000 0)", WebkitMask: "radial-gradient(farthest-side,transparent calc(100% - 7px),#000 0)", filter: "drop-shadow(0 0 8px rgba(255,31,75,.38))" }} />
+      <svg aria-hidden width="100%" height="100%" viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: "absolute", zIndex: 2, inset: 0, overflow: "visible" }}>
+        {modifiers.filter(modifier => modifier.id !== editing?.id).map(modifier => <ModifierZone key={modifier.id} id={modifier.id} centerDeg={modifier.centerDeg} />)}
+        {editing && <ModifierZone centerDeg={editing.centerDeg} invalid={!editing.valid} preview />}
+      </svg>
+
+      <AnimatePresence>
+        {showTimingGuide && <motion.div data-pulse-timing-guide initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, scale: .96 }} transition={{ duration: .24 }} style={{ position: "absolute", zIndex: 5, top: -43, left: "50%", translate: "-50% 0", width: 224, display: "grid", gridTemplateColumns: "1fr 1.15fr 1fr", alignItems: "end", gap: 3, pointerEvents: "none" }}>
+          <span style={{ color: "#ffe267", fontFamily: "var(--font-mono)", fontSize: 7, fontWeight: 900, letterSpacing: ".05em", textAlign: "center", textShadow: "0 0 8px rgba(255,216,77,.7)" }}>GOOD 50%</span>
+          <span style={{ color: "#75ffb5", fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 900, letterSpacing: ".05em", textAlign: "center", textShadow: "0 0 9px rgba(73,255,154,.78)" }}>PERFECT 100%</span>
+          <span style={{ color: "#ffe267", fontFamily: "var(--font-mono)", fontSize: 7, fontWeight: 900, letterSpacing: ".05em", textAlign: "center", textShadow: "0 0 8px rgba(255,216,77,.7)" }}>GOOD 50%</span>
+        </motion.div>}
+      </AnimatePresence>
+
+      <div data-pulse-traveler ref={travelerRef} className="opening-electric-pulse" style={{ position: "absolute", zIndex: 4, left: "calc(50% - 6px)", top: "calc(50% - 6px)", width: 12, height: 12, transformOrigin: "6px 6px", willChange: "transform" }}>
+        <span className="opening-electric-tail" />
+        <span className="opening-electric-ripple" />
+        <span className="opening-electric-core" />
+        <span className="opening-electric-spark opening-electric-spark-a" />
+        <span className="opening-electric-spark opening-electric-spark-b" />
+        <span className="opening-electric-spark opening-electric-spark-c" />
       </div>
 
       <AnimatePresence>

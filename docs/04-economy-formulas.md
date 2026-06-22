@@ -928,15 +928,17 @@ coherent table in docs/code/simulation; do not lower thresholds piecemeal to mak
 pulseCycleMs = 1800
 greenArc = 36 degrees total, centered at 12 o'clock
 yellowArc = 24 degrees on each side of green
-bonusGreenArc = 24 degrees, initially centered at 180 degrees
+bonusGreenArc = 36 degrees, initially centered at 180 degrees
+bonusYellowArc = 24 degrees on each side of bonus green
 bonusPlacementGap = 4 degrees
 
 greenFollowerGain = 1 + audienceReachLevel × audienceReach.followerAmountAddPerLevel
 yellowFollowerGain = ceil(greenFollowerGain / 2)
 redFollowerGain = 0
 
-bonus placement is valid when its arc plus the 4-degree gap does not overlap the authored
-top green/yellow scoring arc or another placed modifier. A placed bonus arc grades as green.
+bonus placement is valid when its complete 84-degree green/yellow zone plus the 4-degree gap does
+not overlap the authored top zone or another placed modifier. Its green center grades PERFECT and
+its yellow sides grade GOOD exactly like the starting zone.
 
 engagementPerTap = engagement mechanic unlocked
                   ? engagement.baseFillPerTap
@@ -959,7 +961,7 @@ legible.
 | Goal | Requirement | Coins | Reveal |
 |---|---:|---:|---|
 | Analytics surface | 5 total Followers | 0 | Inbox Analytics becomes available |
-| `meet_teb` | 10 total Followers | 0 | second green zone + placement teach |
+| `meet_teb` | explicit Analytics claim at 10 total Followers | 0 | complete second timing zone + placement teach |
 | `unlock_studio` | claim in Analytics at 25 total Followers | 5 | Creator Studio + Gold |
 | `buy_audience_reach` | Audience Reach Lv1 | 0 | Engagement Rate + Audience Reach Lv2+ |
 | `reach_700` | 700 total Followers | 25 | funds the two newly available purchases |
@@ -968,8 +970,9 @@ legible.
 | `unlock_rhythm` | 2,400 total Followers and prior goals complete | 0 | engagement meter + TAP THREE |
 | `complete_first_rhythm` | 1 TAP THREE completion | chart payout | repeatable Coin loop |
 
-The ordered requirement is mandatory. `unlock_studio` never auto-resolves from wallet totals:
-Analytics owns its explicit obtain action, reward, feature animation, and post-claim Studio link.
+The ordered requirement is mandatory. Neither `meet_teb` nor `unlock_studio` auto-resolves from
+wallet totals: Analytics owns both explicit obtain actions and sends the first entry directly into
+the Home timing-zone editor.
 
 ### 17.4 First rhythm reward
 

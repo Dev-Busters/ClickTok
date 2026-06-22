@@ -43,7 +43,7 @@ Follower requirements read monotonic `wallet.totalFollowers`, never the spendabl
 | Order | Step | Player objective | Reward / reveal |
 |---:|---|---|---|
 | — | Analytics gate | Reach 5 Followers | Inbox Analytics becomes available; Studio entry remains a 25-Follower target |
-| 1 | `meet_teb` | Reach 10 Followers | Add a 24° green modifier opposite the crest and teach drag/place editing |
+| 1 | `meet_teb` | Reach 10 Followers, then claim the first Analytics entry | Add a complete second timing zone opposite the crest and teach drag/place editing |
 | 2 | `unlock_studio` | Reach 25 Followers, then obtain the Analytics entry | Feature-unlock animation; Creator Studio + 5 Gold; card becomes a Studio link |
 | 3 | `buy_audience_reach` | Open Studio and buy the only visible upgrade | Unlock `engagement_rate` Lv1 and `audience_reach` Lv2+ |
 | 4 | `reach_700` | Use the stronger TEB to reach 700 Followers | Award Coins for another FYP upgrade |
@@ -60,8 +60,9 @@ upgrade level without adding HUD.
 
 Tune thresholds and costs from measured human tap rate, not arbitrary round-number ladders:
 
-- Analytics opens at 5 Followers. The first goal lands at 10 Followers and adds a second green timing
-  zone; Creator Studio remains an explicit Analytics obtain at 25 Followers.
+- Analytics opens at 5 Followers and the Inbox control visibly activates. Its first entry targets
+  10 Followers; claiming that entry returns to Home and opens the zone editor. Creator Studio
+  remains the second explicit Analytics obtain at 25 Followers.
 - First Studio purchase: within **30–60 seconds** of opening Studio; its goal reward guarantees it.
 - First rhythm reveal timing is **provisional** while later Analytics entries are authored. The new
   +5-point Audience Reach curve currently reaches it at ~40 minutes at 3 taps/sec; this pass only
@@ -92,11 +93,18 @@ progress fills → goal complete → reward lands → reveal ceremony (if any)
 
 ### TEB pulse modifiers
 
-The first goal installs `bonus_green_1` at `180°`, exactly opposite the authored top crest. During
-its inline teach, the placed arc becomes a translucent selected ghost. Dragging anywhere on the dial
+Claiming the first Analytics entry installs `bonus_green_1` at `180°`, exactly opposite the authored
+top crest, and returns to Home. The modifier is a complete copy of the starting timing zone: 36°
+green with one 24° yellow side on each edge. During its inline teach, the zone becomes a translucent
+selected ghost. Dragging anywhere on the dial
 updates its circular center; keyboard arrows move it by 3° (Shift = 12°). The preview turns red and
-cannot be placed when its 24° arc plus a 4° visual gap overlaps the top green/yellow band or another
+cannot be placed when its full 84° zone plus a 4° visual gap overlaps the starting zone or another
 modifier. Confirmed positions persist; edit drafts and active pointers do not.
+
+Before the first PERFECT tap, three labels sit outside the top ring: `GOOD 50%`, `PERFECT 100%`,
+and `GOOD 50%`. They disappear permanently on that first PERFECT. The orbiting pulse uses an
+electrical core, color-matched tail, moving waveform sparks, and particles keyed to the current
+red/yellow/green grade.
 
 - While a reveal is active, further progress may accumulate but no later goal resolves.
 - `TAKE ME THERE` opens Creator Studio immediately; `SHOW ME` moves focus to the exact new

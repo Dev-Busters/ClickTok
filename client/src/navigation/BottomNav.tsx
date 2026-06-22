@@ -2,16 +2,21 @@ import type { CSSProperties, ReactElement } from "react";
 import { motion } from "framer-motion";
 import { useGameStore } from "../store";
 import { isFeatureUnlocked } from "../features/metrics/unlocks";
+import { BALANCE } from "../features/economy/balance";
 
 export function BottomNav({ opening = false }: { opening?: boolean }) {
   const activeTab = useGameStore(s => s.activeTab);
   const setTab = useGameStore(s => s.setTab);
   const setSheet = useGameStore(s => s.setSheet);
   const metricsReached = useGameStore(s => s.metricsReached);
+  const followers = useGameStore(s => s.wallet.totalFollowers);
+  const analyticsOpened = useGameStore(s => s.onboardingTeachesSeen.analytics_first_open === true);
+  const openOpeningAnalytics = useGameStore(s => s.openOpeningAnalytics);
 
   const postingUnlocked  = isFeatureUnlocked("posting",  metricsReached);
   const inboxUnlocked    = isFeatureUnlocked("inbox",    metricsReached);
   const discoverUnlocked = isFeatureUnlocked("discover", metricsReached);
+  const openingAnalyticsUnlocked = followers >= BALANCE.onboarding.analyticsFollowers;
 
   return (
     <nav
@@ -58,9 +63,11 @@ export function BottomNav({ opening = false }: { opening?: boolean }) {
       <NavButton
         active={activeTab === 'inbox'}
         label="Inbox"
-        onClick={opening || inboxUnlocked ? () => setTab('inbox') : undefined}
+        onClick={opening ? (openingAnalyticsUnlocked ? openOpeningAnalytics : undefined) : inboxUnlocked ? () => setTab('inbox') : undefined}
         icon={InboxIcon}
-        locked={!opening && !inboxUnlocked}
+        locked={opening ? !openingAnalyticsUnlocked : !inboxUnlocked}
+        highlighted={opening && openingAnalyticsUnlocked && !analyticsOpened}
+        attention={opening && openingAnalyticsUnlocked && !analyticsOpened}
       />
       <NavButton
         active={activeTab === 'profile'}
@@ -79,6 +86,7 @@ function NavButton({
   icon: Icon,
   locked,
   highlighted,
+  attention,
 }: {
   active: boolean;
   label: string;
@@ -86,6 +94,7 @@ function NavButton({
   icon: (props: { color: string }) => ReactElement;
   locked?: boolean;
   highlighted?: boolean;
+  attention?: boolean;
 }) {
   const color = active || highlighted ? 'var(--text)' : 'var(--dim)';
   return (
@@ -95,9 +104,11 @@ function NavButton({
       disabled={locked}
       whileHover={locked ? {} : { scale: 1.1, y: -2 }}
       whileTap={locked ? {} : { scale: 0.88 }}
-      transition={{ type: "spring", stiffness: 520, damping: 22 }}
-      style={{ ...navButtonStyle, opacity: locked ? 0.25 : 1, cursor: locked ? 'default' : 'pointer' }}
+      transition={attention ? { duration: 1.4, repeat: Infinity, ease: "easeInOut" } : { type: "spring", stiffness: 520, damping: 22 }}
+      animate={attention ? { filter: ["drop-shadow(0 0 0 rgba(37,244,238,0))", "drop-shadow(0 0 8px rgba(37,244,238,.95))", "drop-shadow(0 0 0 rgba(37,244,238,0))"] } : { filter: "none" }}
+      style={{ ...navButtonStyle, position: "relative", opacity: locked ? 0.25 : 1, cursor: locked ? 'default' : 'pointer' }}
     >
+      {attention && <span aria-hidden style={{ position: "absolute", top: 2, right: "28%", width: 6, height: 6, borderRadius: "50%", background: "var(--cyan)", boxShadow: "0 0 8px var(--cyan)" }} />}
       <Icon color={color} />
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.08em', color }}>
         {label}

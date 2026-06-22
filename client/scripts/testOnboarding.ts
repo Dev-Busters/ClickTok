@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { BALANCE } from "../src/features/economy/balance";
 import { ONBOARDING_GOALS } from "../src/features/onboarding/catalog";
-import { OPENING_PULSE_CYCLE_MS, OPENING_PULSE_GREEN_DEG, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_YELLOW_DEG, canClaimCreatorStudioAnalytics, engagementPerTap, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, openingFollowerAmount, openingFollowersPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, resolvableGoal, rollOpeningFollowers } from "../src/features/onboarding/helpers";
+import { OPENING_PULSE_CYCLE_MS, OPENING_PULSE_GREEN_DEG, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_YELLOW_DEG, canClaimCreatorStudioAnalytics, canClaimPulseModifierAnalytics, engagementPerTap, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, openingFollowerAmount, openingFollowersPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, resolvableGoal, rollOpeningFollowers } from "../src/features/onboarding/helpers";
 import { pickSequence } from "../src/features/teb/chartCatalog";
 import { persistedStatePatch } from "../src/store/slices/cloudSlice";
 import type { PersistedState } from "../src/store/slices/meta";
@@ -15,10 +15,13 @@ const richProgress = {
   tapThreeCompletions: 10,
 };
 
-assert.equal(resolvableGoal("meet_teb", [], false, richProgress), "meet_teb", "only the active goal resolves");
+assert.equal(resolvableGoal("meet_teb", [], false, richProgress), null, "the first goal waits for its explicit Analytics claim");
 assert.deepEqual(ONBOARDING_GOALS[0].requirement, { kind: "total_followers", amount: 10 }, "first goal is 10 Followers");
 assert.equal(ONBOARDING_GOALS[0].reveals, "pulse_modifier");
 assert.equal(BALANCE.onboarding.analyticsFollowers, 5);
+assert.equal(canClaimPulseModifierAnalytics("meet_teb", [], 9), false);
+assert.equal(canClaimPulseModifierAnalytics("meet_teb", [], 10), true);
+assert.equal(canClaimPulseModifierAnalytics("meet_teb", ["meet_teb"], 10), false);
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], true, richProgress), null, "reveal/teach blocks a later resolution");
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], false, richProgress), null, "Studio waits for an explicit Analytics claim");
 assert.equal(canClaimCreatorStudioAnalytics("unlock_studio", ["meet_teb"], 24), false);
@@ -41,10 +44,12 @@ assert.equal(openingPulseZone(OPENING_PULSE_CYCLE_MS - msAtDegrees(greenEdge)), 
 const bonusModifier = [{ id: "bonus_green_1" as const, centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG }];
 assert.equal(openingPulseZone(msAtDegrees(180)), "red", "the opposite side starts unscored");
 assert.equal(openingPulseZone(msAtDegrees(180), bonusModifier), "green", "the placed modifier adds a green scoring zone");
+assert.equal(openingPulseZone(msAtDegrees(150), bonusModifier), "yellow", "the placed modifier includes a Good zone on each side");
 assert.equal(isOpeningPulseModifierPlacementValid(180, bonusModifier), true, "default placement is valid");
 assert.equal(isOpeningPulseModifierPlacementValid(0, bonusModifier), false, "modifier cannot overlap the top scoring zones");
 assert.equal(isOpeningPulseModifierPlacementValid(52, bonusModifier), false, "collision includes yellow plus a visible gap");
-assert.equal(isOpeningPulseModifierPlacementValid(60, bonusModifier), true, "modifier can move around the remaining circle");
+assert.equal(isOpeningPulseModifierPlacementValid(60, bonusModifier), false, "a complete second timing zone cannot overlap the authored zone");
+assert.equal(isOpeningPulseModifierPlacementValid(90, bonusModifier), true, "modifier can move around the remaining open circle");
 assert.equal(openingFollowerAmount(0), 1);
 assert.equal(openingFollowerAmount(2), 3);
 assert.equal(openingPulseReward(2, "green"), 3);
@@ -52,7 +57,7 @@ assert.equal(openingPulseReward(2, "yellow"), 2);
 assert.equal(openingPulseReward(2, "red"), 0);
 assert.equal(rollOpeningFollowers(2, 0), 3);
 assert.ok(Math.abs(openingFollowersPerTap(0) - 7 / 30) < 1e-10, "random timing earns on the 84-degree scoring arc");
-assert.ok(openingFollowersPerTap(0, 1) > openingFollowersPerTap(0), "a bonus zone increases the expected timed-hit rate");
+assert.ok(Math.abs(openingFollowersPerTap(0, 1) - 7 / 15) < 1e-10, "a complete second timing zone doubles the initial scoring arc");
 assert.equal(engagementPerTap(0), 1);
 assert.equal(engagementPerTap(1), 1.25);
 assert.equal(openingUpgradeCost("audience_reach", 0), 5);

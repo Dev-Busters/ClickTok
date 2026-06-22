@@ -49,13 +49,31 @@ export function Shell() {
     const params = new URLSearchParams(window.location.search);
     const onboardingQa = params.get("onboardingQa");
     if (onboardingQa === "fresh") useGameStore.getState().resetOnboardingRevision();
+    if (onboardingQa === "analyticsFive") useGameStore.setState({
+      wallet: { followers: 5, totalFollowers: 5, coins: 0, likes: 0, diamonds: 0 },
+      onboardingStep: "meet_teb",
+      completedOnboardingGoals: [],
+      activeOnboardingReveal: null,
+      onboardingTeachesSeen: {},
+      openingPulseModifiers: [],
+      activeTab: "home",
+    });
+    if (onboardingQa === "zoneReady") useGameStore.setState({
+      wallet: { followers: 10, totalFollowers: 10, coins: 0, likes: 0, diamonds: 0 },
+      onboardingStep: "meet_teb",
+      completedOnboardingGoals: [],
+      activeOnboardingReveal: null,
+      onboardingTeachesSeen: { analytics_first_open: true },
+      openingPulseModifiers: [],
+      activeTab: "inbox",
+    });
     if (onboardingQa === "modifier") useGameStore.setState({
       wallet: { followers: 10, totalFollowers: 10, coins: 0, likes: 0, diamonds: 0 },
       viewsTotal: 14,
       onboardingStep: "meet_teb",
       completedOnboardingGoals: ["meet_teb"],
       activeOnboardingReveal: { feature: "pulse_modifier", shownAt: Date.now(), dismissed: false },
-      onboardingTeachesSeen: {},
+      onboardingTeachesSeen: { analytics_first_open: true },
       openingPulseModifiers: [{ id: "bonus_green_1", centerDeg: 180 }],
     });
     if (onboardingQa === "studio") useGameStore.setState({
