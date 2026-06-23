@@ -724,7 +724,7 @@ export type MetricDef = {
 
 ```ts
 // store/slices/meta.ts
-export const SAVE_VERSION = 17; // opening TEB pulse modifiers
+export const SAVE_VERSION = 18; // opening TEB zone modifier kinds
 // v1 → base shape; v2 → wallet/skills/videos; v3 → inbox/milestones;
 // v4 → ownedElements (7.3); v5 → upgradeLevels + tebTeachSeen (9.1)
 // v6 → metricsReached + lifetime counters (9.2); v7 → affordableNotifiedPillars (10.2)
@@ -732,7 +732,7 @@ export const SAVE_VERSION = 17; // opening TEB pulse modifiers
 // v9 → elementsTeachSeen (11.3); v10 → metric-id re-derive; v11 → modTeachSeen;
 // v12 → catalog activation marker; v13 → tebChargeTeachSeen;
 // v14 → tebSequenceTeachSeen; v15 → staged onboarding; v16 → reset/cloud parity + deferred video;
-// v17 → openingPulseModifiers
+// v17 → openingPulseModifiers; v18 → openingPulseModifiers typed by zone kind
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
 //   multiplier, followerConversion, boonMultiplier, lastSeenAt,
@@ -781,8 +781,13 @@ export type OnboardingFeatureId =
 
 export type OpeningUpgradeId = "audience_reach" | "engagement_rate";
 
-export type OpeningPulseModifierId = "bonus_green_1";
-export type OpeningPulseModifier = { id: OpeningPulseModifierId; centerDeg: number };
+export type OpeningPulseModifierId = "passive_boost_1" | "blue_event_1";
+export type OpeningPulseModifierKind = "passive" | "event";
+export type OpeningPulseModifier = {
+  id: OpeningPulseModifierId;
+  kind: OpeningPulseModifierKind;
+  centerDeg: number;
+};
 
 export type GoalRequirement =
   | { kind: "tap_count"; amount: number }
@@ -823,9 +828,9 @@ export type OnboardingSlice = {
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
   openOpeningAnalytics: () => boolean; // gated at 5 Followers; marks first open
-  claimPulseModifierAnalytics: () => boolean; // explicit 10-Follower Analytics claim → Home editor
+  claimPulseModifierAnalytics: () => boolean; // explicit 5-Follower Analytics claim → Home editor + 5 Gold
   claimCreatorStudioAnalytics: () => boolean; // explicit 25-Follower Analytics obtain action
-  setOpeningPulseModifier: (id: OpeningPulseModifierId, centerDeg: number) => boolean;
+  setOpeningPulseModifier: (id: OpeningPulseModifierId, kind: OpeningPulseModifierKind, centerDeg: number) => boolean;
   addEngagement: (amount: number) => void;
   consumeEngagementForRhythm: () => boolean;
   resetOnboardingRevision: () => void; // development/release-controlled action
@@ -836,6 +841,6 @@ Opening feature availability derives from completed ordered goals, not `metricsR
 metric flags must not unlock fresh-opening UI in parallel. Once `video_fyp` is complete, later
 chapters may bridge back into authored metrics or additional ordered goal catalogs.
 
-Phase 18 originally bumped the save through v16. The post-phase TEB modifier pass bumps **16 → 17**
-and persists `openingPulseModifiers`; editor drafts, active pointers, and judgement state remain
-ephemeral.
+Phase 18 originally bumped the save through v16. The post-phase TEB modifier passes bump through
+**v18** and persist typed `openingPulseModifiers`; editor drafts, active pointers, pulse direction,
+passive-arm state, and judgement state remain ephemeral.

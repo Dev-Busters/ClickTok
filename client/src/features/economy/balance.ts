@@ -268,7 +268,7 @@ export const BALANCE = {
   },
   onboarding: {
     analyticsFollowers: 5,
-    firstGoalFollowers: 10,
+    firstGoalFollowers: 5,
     studioFollowers: 25,
     minorFollowerGoal1: 700,
     minorFollowerGoal2: 1200,
@@ -277,7 +277,7 @@ export const BALANCE = {
     audienceReach: { baseCost: 5, costGrowth: 1.4, followerAmountAddPerLevel: 1 },
     engagementRate: { baseCost: 18, costGrowth: 1.9, fillAddPerLevel: 0.25 },
     engagement: { cap: 100, baseFillPerTap: 1 },
-    goalCoins: { unlockStudio: 5, buyAudienceReach: 0, reach700: 25, ownThreeFypLevels: 35, reach1200: 40 },
+    goalCoins: { unlockPulseModifier: 5, unlockStudio: 5, buyAudienceReach: 0, reach700: 25, ownThreeFypLevels: 35, reach1200: 40 },
     tapThreeCoins: { completionBase: 12, qualityBonusMax: 8 },
   },
 } as const;

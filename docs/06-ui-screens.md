@@ -380,8 +380,9 @@ feed. Render only:
 1. Followers hero at the top; add the Coin pill only when Studio reveals it.
 2. One compact current-goal chip with action, progress, and reward.
 3. The TEB system centered in the large free interaction field, labeled **ENGAGEMENT** during the
-   staged opening. Its waveform dial shows the authored top green/yellow timing zones, the orbiting
-   burst, and any earned green modifiers. Every press emits PERFECT / GOOD / OFF BEAT feedback.
+   staged opening. Its waveform dial shows the authored top green timing zone, the orbiting burst,
+   and any earned passive/blue event zones. Every press emits PERFECT / BLUE / BOOST ARMED /
+   OFF BEAT feedback.
 4. Ambient background motion with no fake video metadata.
 5. A Studio edge button only after its reveal.
 
@@ -392,16 +393,17 @@ stats and reset controls. Discover and Create remain disabled. The current goal 
 clear of TEB and be no taller than two short lines at 320px width.
 
 Before 5 Followers the Inbox control is locked. At 5, Home announces Analytics, the Inbox control
-activates/pulses, and Analytics opens with `SECOND TIMING ZONE` as its first entry. At 10 Followers
-the entry's `CUSTOMIZE ZONE` action returns to Home and enters the inline modifier teach. A
-translucent complete zone—yellow / green / yellow—starts at 6 o'clock, follows pointer drag or arrow
+activates/pulses, and Analytics opens with a compact `TEB EDITOR` first entry. Claiming it grants
+5 Gold and returns to Home's inline editor. The editor offers two 5-Gold zone cards: Passive Boost
+and Blue Event. The selected translucent ghost starts at 6 o'clock, follows pointer drag or arrow
 keys around the dial, turns fully red over occupied zones, and disables placement until valid.
-After placement, `EDIT TIMING ZONE` reopens the same editor without a modal.
+After placement, `OPEN TEB EDITOR` reopens the same editor without a modal.
 
-Before the first PERFECT, place `GOOD 50% / PERFECT 100% / GOOD 50%` outside and above the top
-timing zone; never overlap the ring. Remove the guide permanently after the first PERFECT. The
+Before the first PERFECT, place `PERFECT 100%` outside and above the top timing zone; never overlap
+the ring. Remove the guide permanently after the first PERFECT. The
 orbiting indicator is an electrical pulse rather than a plain dot: bright core, short color-matched
-tail, waveform energy dashes, and trailing sparks that inherit red/yellow/green from the live grade.
+tail, waveform energy dashes, and trailing sparks that inherit red/green/blue/purple from the live
+zone.
 
 ### 13.2 Reveal and teaching pattern
 

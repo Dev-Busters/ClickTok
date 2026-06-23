@@ -91,20 +91,25 @@ progress fills → goal complete → reward lands → reveal ceremony (if any)
 → TAKE ME THERE / SHOW ME focus → first-use teach → next goal becomes active
 ```
 
-### TEB pulse modifiers
+### TEB editor zones
 
-Claiming the first Analytics entry installs `bonus_green_1` at `180°`, exactly opposite the authored
-top crest, and returns to Home. The modifier is a complete copy of the starting timing zone: 36°
-green with one 24° yellow side on each edge. During its inline teach, the zone becomes a translucent
-selected ghost. Dragging anywhere on the dial
-updates its circular center; keyboard arrows move it by 3° (Shift = 12°). The preview turns red and
-cannot be placed when its full 84° zone plus a 4° visual gap overlaps the starting zone or another
-modifier. Confirmed positions persist; edit drafts and active pointers do not.
+Claiming the first Analytics entry at 5 Followers unlocks the TEB editor, grants 5 Gold, and returns
+to Home. The editor offers two 5-Gold starter choices:
 
-Before the first PERFECT tap, three labels sit outside the top ring: `GOOD 50%`, `PERFECT 100%`,
-and `GOOD 50%`. They disappear permanently on that first PERFECT. The orbiting pulse uses an
-electrical core, color-matched tail, moving waveform sparks, and particles keyed to the current
-red/yellow/green grade.
+- `passive_boost_1`: a purple passive zone. Passing through it arms the first event the pulse reaches
+  next; tapping that first event grants +1 Follower. Missing that first event clears the bonus.
+- `blue_event_1`: a blue event zone. Tapping while the pulse is inside grants 2 Followers and sends
+  the pulse back in the opposite direction.
+
+The selected zone starts as a translucent ghost at `180°`, exactly opposite the authored top crest.
+Dragging anywhere on the dial updates its circular center; keyboard arrows move it by 3° (Shift =
+12°). The preview turns red and cannot be placed when its own width plus a 4° visual gap overlaps the
+starting zone or another modifier. Confirmed positions persist; edit drafts, active pointers, pulse
+direction, and passive-arm state do not.
+
+Before the first PERFECT tap, `PERFECT 100%` sits outside the top ring. It disappears permanently on
+that first PERFECT. The orbiting pulse uses an electrical core, color-matched tail, moving waveform
+sparks, and particles keyed to the current red/green/blue/purple zone.
 
 - While a reveal is active, further progress may accumulate but no later goal resolves.
 - `TAKE ME THERE` opens Creator Studio immediately; `SHOW ME` moves focus to the exact new
@@ -119,10 +124,11 @@ red/yellow/green grade.
 ### Followers
 
 - Every quick TEB tap grades the orbiting pulse at the 12 o'clock crest and increments lifetime
-  taps whether it scores or not. The 36° green zone grants the full Audience Reach amount; either
-  adjacent 24° yellow zone grants half, rounded up; red grants zero.
-- The orbiting burst and scoring use the same wall-clock phase so the visible hit location is the
-  scored location. Every tap emits immediate PERFECT / GOOD / OFF BEAT ring and text feedback.
+  taps whether it scores or not. The 48° green zone grants the full Audience Reach amount; red grants
+  zero. Placed event zones define their own rewards.
+- The orbiting burst and scoring use the same pulse phase so the visible hit location is the scored
+  location, including blue-zone direction reversals. Every tap emits immediate PERFECT / BLUE /
+  BOOST ARMED / OFF BEAT ring and text feedback.
 - Followers are the headline growth number and unlock gate. They are not spent in Phase 18.
 - `audience_reach` increases the full green-hit Follower amount by 1 per level.
 
@@ -159,7 +165,7 @@ Canonical opening upgrades:
 
 | id | Display name | Effect | First reveal |
 |---|---|---|---|
-| `audience_reach` | Audience Reach | Adds 1 Follower to perfect green hits; yellow pays half rounded up | Studio opens |
+| `audience_reach` | Audience Reach | Adds 1 Follower to perfect green hits | Studio opens |
 | `engagement_rate` | Engagement Rate | Adds engagement-meter fill per quick TEB tap | Buy Audience Reach Lv1 |
 
 Every upgrade card must show:

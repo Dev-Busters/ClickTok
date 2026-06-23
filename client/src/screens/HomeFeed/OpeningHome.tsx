@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, OPENING_PULSE_MODIFIER_DEFAULT_DEG, openingPulseZone, requirementValue, type OpeningPulseZone } from "../../features/onboarding/helpers";
+import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_ZONE_COST, openingPulseZone, requirementValue, type OpeningPulseZone } from "../../features/onboarding/helpers";
+import type { OpeningPulseModifierId, OpeningPulseModifierKind } from "../../features/onboarding/types";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
@@ -9,7 +10,9 @@ import { OpeningPulseDial } from "./OpeningPulseDial";
 import { OpeningPulseModifierEditor } from "./OpeningPulseModifierEditor";
 
 function OpeningTeb() {
+  const wallet = useGameStore(state => state.wallet);
   const openingTap = useGameStore(state => state.openingTap);
+  const updatePassivePulse = useGameStore(state => state.updateOpeningPulsePassive);
   const beginCharge = useGameStore(state => state.beginCharge);
   const releaseCharge = useGameStore(state => state.releaseCharge);
   const session = useGameStore(state => state.session);
@@ -20,6 +23,9 @@ function OpeningTeb() {
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const acknowledgeReveal = useGameStore(state => state.acknowledgeOnboardingReveal);
   const modifiers = useGameStore(state => state.openingPulseModifiers);
+  const pulseDirection = useGameStore(state => state.openingPulseDirection);
+  const pulseOffsetDeg = useGameStore(state => state.openingPulseOffsetDeg);
+  const passiveArmed = useGameStore(state => state.openingPulsePassiveArmed);
   const setModifier = useGameStore(state => state.setOpeningPulseModifier);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
@@ -29,25 +35,37 @@ function OpeningTeb() {
   const [tapReactions, setTapReactions] = useState<Array<{ id: number; full: boolean; drift: number; zone: OpeningPulseZone; followers: number }>>([]);
   const [pulseFeedback, setPulseFeedback] = useState<{ id: number; zone: OpeningPulseZone } | null>(null);
   const [manualEditing, setManualEditing] = useState(false);
+  const [selectedModifierId, setSelectedModifierId] = useState<OpeningPulseModifierId>("blue_event_1");
   const [draftAngle, setDraftAngle] = useState(OPENING_PULSE_MODIFIER_DEFAULT_DEG);
   const reduced = useReducedMotion();
   const meterVisible = isOpeningEngagementAvailable(completed);
   const rhythmUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
   const meterFull = meterVisible && fill >= BALANCE.onboarding.engagement.cap;
   const ready = rhythmUnlocked && meterFull;
-  const modifier = modifiers.find(item => item.id === "bonus_green_1");
+  const selectedKind: OpeningPulseModifierKind = selectedModifierId === "blue_event_1" ? "event" : "passive";
+  const selectedModifier = modifiers.find(item => item.id === selectedModifierId);
+  const selectedOwned = selectedModifier !== undefined;
+  const editorUnlocked = completed.includes("meet_teb");
   const firstPlacement = reveal?.feature === "pulse_modifier";
   const editing = firstPlacement || manualEditing;
-  const placementValid = isOpeningPulseModifierPlacementValid(draftAngle, modifiers, "bonus_green_1");
+  const placementValid = isOpeningPulseModifierPlacementValid(draftAngle, modifiers, selectedModifierId, selectedKind);
+  const canAffordSelected = wallet.coins >= OPENING_PULSE_ZONE_COST;
 
   useEffect(() => {
     if (!firstPlacement) return;
-    setDraftAngle(modifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
-  }, [firstPlacement, modifier?.centerDeg]);
+    setDraftAngle(selectedModifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
+  }, [firstPlacement, selectedModifier?.centerDeg]);
+
+  const selectZone = (id: OpeningPulseModifierId) => {
+    const existing = modifiers.find(item => item.id === id);
+    setSelectedModifierId(id);
+    setDraftAngle(existing?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
+  };
 
   const start = useCallback(() => {
     const now = Date.now();
-    const zone = openingPulseZone(now, modifiers);
+    const state = useGameStore.getState();
+    const zone = openingPulseZone(now, state.openingPulseModifiers, state.openingPulseDirection, state.openingPulseOffsetDeg);
     const followers = openingTap(now);
     const full = useGameStore.getState().engagementFill >= BALANCE.onboarding.engagement.cap;
     const id = nextReactionId.current++;
@@ -63,7 +81,7 @@ function OpeningTeb() {
       beginCharge();
       if (reveal?.feature === "engagement_meter" && reveal.dismissed && !teaches.rhythm_first_hold) completeTeach("rhythm_first_hold");
     }, BALANCE.teb.holdLaunchThresholdMs);
-  }, [beginCharge, completeTeach, modifiers, openingTap, ready, reveal, session, teaches.rhythm_first_hold]);
+  }, [beginCharge, completeTeach, openingTap, ready, reveal, session, teaches.rhythm_first_hold]);
   const end = useCallback(() => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = null;
@@ -75,7 +93,7 @@ function OpeningTeb() {
   }, []);
 
   const confirmModifier = () => {
-    if (!setModifier("bonus_green_1", draftAngle)) return;
+    if (!setModifier(selectedModifierId, selectedKind, draftAngle)) return;
     setManualEditing(false);
     if (!firstPlacement) return;
     acknowledgeReveal();
@@ -94,9 +112,27 @@ function OpeningTeb() {
           feedback={pulseFeedback}
           modifiers={modifiers}
           showTimingGuide={teaches.pulse_timing_first_perfect !== true}
-          editing={editing ? { id: "bonus_green_1", centerDeg: draftAngle, valid: placementValid } : undefined}
+          direction={pulseDirection}
+          offsetDeg={pulseOffsetDeg}
+          passiveArmed={passiveArmed}
+          onPulseFrame={updatePassivePulse}
+          editing={editing ? { id: selectedModifierId, kind: selectedKind, centerDeg: draftAngle, valid: placementValid } : undefined}
         />
-        {editing && <OpeningPulseModifierEditor angle={draftAngle} valid={placementValid} firstPlacement={firstPlacement} onAngleChange={setDraftAngle} onConfirm={confirmModifier} onCancel={() => { setDraftAngle(modifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG); setManualEditing(false); }} />}
+        {editing && <OpeningPulseModifierEditor
+          angle={draftAngle}
+          valid={placementValid}
+          canAfford={canAffordSelected}
+          coins={wallet.coins}
+          firstPlacement={firstPlacement}
+          selectedId={selectedModifierId}
+          selectedKind={selectedKind}
+          selectedOwned={selectedOwned}
+          ownedIds={modifiers.map(modifier => modifier.id)}
+          onSelectZone={selectZone}
+          onAngleChange={setDraftAngle}
+          onConfirm={confirmModifier}
+          onCancel={() => { setDraftAngle(selectedModifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG); setManualEditing(false); }}
+        />}
         <motion.button
         aria-label={ready ? "Ready. Hold Engagement to launch TAP THREE" : "Tap Engagement on the moving pulse to earn followers"}
         disabled={editing}
@@ -181,13 +217,20 @@ function OpeningTeb() {
           animate={{ opacity: [0, 1, 1, 0], scale: reaction.full ? [.45, 1.55, 1.25, 1.05] : [.45, 1.35, 1.12, 1], x: reaction.full ? reaction.drift * .35 : reaction.drift, y: reaction.full ? -236 : -218 }}
           exit={{ opacity: 0 }}
           transition={{ duration: reaction.full ? 1.2 : 1, ease: "easeOut" }}
-          style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%", zIndex: 8, pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: reaction.full ? (reaction.followers > 0 ? 16 : 30) : reaction.followers > 0 ? 18 : 30, fontWeight: 900, letterSpacing: reaction.full && reaction.followers > 0 ? ".06em" : ".1em", color: reaction.zone === "green" ? "#4dff9a" : reaction.zone === "yellow" ? "#ffd84d" : "var(--red)", textShadow: reaction.full ? "0 0 26px currentColor,0 0 8px white,0 2px 4px rgba(0,0,0,.9)" : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)" }}
+          style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%", zIndex: 8, pointerEvents: "none", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: reaction.full ? (reaction.followers > 0 ? 16 : 30) : reaction.followers > 0 ? 18 : 30, fontWeight: 900, letterSpacing: reaction.full && reaction.followers > 0 ? ".06em" : ".1em", color: reaction.zone === "green" ? "#4dff9a" : reaction.zone === "blue" ? "#37a6ff" : reaction.zone === "passive" ? "#b56cff" : "var(--red)", textShadow: reaction.full ? "0 0 26px currentColor,0 0 8px white,0 2px 4px rgba(0,0,0,.9)" : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)" }}
         >
-          {reaction.zone === "green" ? `PERFECT · +${formatCount(reaction.followers)}` : reaction.zone === "yellow" ? `GOOD · +${formatCount(reaction.followers)}` : "OFF BEAT"}
+          {reaction.zone === "green" ? `PERFECT · +${formatCount(reaction.followers)}` : reaction.zone === "blue" ? `BLUE · +${formatCount(reaction.followers)} · REVERSE` : reaction.zone === "passive" ? "BOOST ARMED" : "OFF BEAT"}
         </motion.div>)}
       </AnimatePresence>
       {meterVisible && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: meterFull ? 900 : 400, letterSpacing: ".1em", color: meterFull ? "var(--gold)" : "rgba(255,255,255,.72)", textShadow: meterFull ? "0 0 12px rgba(255,210,0,.72)" : "none" }}>ENGAGEMENT {Math.round(fill)} / 100{meterFull ? (rhythmUnlocked ? " · HOLD TO LAUNCH" : " · FULL · TAP THREE LOCKED") : !rhythmUnlocked ? " · BUILDING FOR TAP THREE" : ""}</div>}
-      {modifier && !editing && <button data-open-pulse-modifier onClick={() => { setDraftAngle(modifier.centerDeg); setManualEditing(true); }} style={{ marginTop: meterVisible ? 7 : 11, minHeight: 34, padding: "7px 12px", borderRadius: 999, border: "1px solid rgba(73,255,154,.4)", background: "rgba(73,255,154,.08)", color: "#75ffb5", fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 900, letterSpacing: ".12em", cursor: "pointer" }}>✦ EDIT TIMING ZONE</button>}
+      {passiveArmed && !editing && <div data-passive-armed style={{ marginTop: 7, color: "#d2a8ff", fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 900, letterSpacing: ".12em", textShadow: "0 0 10px rgba(181,108,255,.68)" }}>PASSIVE BOOST ARMED · TAP NEXT EVENT</div>}
+      {editorUnlocked && !editing && <button data-open-pulse-modifier onClick={() => {
+        const nextId = modifiers[0]?.id ?? selectedModifierId;
+        const existing = modifiers.find(item => item.id === nextId);
+        setSelectedModifierId(nextId);
+        setDraftAngle(existing?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
+        setManualEditing(true);
+      }} style={{ marginTop: meterVisible || passiveArmed ? 7 : 11, minHeight: 34, padding: "7px 12px", borderRadius: 999, border: "1px solid rgba(55,166,255,.44)", background: "rgba(55,166,255,.09)", color: "#65bdff", fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 900, letterSpacing: ".12em", cursor: "pointer" }}>✦ OPEN TEB EDITOR</button>}
     </div>
   );
 }
@@ -253,8 +296,8 @@ export function OpeningHome() {
       {studio && <><strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 24 }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>GOLD</span></>}
     </header>
     <div data-onboarding="goal" style={{ position: "absolute", top: 72, left: 14, right: studio ? 104 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
-      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: studioReadyToClaim || pulseModifierReadyToClaim ? "var(--gold)" : "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "REFILL ENGAGEMENT · PLAY TAP THREE" : modifierTeachActive ? "PLACE YOUR SECOND ZONE" : analyticsUnlocked && !analyticsOpened ? "ANALYTICS UNLOCKED · OPEN INBOX" : pulseModifierReadyToClaim ? "CLAIM SECOND ZONE · INBOX → ANALYTICS" : studioReadyToClaim ? "CLAIM STUDIO · INBOX → ANALYTICS" : goal.label}</div>
-      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? `${Math.round(engagementFill)} / ${BALANCE.onboarding.engagement.cap} · REPEATABLE GOLD` : modifierTeachActive ? "DRAG THE GHOST · AVOID ACTIVE ZONES" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: SECOND TIMING ZONE · 10 FOLLOWERS" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: studioReadyToClaim || pulseModifierReadyToClaim ? "var(--gold)" : "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "REFILL ENGAGEMENT · PLAY TAP THREE" : modifierTeachActive ? "PLACE YOUR FIRST TEB ZONE" : analyticsUnlocked && !analyticsOpened ? "ANALYTICS UNLOCKED · OPEN INBOX" : pulseModifierReadyToClaim ? "CLAIM TEB EDITOR · INBOX → ANALYTICS" : studioReadyToClaim ? "CLAIM STUDIO · INBOX → ANALYTICS" : goal.label}</div>
+      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? `${Math.round(engagementFill)} / ${BALANCE.onboarding.engagement.cap} · REPEATABLE GOLD` : modifierTeachActive ? "CHOOSE PASSIVE OR BLUE · DRAG THE GHOST" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: TEB EDITOR · +5 GOLD" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
     </div>
     {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 72, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
     {!rhythm && <OpeningTeb />}

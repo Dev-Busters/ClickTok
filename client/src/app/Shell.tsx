@@ -59,7 +59,7 @@ export function Shell() {
       activeTab: "home",
     });
     if (onboardingQa === "zoneReady") useGameStore.setState({
-      wallet: { followers: 10, totalFollowers: 10, coins: 0, likes: 0, diamonds: 0 },
+      wallet: { followers: 5, totalFollowers: 5, coins: 0, likes: 0, diamonds: 0 },
       onboardingStep: "meet_teb",
       completedOnboardingGoals: [],
       activeOnboardingReveal: null,
@@ -68,13 +68,13 @@ export function Shell() {
       activeTab: "inbox",
     });
     if (onboardingQa === "modifier") useGameStore.setState({
-      wallet: { followers: 10, totalFollowers: 10, coins: 0, likes: 0, diamonds: 0 },
+      wallet: { followers: 5, totalFollowers: 5, coins: 5, likes: 0, diamonds: 0 },
       viewsTotal: 14,
       onboardingStep: "meet_teb",
       completedOnboardingGoals: ["meet_teb"],
       activeOnboardingReveal: { feature: "pulse_modifier", shownAt: Date.now(), dismissed: false },
       onboardingTeachesSeen: { analytics_first_open: true },
-      openingPulseModifiers: [{ id: "bonus_green_1", centerDeg: 180 }],
+      openingPulseModifiers: [],
     });
     if (onboardingQa === "studio") useGameStore.setState({
       wallet: { followers: 25, totalFollowers: 25, coins: 5, likes: 0, diamonds: 0 },
@@ -84,7 +84,7 @@ export function Shell() {
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { studio_first_use: true },
       openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
-      openingPulseModifiers: [{ id: "bonus_green_1", centerDeg: 180 }],
+      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
     });
     if (onboardingQa === "analyticsReady") useGameStore.setState({
       wallet: { followers: 25, totalFollowers: 25, coins: 0, likes: 0, diamonds: 0 },
@@ -94,7 +94,7 @@ export function Shell() {
       activeOnboardingReveal: null,
       onboardingTeachesSeen: {},
       openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
-      openingPulseModifiers: [{ id: "bonus_green_1", centerDeg: 180 }],
+      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
       activeTab: "inbox",
     });
     if (onboardingQa === "rhythm") useGameStore.setState({
@@ -105,7 +105,7 @@ export function Shell() {
       activeOnboardingReveal: { feature: "engagement_meter", shownAt: Date.now(), dismissed: true },
       onboardingTeachesSeen: { studio_first_use: true },
       openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1 },
-      openingPulseModifiers: [{ id: "bonus_green_1", centerDeg: 180 }],
+      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
       engagementFill: 100,
     });
     if (onboardingQa === "meterFull") useGameStore.setState({
@@ -116,7 +116,7 @@ export function Shell() {
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { studio_first_use: true },
       openingUpgradeLevels: { audience_reach: 1, engagement_rate: 1 },
-      openingPulseModifiers: [{ id: "bonus_green_1", centerDeg: 180 }],
+      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
       engagementFill: 100,
       session: null,
     });
@@ -128,7 +128,7 @@ export function Shell() {
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { studio_first_use: true, rhythm_first_hold: true },
       openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1 },
-      openingPulseModifiers: [{ id: "bonus_green_1", centerDeg: 180 }],
+      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
       engagementFill: 0,
       tapThreeCompletions: 1,
       session: null,

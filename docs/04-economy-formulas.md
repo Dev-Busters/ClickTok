@@ -883,7 +883,7 @@ sources explicitly; they must never appear merely because legacy §1 code still 
 ```ts
 onboarding: {
   analyticsFollowers: 5,
-  firstGoalFollowers: 10,
+  firstGoalFollowers: 5,
   studioFollowers: 25,
   minorFollowerGoal1: 700,
   minorFollowerGoal2: 1200,
@@ -906,6 +906,7 @@ onboarding: {
   },
 
   goalCoins: {
+    unlockPulseModifier: 5,    // funds exactly one first TEB editor zone
     unlockStudio: 5,           // exactly Audience Reach Lv1
     buyAudienceReach: 0,       // first purchase must not fund the second immediately
     reach700: 25,              // funds Audience Reach Lv2 + Engagement Rate Lv1 after active play
@@ -926,19 +927,22 @@ coherent table in docs/code/simulation; do not lower thresholds piecemeal to mak
 
 ```text
 pulseCycleMs = 1800
-greenArc = 36 degrees total, centered at 12 o'clock
-yellowArc = 24 degrees on each side of green
-bonusGreenArc = 36 degrees, initially centered at 180 degrees
-bonusYellowArc = 24 degrees on each side of bonus green
+greenArc = 48 degrees total, centered at 12 o'clock
+blueEventArc = 48 degrees total, default editor draft at 180 degrees
+passiveArc = 34 degrees total, default editor draft at 180 degrees
+zoneCost = 5 Gold
 bonusPlacementGap = 4 degrees
 
 greenFollowerGain = 1 + audienceReachLevel × audienceReach.followerAmountAddPerLevel
-yellowFollowerGain = ceil(greenFollowerGain / 2)
+blueEventFollowerGain = 2
+passiveFollowerGain = 0 immediately; passing through it arms the next event for +1 Follower
 redFollowerGain = 0
 
-bonus placement is valid when its complete 84-degree green/yellow zone plus the 4-degree gap does
-not overlap the authored top zone or another placed modifier. Its green center grades PERFECT and
-its yellow sides grade GOOD exactly like the starting zone.
+zone placement is valid when the selected zone width plus the 4-degree gap does not overlap the
+authored top green zone or another placed modifier. The blue event zone is tapped like an event:
+it grants 2 Followers and reverses pulse direction when used. The passive zone arms as the pulse
+travels through it; only the first event reached after that pass can pay the +1 Follower bonus, and
+missing that first event clears the bonus.
 
 engagementPerTap = engagement mechanic unlocked
                   ? engagement.baseFillPerTap

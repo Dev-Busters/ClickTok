@@ -20,10 +20,13 @@ export type OnboardingFeatureId =
 
 export type OpeningUpgradeId = "audience_reach" | "engagement_rate";
 
-export type OpeningPulseModifierId = "bonus_green_1";
+export type OpeningPulseModifierId = "passive_boost_1" | "blue_event_1";
+
+export type OpeningPulseModifierKind = "passive" | "event";
 
 export type OpeningPulseModifier = {
   id: OpeningPulseModifierId;
+  kind: OpeningPulseModifierKind;
   centerDeg: number;
 };
 

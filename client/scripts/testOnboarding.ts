@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { BALANCE } from "../src/features/economy/balance";
 import { ONBOARDING_GOALS } from "../src/features/onboarding/catalog";
-import { OPENING_PULSE_CYCLE_MS, OPENING_PULSE_GREEN_DEG, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_YELLOW_DEG, canClaimCreatorStudioAnalytics, canClaimPulseModifierAnalytics, engagementPerTap, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, openingFollowerAmount, openingFollowersPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, resolvableGoal, rollOpeningFollowers } from "../src/features/onboarding/helpers";
+import { OPENING_PULSE_CYCLE_MS, OPENING_PULSE_GREEN_DEG, OPENING_PULSE_MODIFIER_DEFAULT_DEG, canClaimCreatorStudioAnalytics, canClaimPulseModifierAnalytics, engagementPerTap, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, openingFollowerAmount, openingFollowersPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, resolvableGoal, rollOpeningFollowers } from "../src/features/onboarding/helpers";
 import { pickSequence } from "../src/features/teb/chartCatalog";
 import { persistedStatePatch } from "../src/store/slices/cloudSlice";
 import type { PersistedState } from "../src/store/slices/meta";
@@ -16,12 +16,13 @@ const richProgress = {
 };
 
 assert.equal(resolvableGoal("meet_teb", [], false, richProgress), null, "the first goal waits for its explicit Analytics claim");
-assert.deepEqual(ONBOARDING_GOALS[0].requirement, { kind: "total_followers", amount: 10 }, "first goal is 10 Followers");
+assert.deepEqual(ONBOARDING_GOALS[0].requirement, { kind: "total_followers", amount: 5 }, "first goal is 5 Followers");
 assert.equal(ONBOARDING_GOALS[0].reveals, "pulse_modifier");
 assert.equal(BALANCE.onboarding.analyticsFollowers, 5);
-assert.equal(canClaimPulseModifierAnalytics("meet_teb", [], 9), false);
-assert.equal(canClaimPulseModifierAnalytics("meet_teb", [], 10), true);
-assert.equal(canClaimPulseModifierAnalytics("meet_teb", ["meet_teb"], 10), false);
+assert.equal(ONBOARDING_GOALS[0].reward?.coins, 5);
+assert.equal(canClaimPulseModifierAnalytics("meet_teb", [], 4), false);
+assert.equal(canClaimPulseModifierAnalytics("meet_teb", [], 5), true);
+assert.equal(canClaimPulseModifierAnalytics("meet_teb", ["meet_teb"], 5), false);
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], true, richProgress), null, "reveal/teach blocks a later resolution");
 assert.equal(resolvableGoal("unlock_studio", ["meet_teb"], false, richProgress), null, "Studio waits for an explicit Analytics claim");
 assert.equal(canClaimCreatorStudioAnalytics("unlock_studio", ["meet_teb"], 24), false);
@@ -34,30 +35,30 @@ assert.equal(isOpeningEngagementAvailable(["meet_teb", "unlock_studio", "buy_aud
 
 const msAtDegrees = (degrees: number) => degrees / 360 * OPENING_PULSE_CYCLE_MS;
 const greenEdge = OPENING_PULSE_GREEN_DEG / 2;
-const yellowEdge = greenEdge + OPENING_PULSE_YELLOW_DEG;
 assert.equal(openingPulseZone(0), "green", "the scoring crest is at 12 o'clock");
 assert.equal(openingPulseZone(msAtDegrees(greenEdge)), "green");
-assert.equal(openingPulseZone(msAtDegrees(greenEdge + 0.01)), "yellow");
-assert.equal(openingPulseZone(msAtDegrees(yellowEdge)), "yellow");
-assert.equal(openingPulseZone(msAtDegrees(yellowEdge + 0.01)), "red");
+assert.equal(openingPulseZone(msAtDegrees(greenEdge + 0.01)), "red");
 assert.equal(openingPulseZone(OPENING_PULSE_CYCLE_MS - msAtDegrees(greenEdge)), "green", "zones are symmetrical around the crest");
-const bonusModifier = [{ id: "bonus_green_1" as const, centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG }];
+const blueModifier = [{ id: "blue_event_1" as const, kind: "event" as const, centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG }];
+const passiveModifier = [{ id: "passive_boost_1" as const, kind: "passive" as const, centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG }];
 assert.equal(openingPulseZone(msAtDegrees(180)), "red", "the opposite side starts unscored");
-assert.equal(openingPulseZone(msAtDegrees(180), bonusModifier), "green", "the placed modifier adds a green scoring zone");
-assert.equal(openingPulseZone(msAtDegrees(150), bonusModifier), "yellow", "the placed modifier includes a Good zone on each side");
-assert.equal(isOpeningPulseModifierPlacementValid(180, bonusModifier), true, "default placement is valid");
-assert.equal(isOpeningPulseModifierPlacementValid(0, bonusModifier), false, "modifier cannot overlap the top scoring zones");
-assert.equal(isOpeningPulseModifierPlacementValid(52, bonusModifier), false, "collision includes yellow plus a visible gap");
-assert.equal(isOpeningPulseModifierPlacementValid(60, bonusModifier), false, "a complete second timing zone cannot overlap the authored zone");
-assert.equal(isOpeningPulseModifierPlacementValid(90, bonusModifier), true, "modifier can move around the remaining open circle");
+assert.equal(openingPulseZone(msAtDegrees(180), blueModifier), "blue", "the event zone adds a blue scoring event");
+assert.equal(openingPulseZone(msAtDegrees(180), passiveModifier), "passive", "the passive zone arms a future event but does not score itself");
+assert.equal(isOpeningPulseModifierPlacementValid(180, blueModifier, "blue_event_1", "event"), true, "default placement is valid");
+assert.equal(isOpeningPulseModifierPlacementValid(0, [], "blue_event_1", "event"), false, "modifier cannot overlap the top scoring zone");
+assert.equal(isOpeningPulseModifierPlacementValid(51, [], "blue_event_1", "event"), false, "collision includes the visible gap");
+assert.equal(isOpeningPulseModifierPlacementValid(52, [], "blue_event_1", "event"), true, "edge beyond the gap can be placed");
+assert.equal(isOpeningPulseModifierPlacementValid(90, blueModifier, "blue_event_1", "event"), true, "modifier can move around the remaining open circle");
 assert.equal(openingFollowerAmount(0), 1);
 assert.equal(openingFollowerAmount(2), 3);
 assert.equal(openingPulseReward(2, "green"), 3);
-assert.equal(openingPulseReward(2, "yellow"), 2);
+assert.equal(openingPulseReward(2, "blue"), 2);
+assert.equal(openingPulseReward(2, "blue", true), 3);
+assert.equal(openingPulseReward(2, "passive"), 0);
 assert.equal(openingPulseReward(2, "red"), 0);
 assert.equal(rollOpeningFollowers(2, 0), 3);
-assert.ok(Math.abs(openingFollowersPerTap(0) - 7 / 30) < 1e-10, "random timing earns on the 84-degree scoring arc");
-assert.ok(Math.abs(openingFollowersPerTap(0, 1) - 7 / 15) < 1e-10, "a complete second timing zone doubles the initial scoring arc");
+assert.ok(Math.abs(openingFollowersPerTap(0) - 2 / 15) < 1e-10, "random timing earns on the 48-degree green scoring arc");
+assert.ok(Math.abs(openingFollowersPerTap(0, blueModifier) - 2 / 5) < 1e-10, "a blue event zone adds its own reward arc");
 assert.equal(engagementPerTap(0), 1);
 assert.equal(engagementPerTap(1), 1.25);
 assert.equal(openingUpgradeCost("audience_reach", 0), 5);
@@ -93,7 +94,7 @@ const deferredVideoMigration = migrate({
   activeOnboardingReveal: { feature: "video_fyp", shownAt: 1, dismissed: false },
   onboardingTeachesSeen: { video_fyp_first_action: true },
 } as PersistedState, 15);
-assert.equal(deferredVideoMigration.version, 17);
+assert.equal(deferredVideoMigration.version, 18);
 assert.equal(deferredVideoMigration.onboardingStep, "complete_first_rhythm");
 assert.deepEqual(deferredVideoMigration.completedOnboardingGoals, ["complete_first_rhythm"]);
 assert.equal(deferredVideoMigration.activeOnboardingReveal, null);
@@ -101,8 +102,8 @@ assert.equal(deferredVideoMigration.activeOnboardingReveal, null);
 const pulseModifierMigration = migrate({
   completedOnboardingGoals: ["meet_teb"],
 } as PersistedState, 16);
-assert.equal(pulseModifierMigration.version, 17);
-assert.deepEqual(pulseModifierMigration.openingPulseModifiers, [{ id: "bonus_green_1", centerDeg: 180 }], "v16 progress receives the opposite-side default zone");
+assert.equal(pulseModifierMigration.version, 18);
+assert.deepEqual(pulseModifierMigration.openingPulseModifiers, [{ id: "blue_event_1", kind: "event", centerDeg: 180 }], "old modifier progress becomes a blue event zone");
 
 const resetStorageData = new Map([[RESET_PENDING_KEY, "1"]]);
 const resetStorage = {

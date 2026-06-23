@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
-import { canClaimCreatorStudioAnalytics, canClaimPulseModifierAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, openingPulseReward, openingPulseZone, openingUpgradeCost, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, normalizePulseAngle, OPENING_PULSE_MODIFIER_DEFAULT_DEG } from "../../features/onboarding/helpers";
-import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningPulseModifier, type OpeningPulseModifierId, type OpeningUpgradeId } from "../../features/onboarding/types";
+import { canClaimCreatorStudioAnalytics, canClaimPulseModifierAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, openingPulseAngle, openingPulseHit, openingPulseReward, openingUpgradeCost, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, normalizePulseAngle, OPENING_PULSE_CYCLE_MS, OPENING_PULSE_ZONE_COST, type OpeningPulseDirection, type OpeningPulseEventKey, type OpeningPulseHit } from "../../features/onboarding/helpers";
+import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningPulseModifier, type OpeningPulseModifierId, type OpeningPulseModifierKind, type OpeningUpgradeId } from "../../features/onboarding/types";
 import { track } from "../../lib/telemetry";
 import type { FullState } from "../index";
 
@@ -13,6 +13,10 @@ export type OnboardingSlice = {
   onboardingTeachesSeen: Record<string, true>;
   openingUpgradeLevels: Record<OpeningUpgradeId, number>;
   openingPulseModifiers: OpeningPulseModifier[];
+  openingPulseDirection: OpeningPulseDirection;
+  openingPulseOffsetDeg: number;
+  openingPulsePassiveArmed: boolean;
+  openingPulsePassiveTarget: OpeningPulseEventKey | null;
   engagementFill: number;
   tapThreeCompletions: number;
   onboardingStepStartedAt: number;
@@ -20,11 +24,12 @@ export type OnboardingSlice = {
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
   openingTap: (now?: number) => number;
+  updateOpeningPulsePassive: (now?: number) => void;
   openOpeningAnalytics: () => boolean;
   claimPulseModifierAnalytics: () => boolean;
   claimCreatorStudioAnalytics: () => boolean;
   levelOpeningUpgrade: (id: OpeningUpgradeId) => boolean;
-  setOpeningPulseModifier: (id: OpeningPulseModifierId, centerDeg: number) => boolean;
+  setOpeningPulseModifier: (id: OpeningPulseModifierId, kind: OpeningPulseModifierKind, centerDeg: number) => boolean;
   addEngagement: (amount: number) => void;
   consumeEngagementForRhythm: () => boolean;
   resetOnboardingRevision: () => void;
@@ -48,6 +53,34 @@ function advance(set: (patch: Partial<FullState>) => void, get: () => FullState)
   }
 }
 
+function pulseOffsetForAngle(now: number, direction: OpeningPulseDirection, angle: number): number {
+  return normalizePulseAngle(angle - (now % OPENING_PULSE_CYCLE_MS) / OPENING_PULSE_CYCLE_MS * 360 * direction);
+}
+
+function resolvePassiveState(state: FullState, now: number): {
+  hit: OpeningPulseHit;
+  passiveArmed: boolean;
+  passiveTarget: OpeningPulseEventKey | null;
+} {
+  const hit = openingPulseHit(now, state.openingPulseModifiers, state.openingPulseDirection, state.openingPulseOffsetDeg);
+  let passiveArmed = state.openingPulsePassiveArmed;
+  let passiveTarget = state.openingPulsePassiveTarget;
+
+  if (hit.zone === "passive" && hit.modifier?.kind === "passive") {
+    passiveArmed = true;
+    passiveTarget = null;
+  } else if (passiveArmed) {
+    if (passiveTarget === null && hit.eventKey) {
+      passiveTarget = hit.eventKey;
+    } else if (passiveTarget !== null && hit.eventKey !== passiveTarget) {
+      passiveArmed = false;
+      passiveTarget = null;
+    }
+  }
+
+  return { hit, passiveArmed, passiveTarget };
+}
+
 export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSlice> = (set, get) => ({
   onboardingRevision: ONBOARDING_REVISION,
   onboardingStep: "meet_teb",
@@ -56,6 +89,10 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   onboardingTeachesSeen: {},
   openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
   openingPulseModifiers: [],
+  openingPulseDirection: 1,
+  openingPulseOffsetDeg: 0,
+  openingPulsePassiveArmed: false,
+  openingPulsePassiveTarget: null,
   engagementFill: 0,
   tapThreeCompletions: 0,
   onboardingStepStartedAt: Date.now(),
@@ -97,16 +134,23 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   openingTap: (now = Date.now()) => {
     const state = get();
     if (state.session) return 0;
-    const zone = openingPulseZone(now, state.openingPulseModifiers);
-    const followers = openingPulseReward(state.openingUpgradeLevels.audience_reach, zone);
+    const { hit, passiveArmed, passiveTarget } = resolvePassiveState(state, now);
+    const passiveBonus = passiveArmed && passiveTarget !== null && hit.eventKey === passiveTarget;
+    const followers = openingPulseReward(state.openingUpgradeLevels.audience_reach, hit, passiveBonus);
     const engagementAvailable = isOpeningEngagementAvailable(state.completedOnboardingGoals);
     const engagement = engagementAvailable ? engagementPerTap(state.openingUpgradeLevels.engagement_rate) : 0;
+    const nextDirection: OpeningPulseDirection = hit.zone === "blue" && followers > 0 ? (state.openingPulseDirection === 1 ? -1 : 1) : state.openingPulseDirection;
+    const currentAngle = openingPulseAngle(now, state.openingPulseDirection, state.openingPulseOffsetDeg);
     set({
       wallet: { ...state.wallet, followers: state.wallet.followers + followers, totalFollowers: state.wallet.totalFollowers + followers },
       viewsTotal: state.viewsTotal + 1,
       lastTapAt: now,
       engagementFill: Math.min(BALANCE.onboarding.engagement.cap, state.engagementFill + engagement),
-      onboardingTeachesSeen: zone === "green" && !state.onboardingTeachesSeen.pulse_timing_first_perfect
+      openingPulseDirection: nextDirection,
+      openingPulseOffsetDeg: nextDirection === state.openingPulseDirection ? state.openingPulseOffsetDeg : pulseOffsetForAngle(now, nextDirection, currentAngle),
+      openingPulsePassiveArmed: passiveBonus ? false : passiveArmed,
+      openingPulsePassiveTarget: passiveBonus ? null : passiveTarget,
+      onboardingTeachesSeen: hit.zone === "green" && !state.onboardingTeachesSeen.pulse_timing_first_perfect
         ? { ...state.onboardingTeachesSeen, pulse_timing_first_perfect: true }
         : state.onboardingTeachesSeen,
     });
@@ -115,6 +159,13 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     }
     get().checkOnboardingGoal();
     return followers;
+  },
+
+  updateOpeningPulsePassive: (now = Date.now()) => {
+    const state = get();
+    const { passiveArmed, passiveTarget } = resolvePassiveState(state, now);
+    if (state.openingPulsePassiveArmed === passiveArmed && state.openingPulsePassiveTarget === passiveTarget) return;
+    set({ openingPulsePassiveArmed: passiveArmed, openingPulsePassiveTarget: passiveTarget });
   },
 
   openOpeningAnalytics: () => {
@@ -133,14 +184,17 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   claimPulseModifierAnalytics: () => {
     const state = get();
     if (!canClaimPulseModifierAnalytics(state.onboardingStep, state.completedOnboardingGoals, state.wallet.totalFollowers)) return false;
-    const modifier: OpeningPulseModifier = { id: "bonus_green_1", centerDeg: OPENING_PULSE_MODIFIER_DEFAULT_DEG };
+    const goal = goalById("meet_teb");
+    const gold = goal.reward?.coins ?? 0;
     set({
       completedOnboardingGoals: [...state.completedOnboardingGoals, "meet_teb"],
       activeOnboardingReveal: { feature: "pulse_modifier", shownAt: Date.now(), dismissed: false },
-      openingPulseModifiers: [modifier],
+      wallet: { ...state.wallet, coins: state.wallet.coins + gold },
+      coinsEarned: state.coinsEarned + gold,
+      openingPulseModifiers: state.openingPulseModifiers,
       activeTab: "home",
     });
-    track("analytics_unlock_claimed", { id: "bonus_green_1", type: "feature" });
+    track("analytics_unlock_claimed", { id: "teb_editor", type: "feature", rewardGold: gold });
     track("onboarding_goal_complete", { goal: "meet_teb", durationMs: Date.now() - state.onboardingStepStartedAt });
     track("onboarding_reveal_shown", { feature: "pulse_modifier" });
     return true;
@@ -182,17 +236,21 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     return true;
   },
 
-  setOpeningPulseModifier: (id, centerDeg) => {
+  setOpeningPulseModifier: (id, kind, centerDeg) => {
     const state = get();
     if (!state.completedOnboardingGoals.includes("meet_teb")) return false;
     const normalized = normalizePulseAngle(centerDeg);
-    if (!isOpeningPulseModifierPlacementValid(normalized, state.openingPulseModifiers, id)) return false;
+    if (!isOpeningPulseModifierPlacementValid(normalized, state.openingPulseModifiers, id, kind)) return false;
     const exists = state.openingPulseModifiers.some(modifier => modifier.id === id);
+    if (!exists && state.wallet.coins < OPENING_PULSE_ZONE_COST) return false;
     const openingPulseModifiers = exists
-      ? state.openingPulseModifiers.map(modifier => modifier.id === id ? { ...modifier, centerDeg: normalized } : modifier)
-      : [...state.openingPulseModifiers, { id, centerDeg: normalized }];
-    set({ openingPulseModifiers });
-    track("onboarding_pulse_modifier_placed", { id, centerDeg: Math.round(normalized) });
+      ? state.openingPulseModifiers.map(modifier => modifier.id === id ? { ...modifier, kind, centerDeg: normalized } : modifier)
+      : [...state.openingPulseModifiers, { id, kind, centerDeg: normalized }];
+    set({
+      openingPulseModifiers,
+      wallet: exists ? state.wallet : { ...state.wallet, coins: state.wallet.coins - OPENING_PULSE_ZONE_COST },
+    });
+    track("onboarding_pulse_modifier_placed", { id, kind, centerDeg: Math.round(normalized), cost: exists ? 0 : OPENING_PULSE_ZONE_COST });
     return true;
   },
 
@@ -213,6 +271,10 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     onboardingTeachesSeen: {},
     openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
     openingPulseModifiers: [],
+    openingPulseDirection: 1,
+    openingPulseOffsetDeg: 0,
+    openingPulsePassiveArmed: false,
+    openingPulsePassiveTarget: null,
     engagementFill: 0,
     tapThreeCompletions: 0,
     onboardingStepStartedAt: Date.now(),

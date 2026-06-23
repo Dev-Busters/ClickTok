@@ -2169,6 +2169,10 @@ plays inside a measured center field while all unlocked FYP chrome stays visible
   > claimed at 10 Followers and opens Home's editor with a persisted full green/yellow timing zone at
   > 180°. Placement uses ghost/red collision previews, pointer + keyboard controls, and a v16→v17
   > migration. First-perfect labels and a color-matched electrical pulse teach and energize timing.
+  > note: Follow-up TEB editor pass replaces yellow Good timing with a larger 48° green-only base
+  > zone, compacts Analytics rows, moves the first Analytics entry to 5 Followers with +5 Gold, and
+  > changes the editor from a second green zone into two 5-Gold choices: Passive Boost and Blue
+  > Event. Save v18 maps old `bonus_green_1` progress to the new blue event zone.
 
 - [x] **18.6 — Rhythm interaction-field correction (`14` §F, `06` §13.5).** Remove Phase 17's
   global blackout/chrome-hide behavior. Measure visible chrome rectangles and mount rhythm in the

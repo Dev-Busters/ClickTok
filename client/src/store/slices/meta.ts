@@ -4,10 +4,10 @@ import type { SkillId } from "../../features/skills/types";
 import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { SequenceId } from "../../features/teb/types";
-import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningPulseModifier, type OpeningUpgradeId } from "../../features/onboarding/types";
+import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningPulseModifier, type OpeningPulseModifierKind, type OpeningUpgradeId } from "../../features/onboarding/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -128,12 +128,21 @@ export type PersistedV15 = Omit<PersistedV14, "version"> & {
 };
 
 export type PersistedV16 = Omit<PersistedV15, "version"> & { version: 16 };
+type PersistedV17OpeningPulseModifier = {
+  id: "bonus_green_1" | OpeningPulseModifier["id"];
+  kind?: OpeningPulseModifierKind;
+  centerDeg: number;
+};
 export type PersistedV17 = Omit<PersistedV16, "version"> & {
   version: 17;
+  openingPulseModifiers: PersistedV17OpeningPulseModifier[];
+};
+export type PersistedV18 = Omit<PersistedV17, "version" | "openingPulseModifiers"> & {
+  version: 18;
   openingPulseModifiers: OpeningPulseModifier[];
 };
 
-export type PersistedState = PersistedV17;
+export type PersistedState = PersistedV18;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -206,7 +215,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17 | PersistedV18;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -425,6 +434,20 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       openingPulseModifiers: v16.completedOnboardingGoals?.includes("meet_teb")
         ? [{ id: "bonus_green_1", centerDeg: 180 }]
         : [],
+    };
+  }
+
+  if (version < 18) {
+    const v17 = state as PersistedV17;
+    const openingPulseModifiers: OpeningPulseModifier[] = (v17.openingPulseModifiers ?? []).flatMap((modifier): OpeningPulseModifier[] => {
+      if (modifier.id === "bonus_green_1" || modifier.id === "blue_event_1") return [{ id: "blue_event_1", kind: "event", centerDeg: modifier.centerDeg }];
+      if (modifier.id === "passive_boost_1") return [{ id: "passive_boost_1", kind: "passive", centerDeg: modifier.centerDeg }];
+      return [];
+    });
+    state = {
+      ...v17,
+      version: 18,
+      openingPulseModifiers,
     };
   }
 

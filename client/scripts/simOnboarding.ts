@@ -6,12 +6,20 @@ type Result = { tapsPerSecond: number; analyticsMin: number; studioMin: number; 
 function simulate(tapsPerSecond: number): Result {
   let seconds = 0, followers = 0, coins = 0, engagement = 0, completions = 0;
   let audience = 0, rate = 0, analyticsAt = 0, studioAt = 0, rhythmAt = 0;
-  let studioRewarded = false, audienceRewarded = false, reach700Rewarded = false, threeRewarded = false, reach1200Rewarded = false;
+  let editorRewarded = false, blueZoneOwned = false, studioRewarded = false, audienceRewarded = false, reach700Rewarded = false, threeRewarded = false, reach1200Rewarded = false;
+  const blueZone = [{ id: "blue_event_1" as const, kind: "event" as const, centerDeg: 180 }];
   while (completions < 1 && seconds < 60 * 75) {
     seconds += 1;
-    const modifierCount = followers >= BALANCE.onboarding.firstGoalFollowers ? 1 : 0;
-    followers += openingFollowersPerTap(audience, modifierCount) * tapsPerSecond;
+    followers += openingFollowersPerTap(audience, blueZoneOwned ? blueZone : []) * tapsPerSecond;
     if (!analyticsAt && followers >= BALANCE.onboarding.analyticsFollowers) analyticsAt = seconds;
+    if (!editorRewarded && followers >= BALANCE.onboarding.firstGoalFollowers) {
+      editorRewarded = true;
+      coins += BALANCE.onboarding.goalCoins.unlockPulseModifier;
+      if (coins >= 5) {
+        coins -= 5;
+        blueZoneOwned = true;
+      }
+    }
     if (!studioRewarded && followers >= BALANCE.onboarding.studioFollowers) { studioRewarded = true; studioAt = seconds; coins += BALANCE.onboarding.goalCoins.unlockStudio; }
     if (studioRewarded && audience === 0 && coins >= openingUpgradeCost("audience_reach", audience)) { coins -= openingUpgradeCost("audience_reach", audience++); audienceRewarded = true; coins += BALANCE.onboarding.goalCoins.buyAudienceReach; }
     if (audienceRewarded && rate === 0 && coins >= openingUpgradeCost("engagement_rate", rate)) coins -= openingUpgradeCost("engagement_rate", rate++);
