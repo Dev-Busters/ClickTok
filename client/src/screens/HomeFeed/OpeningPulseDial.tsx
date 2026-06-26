@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   OPENING_PULSE_CYCLE_MS,
@@ -12,7 +12,7 @@ import {
 } from "../../features/onboarding/helpers";
 import type { OpeningPulseModifier, OpeningPulseModifierId, OpeningPulseModifierKind } from "../../features/onboarding/types";
 
-type PulseFeedback = { id: number; zone: OpeningPulseZone } | null;
+type PulseFeedback = { id: number; zone: OpeningPulseZone; passiveBoosted?: boolean } | null;
 
 type OpeningPulseDialProps = {
   feedback: PulseFeedback;
@@ -64,12 +64,21 @@ export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, directi
   const travelerRef = useRef<HTMLDivElement>(null);
   const waveRef = useRef<SVGGElement>(null);
   const energyWaveRef = useRef<SVGPathElement>(null);
+  const previousPassiveArmed = useRef(passiveArmed);
   const reducedMotion = useReducedMotion();
+  const [armedPulseKey, setArmedPulseKey] = useState(0);
   const paths = useMemo(() => [
     wavePath(102, 4.8, 9, 0),
     wavePath(98, 3.4, 7, 1.8),
     wavePath(106, 2.6, 11, 3.2),
   ], []);
+
+  useEffect(() => {
+    if (passiveArmed && !previousPassiveArmed.current) {
+      setArmedPulseKey(current => current + 1);
+    }
+    previousPassiveArmed.current = passiveArmed;
+  }, [passiveArmed]);
 
   useEffect(() => {
     let frame = 0;
@@ -148,8 +157,8 @@ export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, directi
       </svg>
 
       <AnimatePresence>
-        {showTimingGuide && <motion.div data-pulse-timing-guide initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, scale: .96 }} transition={{ duration: .24 }} style={{ position: "absolute", zIndex: 5, top: -43, left: "50%", translate: "-50% 0", width: 160, display: "grid", placeItems: "center", pointerEvents: "none" }}>
-          <span style={{ color: "#75ffb5", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900, letterSpacing: ".06em", textAlign: "center", textShadow: "0 0 9px rgba(73,255,154,.78)" }}>PERFECT 100%</span>
+        {showTimingGuide && <motion.div data-pulse-timing-guide initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5, scale: .96 }} transition={{ duration: .24 }} style={{ position: "absolute", zIndex: 5, top: -50, left: "50%", translate: "-50% 0", width: 196, display: "grid", placeItems: "center", pointerEvents: "none" }}>
+          <span style={{ color: "#75ffb5", fontFamily: "var(--font-mono)", fontSize: 8.5, fontWeight: 900, letterSpacing: ".06em", textAlign: "center", textShadow: "0 0 9px rgba(73,255,154,.78)" }}>TAP WHILE THE PULSE IS INSIDE THE GREEN ZONE</span>
         </motion.div>}
       </AnimatePresence>
 
@@ -163,14 +172,32 @@ export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, directi
       </div>
 
       <AnimatePresence>
+        {armedPulseKey > 0 && (
+          <motion.div
+            key={`armed-pulse-${armedPulseKey}`}
+            initial={{ opacity: .92, scale: .82 }}
+            animate={{ opacity: 0, scale: 1.34 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: .72, ease: "easeOut" }}
+            style={{ position: "absolute", inset: -8, borderRadius: "50%", border: "4px solid rgba(181,108,255,.9)", boxShadow: "0 0 34px rgba(181,108,255,.9), inset 0 0 22px rgba(181,108,255,.6)" }}
+          />
+        )}
         {feedback && (
           <motion.div
             key={feedback.id}
             initial={{ opacity: .95, scale: .74 }}
-            animate={{ opacity: 0, scale: feedback.zone === "green" ? 1.34 : 1.18 }}
+            animate={{ opacity: 0, scale: feedback.zone === "green" ? 1.4 : feedback.zone === "passive" ? 1.32 : 1.24 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: feedback.zone === "green" ? .48 : .34, ease: "easeOut" }}
-            style={{ position: "absolute", inset: feedback.zone === "green" ? -5 : 1, borderRadius: "50%", border: `3px solid ${feedback.zone === "green" ? "#75ffb5" : feedback.zone === "blue" ? "#37a6ff" : feedback.zone === "passive" ? "#b56cff" : "#ff315d"}`, boxShadow: `0 0 28px ${feedback.zone === "green" ? "#4dff9a" : feedback.zone === "blue" ? "#37a6ff" : feedback.zone === "passive" ? "#b56cff" : "#ff315d"}, inset 0 0 18px currentColor` }}
+            transition={{ duration: feedback.zone === "green" ? .52 : feedback.zone === "passive" ? .46 : .38, ease: "easeOut" }}
+            style={{
+              position: "absolute",
+              inset: feedback.zone === "green" ? -7 : feedback.zone === "passive" ? -5 : 0,
+              borderRadius: "50%",
+              border: `3px solid ${feedback.zone === "green" ? "#75ffb5" : feedback.zone === "blue" ? "#37a6ff" : feedback.zone === "passive" ? "#b56cff" : "#ff315d"}`,
+              boxShadow: feedback.passiveBoosted
+                ? "0 0 34px rgba(181,108,255,.95), 0 0 18px currentColor, inset 0 0 18px rgba(181,108,255,.65)"
+                : `0 0 28px ${feedback.zone === "green" ? "#4dff9a" : feedback.zone === "blue" ? "#37a6ff" : feedback.zone === "passive" ? "#b56cff" : "#ff315d"}, inset 0 0 18px currentColor`,
+            }}
           />
         )}
       </AnimatePresence>

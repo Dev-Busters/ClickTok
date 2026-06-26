@@ -98,11 +98,11 @@ export function OpeningPulseModifierEditor({ angle, valid, canAfford, coins, fir
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        style={{ position: "absolute", zIndex: 24, top: 226, left: "50%", translate: "-50% 0", width: 292, padding: 12, borderRadius: 13, border: `1px solid ${valid ? selectedKind === "event" ? "rgba(55,166,255,.58)" : "rgba(181,108,255,.58)" : "rgba(255,49,93,.65)"}`, background: "rgba(6,9,13,.96)", boxShadow: "0 14px 38px rgba(0,0,0,.5)", textAlign: "center" }}
+        style={{ position: "absolute", zIndex: 24, top: 210, left: "50%", translate: "-50% 0", width: 304, padding: 10, borderRadius: 13, border: `1px solid ${valid ? selectedKind === "event" ? "rgba(55,166,255,.58)" : "rgba(181,108,255,.58)" : "rgba(255,49,93,.65)"}`, background: "rgba(6,9,13,.97)", boxShadow: "0 14px 38px rgba(0,0,0,.5)", textAlign: "center" }}
       >
-        <strong style={{ display: "block", color: valid ? selectedKind === "event" ? "#65bdff" : "#d2a8ff" : "#ff607f", fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: ".07em" }}>{valid ? "TEB EDITOR" : "ZONE OVERLAP"}</strong>
-        <span style={{ display: "block", margin: "2px 0 9px", color: "rgba(255,255,255,.62)", fontFamily: "var(--font-mono)", fontSize: 8, lineHeight: 1.45, letterSpacing: ".08em" }}>{valid ? "SELECT A ZONE · DRAG GHOST · ARROWS FINE-TUNE" : "MOVE THE RED GHOST AWAY FROM ACTIVE ZONES"}</span>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 10 }}>
+        <strong style={{ display: "block", color: valid ? selectedKind === "event" ? "#65bdff" : "#d2a8ff" : "#ff607f", fontFamily: "var(--font-display)", fontSize: 18, letterSpacing: ".07em" }}>{valid ? "TEB EDITOR" : "ZONE OVERLAP"}</strong>
+        <span style={{ display: "block", margin: "2px 0 8px", color: "rgba(255,255,255,.62)", fontFamily: "var(--font-mono)", fontSize: 7.5, lineHeight: 1.35, letterSpacing: ".08em" }}>{valid ? "DRAG THE GHOST · ARROWS FINE-TUNE" : "MOVE THE RED GHOST CLEAR OF ACTIVE ZONES"}</span>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 8 }}>
           {ZONE_OPTIONS.map(option => {
             const selected = option.id === selectedId;
             const owned = ownedIds.includes(option.id);
@@ -114,8 +114,8 @@ export function OpeningPulseModifierEditor({ angle, valid, canAfford, coins, fir
                 data-teb-zone-option={option.id}
                 data-selected={selected ? "true" : "false"}
                 style={{
-                  minHeight: 76,
-                  padding: "9px 8px",
+                  minHeight: 68,
+                  padding: "8px 8px",
                   borderRadius: 11,
                   border: `1px solid ${selected ? option.color : "rgba(255,255,255,.12)"}`,
                   background: selected ? `${option.color}22` : "rgba(255,255,255,.045)",
@@ -129,18 +129,22 @@ export function OpeningPulseModifierEditor({ angle, valid, canAfford, coins, fir
                   {option.title}
                   <span style={{ color: owned ? "#75ffb5" : "var(--gold)" }}>{owned ? "OWNED" : `${OPENING_PULSE_ZONE_COST}G`}</span>
                 </span>
-                <span style={{ display: "block", marginTop: 5, color: "rgba(255,255,255,.62)", fontFamily: "var(--font-mono)", fontSize: 7.5, lineHeight: 1.35, letterSpacing: ".035em" }}>{option.copy}</span>
+                <span style={{ display: "block", marginTop: 4, color: "rgba(255,255,255,.62)", fontFamily: "var(--font-mono)", fontSize: 7, lineHeight: 1.28, letterSpacing: ".03em" }}>{option.copy}</span>
               </button>
             );
           })}
         </div>
-        <div style={{ marginBottom: 9, display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontSize: 8, color: "rgba(255,255,255,.55)", letterSpacing: ".08em" }}>
+        <div style={{ marginBottom: 5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontFamily: "var(--font-mono)", fontSize: 7.5, color: "rgba(255,255,255,.55)", letterSpacing: ".08em" }}>
           <span>{openingPulseModifierLabel(selectedId)}</span>
+          <span>{Math.round(angle)}°</span>
           <span style={{ color: canAfford || selectedOwned ? "var(--gold)" : "#ff607f" }}>{coins} GOLD</span>
         </div>
+        <div style={{ marginBottom: 8, color: valid ? "rgba(255,255,255,.48)" : "#ff94a8", fontFamily: "var(--font-mono)", fontSize: 7, letterSpacing: ".08em" }}>
+          {valid ? "SHIFT = 12° STEPS" : "RED GHOST IS BLOCKED"}
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {!firstPlacement && <button onClick={onCancel} style={{ flex: 1, minHeight: 40, borderRadius: 999, border: "1px solid rgba(255,255,255,.14)", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.72)", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900, letterSpacing: ".1em" }}>CANCEL</button>}
-          <button disabled={!confirmEnabled} onClick={onConfirm} style={{ flex: 1.4, minHeight: 40, border: 0, borderRadius: 999, background: confirmEnabled ? selectedKind === "event" ? "#37a6ff" : "#b56cff" : "rgba(255,49,93,.18)", color: confirmEnabled ? "#041008" : "rgba(255,255,255,.35)", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900, letterSpacing: ".1em", cursor: confirmEnabled ? "pointer" : "not-allowed" }}>{!valid ? "MOVE ZONE" : !selectedOwned && !canAfford ? "NEED 5 GOLD" : selectedOwned ? "MOVE ZONE" : firstPlacement && Math.round(angle) === 180 ? "BUY AT 6 O'CLOCK" : "BUY + PLACE"}</button>
+          {!firstPlacement && <button onClick={onCancel} style={{ flex: 1, minHeight: 36, borderRadius: 999, border: "1px solid rgba(255,255,255,.14)", background: "rgba(255,255,255,.06)", color: "rgba(255,255,255,.72)", fontFamily: "var(--font-mono)", fontSize: 8.5, fontWeight: 900, letterSpacing: ".1em" }}>CANCEL</button>}
+          <button disabled={!confirmEnabled} onClick={onConfirm} style={{ flex: 1.4, minHeight: 36, border: 0, borderRadius: 999, background: confirmEnabled ? selectedKind === "event" ? "#37a6ff" : "#b56cff" : "rgba(255,49,93,.18)", color: confirmEnabled ? "#041008" : "rgba(255,255,255,.35)", fontFamily: "var(--font-mono)", fontSize: 8.5, fontWeight: 900, letterSpacing: ".1em", cursor: confirmEnabled ? "pointer" : "not-allowed" }}>{!valid ? "MOVE ZONE" : !selectedOwned && !canAfford ? "NEED 5 GOLD" : selectedOwned ? "MOVE ZONE" : "BUY + PLACE"}</button>
         </div>
       </motion.div>
     </>
