@@ -21,6 +21,7 @@ type OpeningPulseDialProps = {
   direction: OpeningPulseDirection;
   offsetDeg: number;
   passiveArmed: boolean;
+  pausedAt?: number;
   editing?: { id: OpeningPulseModifierId; kind: OpeningPulseModifierKind; centerDeg: number; valid: boolean };
   onPulseFrame?: (now: number) => void;
 };
@@ -60,7 +61,7 @@ function ModifierZone({ modifier, invalid = false, preview = false }: { modifier
   );
 }
 
-export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, direction, offsetDeg, passiveArmed, editing, onPulseFrame }: OpeningPulseDialProps) {
+export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, direction, offsetDeg, passiveArmed, pausedAt, editing, onPulseFrame }: OpeningPulseDialProps) {
   const travelerRef = useRef<HTMLDivElement>(null);
   const waveRef = useRef<SVGGElement>(null);
   const energyWaveRef = useRef<SVGPathElement>(null);
@@ -82,13 +83,12 @@ export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, directi
 
   useEffect(() => {
     let frame = 0;
-    const update = () => {
-      const now = Date.now();
+    const renderPulse = (now: number) => {
       onPulseFrame?.(now);
       const progress = openingPulseProgress(now, direction, offsetDeg);
       const angle = openingPulseAngle(now, direction, offsetDeg);
       const zone = openingPulseZone(now, modifiers, direction, offsetDeg);
-      const color = zone === "green" ? "#4dff9a" : zone === "blue" ? "#37a6ff" : zone === "passive" ? "#b56cff" : "#ff315d";
+      const color = passiveArmed ? "#b56cff" : zone === "green" ? "#4dff9a" : zone === "blue" ? "#37a6ff" : zone === "passive" ? "#b56cff" : "#ff315d";
       const traveler = travelerRef.current;
       if (traveler) {
         traveler.style.transform = `rotate(${angle}deg) translateY(-112px)`;
@@ -108,11 +108,19 @@ export function OpeningPulseDial({ feedback, modifiers, showTimingGuide, directi
         const breath = 1 + Math.sin(progress * Math.PI * 4) * 0.028;
         wave.setAttribute("transform", `translate(${CENTER} ${CENTER}) scale(${breath}) rotate(${-angle * 0.22}) translate(${-CENTER} ${-CENTER})`);
       }
+    };
+    const update = () => {
+      const now = Date.now();
+      renderPulse(now);
       frame = requestAnimationFrame(update);
     };
+    if (pausedAt !== undefined) {
+      renderPulse(pausedAt);
+      return;
+    }
     update();
     return () => cancelAnimationFrame(frame);
-  }, [direction, modifiers, offsetDeg, onPulseFrame, passiveArmed, reducedMotion]);
+  }, [direction, modifiers, offsetDeg, onPulseFrame, passiveArmed, pausedAt, reducedMotion]);
 
   const greenHalf = OPENING_PULSE_GREEN_DEG / 2;
   const zoneGradient = `conic-gradient(from 0deg,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_ZONE_COST, openingPulseHit, requirementValue, type OpeningPulseZone } from "../../features/onboarding/helpers";
+import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_ZONE_COST, openingPulseHit, openingPulseReward, requirementValue, type OpeningPulseZone } from "../../features/onboarding/helpers";
 import type { OpeningPulseModifierId, OpeningPulseModifierKind } from "../../features/onboarding/types";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
@@ -29,6 +29,7 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
   const completed = useGameStore(state => state.completedOnboardingGoals);
   const teaches = useGameStore(state => state.onboardingTeachesSeen);
   const reveal = useGameStore(state => state.activeOnboardingReveal);
+  const openingUpgradeLevels = useGameStore(state => state.openingUpgradeLevels);
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const acknowledgeReveal = useGameStore(state => state.acknowledgeOnboardingReveal);
   const modifiers = useGameStore(state => state.openingPulseModifiers);
@@ -41,8 +42,9 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
   const nextReactionId = useRef(0);
   const activePointer = useRef<number | null>(null);
   const activeKey = useRef(false);
-  const [tapReactions, setTapReactions] = useState<Array<{ id: number; full: boolean; drift: number; zone: OpeningPulseZone; followers: number; passiveBoosted: boolean }>>([]);
+  const [tapReactions, setTapReactions] = useState<Array<{ id: number; full: boolean; drift: number; zone: OpeningPulseZone; baseFollowers: number; bonusFollowers: number; passiveBoosted: boolean }>>([]);
   const [pulseFeedback, setPulseFeedback] = useState<{ id: number; zone: OpeningPulseZone; passiveBoosted: boolean } | null>(null);
+  const [pausedAt, setPausedAt] = useState<number | null>(null);
   const reduced = useReducedMotion();
   const meterVisible = isOpeningEngagementAvailable(completed);
   const rhythmUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
@@ -61,6 +63,14 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
     setDraftAngle(selectedModifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
   }, [firstPlacement, selectedModifier?.centerDeg, setDraftAngle]);
 
+  useEffect(() => {
+    if (editing) {
+      setPausedAt(current => current ?? Date.now());
+      return;
+    }
+    setPausedAt(null);
+  }, [editing]);
+
   const selectZone = (id: OpeningPulseModifierId) => {
     const existing = modifiers.find(item => item.id === id);
     setSelectedModifierId(id);
@@ -68,15 +78,17 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
   };
 
   const start = useCallback(() => {
-    const now = Date.now();
+    const now = pausedAt ?? Date.now();
     const state = useGameStore.getState();
     const hit = openingPulseHit(now, state.openingPulseModifiers, state.openingPulseDirection, state.openingPulseOffsetDeg);
     const followers = openingTap(now);
     const full = useGameStore.getState().engagementFill >= BALANCE.onboarding.engagement.cap;
     const passiveBoosted = state.openingPulsePassiveArmed && state.openingPulsePassiveTarget !== null && hit.eventKey === state.openingPulsePassiveTarget;
+    const baseFollowers = openingPulseReward(openingUpgradeLevels.audience_reach, hit, false);
+    const bonusFollowers = passiveBoosted ? Math.max(0, followers - baseFollowers) : 0;
     const id = nextReactionId.current++;
     setPulseFeedback({ id, zone: hit.zone, passiveBoosted });
-    setTapReactions(current => [...current.slice(-5), { id, full, drift: (Math.random() - .5) * 72, zone: hit.zone, followers, passiveBoosted }]);
+    setTapReactions(current => [...current.slice(-5), { id, full, drift: (Math.random() - .5) * 72, zone: hit.zone, baseFollowers, bonusFollowers, passiveBoosted }]);
     const timer = setTimeout(() => {
       setTapReactions(current => current.filter(reaction => reaction.id !== id));
       reactionTimers.current.delete(id);
@@ -87,7 +99,7 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
       beginCharge();
       if (reveal?.feature === "engagement_meter" && reveal.dismissed && !teaches.rhythm_first_hold) completeTeach("rhythm_first_hold");
     }, BALANCE.teb.holdLaunchThresholdMs);
-  }, [beginCharge, completeTeach, openingTap, ready, reveal, session, teaches.rhythm_first_hold]);
+  }, [beginCharge, completeTeach, openingTap, openingUpgradeLevels.audience_reach, pausedAt, ready, reveal, session, teaches.rhythm_first_hold]);
   const end = useCallback(() => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = null;
@@ -112,7 +124,7 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
   }, []);
 
   return (
-    <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
+    <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: editing ? "44%" : "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
       <div style={{ position: "relative", width: 206, height: 206, margin: "0 auto" }}>
         <OpeningPulseDial
           feedback={pulseFeedback}
@@ -121,7 +133,8 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
           direction={pulseDirection}
           offsetDeg={pulseOffsetDeg}
           passiveArmed={passiveArmed}
-          onPulseFrame={updatePassivePulse}
+          pausedAt={pausedAt ?? undefined}
+          onPulseFrame={editing ? undefined : updatePassivePulse}
           editing={editing ? { id: selectedModifierId, kind: selectedKind, centerDeg: draftAngle, valid: placementValid } : undefined}
         />
         {editing && <OpeningPulseModifierEditor
@@ -218,7 +231,7 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
       <AnimatePresence>
         {tapReactions.map(reaction => <motion.div
           key={`reaction-${reaction.id}`}
-          data-tap-reaction={reaction.followers > 0 ? "follower" : "miss"}
+          data-tap-reaction={reaction.baseFollowers + reaction.bonusFollowers > 0 ? "follower" : "miss"}
           initial={{ opacity: 0, scale: .45, x: reaction.drift * .2, y: -92 }}
           animate={{ opacity: [0, 1, 1, 0], scale: reaction.full ? [.45, 1.55, 1.25, 1.05] : [.45, 1.35, 1.12, 1], x: reaction.full ? reaction.drift * .35 : reaction.drift, y: reaction.full ? -236 : -218 }}
           exit={{ opacity: 0 }}
@@ -232,9 +245,9 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
             pointerEvents: "none",
             whiteSpace: "nowrap",
             fontFamily: "var(--font-mono)",
-            fontSize: reaction.full ? (reaction.followers > 0 ? 16 : 30) : reaction.followers > 0 ? 18 : 30,
+            fontSize: reaction.full ? (reaction.baseFollowers + reaction.bonusFollowers > 0 ? 16 : 30) : reaction.baseFollowers + reaction.bonusFollowers > 0 ? 18 : 30,
             fontWeight: 900,
-            letterSpacing: reaction.full && reaction.followers > 0 ? ".06em" : ".1em",
+            letterSpacing: reaction.full && reaction.baseFollowers + reaction.bonusFollowers > 0 ? ".06em" : ".1em",
             color: reaction.zone === "green" ? "#4dff9a" : reaction.zone === "blue" ? "#37a6ff" : reaction.zone === "passive" ? "#b56cff" : "var(--red)",
             textShadow: reaction.passiveBoosted
               ? "0 0 26px currentColor,0 0 38px rgba(181,108,255,.92),0 0 10px rgba(181,108,255,.82),0 2px 4px rgba(0,0,0,.9)"
@@ -243,13 +256,15 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
                 : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)",
           }}
         >
-          {reaction.zone === "green"
-            ? `PERFECT${reaction.passiveBoosted ? " ✦ BOOST" : ""} · +${formatCount(reaction.followers)}`
-            : reaction.zone === "blue"
-              ? `BLUE${reaction.passiveBoosted ? " ✦ BOOST" : ""} · +${formatCount(reaction.followers)} · REVERSE`
-              : reaction.zone === "passive"
-                ? "READY"
-                : "MISS"}
+          {reaction.zone === "passive"
+            ? "BOOST READY"
+            : reaction.baseFollowers + reaction.bonusFollowers > 0
+              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: reaction.zone === "blue" ? "#37a6ff" : "#4dff9a" }}>+{formatCount(reaction.baseFollowers)}</span>
+                  {reaction.bonusFollowers > 0 && <span style={{ color: "#d2a8ff", textShadow: "0 0 22px rgba(181,108,255,.92)" }}>+{formatCount(reaction.bonusFollowers)}</span>}
+                  {reaction.zone === "blue" && <span style={{ color: "#9fd4ff", fontSize: 11 }}>REVERSE</span>}
+                </span>
+              : "MISS"}
         </motion.div>)}
       </AnimatePresence>
       {meterVisible && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: meterFull ? 900 : 400, letterSpacing: ".1em", color: meterFull ? "var(--gold)" : "rgba(255,255,255,.72)", textShadow: meterFull ? "0 0 12px rgba(255,210,0,.72)" : "none" }}>ENGAGEMENT {Math.round(fill)} / 100{meterFull ? (rhythmUnlocked ? " · HOLD TO LAUNCH" : " · FULL · TAP THREE LOCKED") : !rhythmUnlocked ? " · BUILDING FOR TAP THREE" : ""}</div>}

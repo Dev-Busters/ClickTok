@@ -158,17 +158,26 @@ function AnalyticsSection() {
   const setTab = useGameStore(s => s.setTab);
   const reduced = useReducedMotion();
   const [celebrating, setCelebrating] = useState(false);
+  const [analyticsView, setAnalyticsView] = useState<"available" | "obtained">(pulseClaimed && studioClaimed ? "obtained" : "available");
   const target = BALANCE.onboarding.studioFollowers;
   const pulseTarget = BALANCE.onboarding.firstGoalFollowers;
   const pulseReady = followers >= pulseTarget;
   const ready = pulseClaimed && followers >= target;
   const type = ANALYTICS_TYPE_STYLE.feature;
 
+  const availableCount = Number(!pulseClaimed) + Number(!studioClaimed);
+  const obtainedCount = Number(pulseClaimed) + Number(studioClaimed);
+
   useEffect(() => {
     if (!celebrating) return;
     const timer = window.setTimeout(() => setCelebrating(false), reduced ? 500 : 1500);
     return () => window.clearTimeout(timer);
   }, [celebrating, reduced]);
+
+  useEffect(() => {
+    if (analyticsView === "available" && availableCount === 0 && obtainedCount > 0) setAnalyticsView("obtained");
+    if (analyticsView === "obtained" && obtainedCount === 0 && availableCount > 0) setAnalyticsView("available");
+  }, [analyticsView, availableCount, obtainedCount]);
 
   const act = () => {
     if (studioClaimed) {
@@ -188,7 +197,48 @@ function AnalyticsSection() {
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: studioClaimed ? 'var(--gold)' : 'var(--dim)' }}>{Number(pulseClaimed) + Number(studioClaimed)} / 2</span>
       </div>
 
-      <motion.article
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button
+          type="button"
+          onClick={() => setAnalyticsView("available")}
+          style={{
+            flex: 1,
+            minHeight: 34,
+            borderRadius: 999,
+            border: analyticsView === "available" ? "1px solid rgba(37,244,238,.55)" : "1px solid rgba(255,255,255,.12)",
+            background: analyticsView === "available" ? "rgba(37,244,238,.12)" : "rgba(255,255,255,.04)",
+            color: analyticsView === "available" ? "var(--cyan)" : "rgba(255,255,255,.62)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 8.5,
+            fontWeight: 900,
+            letterSpacing: ".12em",
+            cursor: "pointer",
+          }}
+        >
+          AVAILABLE · {availableCount}
+        </button>
+        <button
+          type="button"
+          onClick={() => setAnalyticsView("obtained")}
+          style={{
+            flex: 1,
+            minHeight: 34,
+            borderRadius: 999,
+            border: analyticsView === "obtained" ? "1px solid rgba(255,210,0,.55)" : "1px solid rgba(255,255,255,.12)",
+            background: analyticsView === "obtained" ? "rgba(255,210,0,.12)" : "rgba(255,255,255,.04)",
+            color: analyticsView === "obtained" ? "var(--gold)" : "rgba(255,255,255,.62)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 8.5,
+            fontWeight: 900,
+            letterSpacing: ".12em",
+            cursor: "pointer",
+          }}
+        >
+          OBTAINED · {obtainedCount}
+        </button>
+      </div>
+
+      {(analyticsView === "available" ? !pulseClaimed : pulseClaimed) && <motion.article
         data-analytics-entry="teb_editor"
         data-unlock-type="feature"
         style={{ position: "relative", overflow: "hidden", padding: 12, marginBottom: 8, borderRadius: 12, border: `1px solid ${pulseClaimed || pulseReady ? "rgba(55,166,255,.62)" : "rgba(255,255,255,.13)"}`, background: "linear-gradient(145deg,rgba(12,24,38,.98),rgba(9,13,16,.98))", boxShadow: pulseReady && !pulseClaimed ? "0 0 20px rgba(55,166,255,.13)" : "none" }}
@@ -207,9 +257,9 @@ function AnalyticsSection() {
           disabled={!pulseReady && !pulseClaimed}
           style={{ width: "100%", marginTop: 10, padding: 10, border: 0, borderRadius: 999, background: pulseClaimed ? "rgba(55,166,255,.18)" : pulseReady ? "#37a6ff" : "rgba(255,255,255,.08)", color: pulseReady || pulseClaimed ? (pulseClaimed ? "#65bdff" : "#041008") : "rgba(255,255,255,.34)", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 900, letterSpacing: ".12em", cursor: pulseReady || pulseClaimed ? "pointer" : "default" }}
         >{pulseClaimed ? "OPEN EDITOR →" : pulseReady ? "UNLOCK EDITOR · +5 GOLD" : `${pulseTarget} FOLLOWERS REQUIRED`}</motion.button>
-      </motion.article>
+      </motion.article>}
 
-      <motion.article
+      {(analyticsView === "available" ? !studioClaimed : studioClaimed) && <motion.article
         data-analytics-entry="creator_studio"
         data-unlock-type="feature"
         animate={celebrating && !reduced ? { scale: [1, 1.035, 1], boxShadow: ["0 0 0 rgba(37,244,238,0)", "0 0 42px rgba(37,244,238,.58)", "0 0 18px rgba(37,244,238,.2)"] } : { scale: 1 }}
@@ -233,7 +283,18 @@ function AnalyticsSection() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 8, color: ready ? 'var(--gold)' : 'rgba(255,255,255,.56)' }}><span>{Math.min(followers, target)} / {target} FOLLOWERS</span><span>{studioClaimed ? 'OBTAINED' : ready ? 'READY' : 'LOCKED'}</span></div>
         <motion.button whileTap={ready || studioClaimed ? { scale: .97 } : {}} onClick={act} disabled={!ready && !studioClaimed} style={{ width: '100%', marginTop: 10, padding: 10, border: 0, borderRadius: 999, background: studioClaimed ? 'var(--cyan)' : ready ? 'var(--gold)' : 'rgba(255,255,255,.08)', color: ready || studioClaimed ? '#050608' : 'rgba(255,255,255,.34)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 900, letterSpacing: '.12em', cursor: ready || studioClaimed ? 'pointer' : 'default' }}>{studioClaimed ? 'OPEN STUDIO →' : ready ? 'OBTAIN · +5 GOLD' : !pulseClaimed ? 'COMPLETE FIRST ENTRY' : `${target} FOLLOWERS REQUIRED`}</motion.button>
-      </motion.article>
+      </motion.article>}
+
+      {analyticsView === "available" && availableCount === 0 && (
+        <div style={{ padding: "18px 14px", borderRadius: 12, border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 9, color: "rgba(255,255,255,.55)", letterSpacing: ".08em" }}>
+          ALL CURRENT UNLOCKS HAVE BEEN CLAIMED
+        </div>
+      )}
+      {analyticsView === "obtained" && obtainedCount === 0 && (
+        <div style={{ padding: "18px 14px", borderRadius: 12, border: "1px solid rgba(255,255,255,.08)", background: "rgba(255,255,255,.03)", textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 9, color: "rgba(255,255,255,.55)", letterSpacing: ".08em" }}>
+          CLAIMED ENTRIES WILL APPEAR HERE
+        </div>
+      )}
     </section>
   );
 }
