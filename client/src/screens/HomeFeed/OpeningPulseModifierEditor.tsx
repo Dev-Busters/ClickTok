@@ -8,6 +8,7 @@ type OpeningPulseModifierEditorProps = {
   valid: boolean;
   canAfford: boolean;
   coins: number;
+  dockBelow?: boolean;
   firstPlacement: boolean;
   selectedId: OpeningPulseModifierId;
   selectedKind: OpeningPulseModifierKind;
@@ -31,7 +32,7 @@ function pointerAngle(event: PointerEvent<HTMLDivElement>): number {
   return normalizePulseAngle(Math.atan2(x, -y) * 180 / Math.PI);
 }
 
-export function OpeningPulseModifierEditor({ angle, valid, canAfford, coins, firstPlacement, selectedId, selectedKind, selectedOwned, ownedIds, onSelectZone, onAngleChange, onConfirm, onCancel }: OpeningPulseModifierEditorProps) {
+export function OpeningPulseModifierEditor({ angle, valid, canAfford, coins, dockBelow = false, firstPlacement, selectedId, selectedKind, selectedOwned, ownedIds, onSelectZone, onAngleChange, onConfirm, onCancel }: OpeningPulseModifierEditorProps) {
   const activePointer = useRef<number | null>(null);
   const confirmEnabled = valid && (selectedOwned || canAfford);
 
@@ -98,7 +99,21 @@ export function OpeningPulseModifierEditor({ angle, valid, canAfford, coins, fir
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        style={{ position: "absolute", zIndex: 24, top: 232, left: "50%", translate: "-50% 0", width: 304, padding: 10, borderRadius: 13, border: `1px solid ${valid ? selectedKind === "event" ? "rgba(55,166,255,.58)" : "rgba(181,108,255,.58)" : "rgba(255,49,93,.65)"}`, background: "rgba(6,9,13,.97)", boxShadow: "0 14px 38px rgba(0,0,0,.5)", textAlign: "center" }}
+        style={{
+          position: dockBelow ? "relative" : "absolute",
+          zIndex: 24,
+          top: dockBelow ? "auto" : 232,
+          left: dockBelow ? "auto" : "50%",
+          translate: dockBelow ? "none" : "-50% 0",
+          width: 304,
+          marginTop: dockBelow ? 18 : 0,
+          padding: 10,
+          borderRadius: 13,
+          border: `1px solid ${valid ? selectedKind === "event" ? "rgba(55,166,255,.58)" : "rgba(181,108,255,.58)" : "rgba(255,49,93,.65)"}`,
+          background: "rgba(6,9,13,.97)",
+          boxShadow: "0 14px 38px rgba(0,0,0,.5)",
+          textAlign: "center"
+        }}
       >
         <strong style={{ display: "block", color: valid ? selectedKind === "event" ? "#65bdff" : "#d2a8ff" : "#ff607f", fontFamily: "var(--font-display)", fontSize: 18, letterSpacing: ".07em" }}>{valid ? "TEB EDITOR" : "ZONE OVERLAP"}</strong>
         <span style={{ display: "block", margin: "2px 0 8px", color: "rgba(255,255,255,.62)", fontFamily: "var(--font-mono)", fontSize: 7.5, lineHeight: 1.35, letterSpacing: ".08em" }}>{valid ? "DRAG THE GHOST · ARROWS FINE-TUNE" : "MOVE THE RED GHOST CLEAR OF ACTIVE ZONES"}</span>

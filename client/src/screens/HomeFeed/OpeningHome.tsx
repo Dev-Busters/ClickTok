@@ -124,8 +124,8 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
   }, []);
 
   return (
-    <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: editing ? "44%" : "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
-      <div style={{ position: "relative", width: 206, height: 206, margin: "0 auto" }}>
+    <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: editing ? 160 : "52%", transform: editing ? "translateX(-50%)" : "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
+      <div style={{ position: "relative", width: 206, minHeight: editing ? 498 : 206, margin: "0 auto" }}>
         <OpeningPulseDial
           feedback={pulseFeedback}
           modifiers={modifiers}
@@ -142,6 +142,7 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
           valid={placementValid}
           canAfford={canAffordSelected}
           coins={wallet.coins}
+          dockBelow
           firstPlacement={firstPlacement}
           selectedId={selectedModifierId}
           selectedKind={selectedKind}
