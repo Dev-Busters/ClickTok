@@ -55,7 +55,6 @@ export function Shell() {
       completedOnboardingGoals: [],
       activeOnboardingReveal: null,
       onboardingTeachesSeen: {},
-      openingPulseModifiers: [],
       activeTab: "home",
     });
     if (onboardingQa === "zoneReady") useGameStore.setState({
@@ -64,7 +63,6 @@ export function Shell() {
       completedOnboardingGoals: [],
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { analytics_first_open: true },
-      openingPulseModifiers: [],
       activeTab: "inbox",
     });
     if (onboardingQa === "modifier") useGameStore.setState({
@@ -72,9 +70,8 @@ export function Shell() {
       viewsTotal: 14,
       onboardingStep: "meet_teb",
       completedOnboardingGoals: ["meet_teb"],
-      activeOnboardingReveal: { feature: "pulse_modifier", shownAt: Date.now(), dismissed: false },
+      activeOnboardingReveal: { feature: "shout_out", shownAt: Date.now(), dismissed: false },
       onboardingTeachesSeen: { analytics_first_open: true },
-      openingPulseModifiers: [],
     });
     if (onboardingQa === "studio") useGameStore.setState({
       wallet: { followers: 25, totalFollowers: 25, coins: 5, likes: 0, diamonds: 0 },
@@ -83,8 +80,7 @@ export function Shell() {
       completedOnboardingGoals: ["meet_teb", "unlock_studio"],
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { studio_first_use: true },
-      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
-      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
+      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
     });
     if (onboardingQa === "analyticsReady") useGameStore.setState({
       wallet: { followers: 25, totalFollowers: 25, coins: 0, likes: 0, diamonds: 0 },
@@ -93,8 +89,7 @@ export function Shell() {
       completedOnboardingGoals: ["meet_teb"],
       activeOnboardingReveal: null,
       onboardingTeachesSeen: {},
-      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
-      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
+      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
       activeTab: "inbox",
     });
     if (onboardingQa === "rhythm") useGameStore.setState({
@@ -104,8 +99,7 @@ export function Shell() {
       completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm"],
       activeOnboardingReveal: { feature: "engagement_meter", shownAt: Date.now(), dismissed: true },
       onboardingTeachesSeen: { studio_first_use: true },
-      openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1 },
-      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
+      openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1, raid_squad: 0 },
       engagementFill: 100,
     });
     if (onboardingQa === "meterFull") useGameStore.setState({
@@ -115,8 +109,7 @@ export function Shell() {
       completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach"],
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { studio_first_use: true },
-      openingUpgradeLevels: { audience_reach: 1, engagement_rate: 1 },
-      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
+      openingUpgradeLevels: { audience_reach: 1, engagement_rate: 1, raid_squad: 0 },
       engagementFill: 100,
       session: null,
     });
@@ -127,8 +120,7 @@ export function Shell() {
       completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm", "complete_first_rhythm"],
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { studio_first_use: true, rhythm_first_hold: true },
-      openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1 },
-      openingPulseModifiers: [{ id: "blue_event_1", kind: "event", centerDeg: 180 }],
+      openingUpgradeLevels: { audience_reach: 2, engagement_rate: 1, raid_squad: 1 },
       engagementFill: 0,
       tapThreeCompletions: 1,
       session: null,

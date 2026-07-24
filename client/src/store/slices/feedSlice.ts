@@ -72,8 +72,10 @@ export const createFeedSlice: StateCreator<FullState, [], [], FeedSlice> = (set,
   reactedByVideo: {},
 
   engageTap: () => {
-    const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, viewBuffUntil, viewBuffMult, activeWave, deck, deckIndex, tapsThisCard, viewsTotal, coinsEarned } = get();
+    const { tapPower, multiplier, followerConversion, wallet, combo, viralUntil, viewBuffUntil, viewBuffMult, activeWave, deck, deckIndex, tapsThisCard, viewsTotal, coinsEarned, lastTapAt } = get();
     const now = Date.now();
+    // Anti-autoclicker: taps faster than this are silently dropped (see onboarding.minTapIntervalMs).
+    if (lastTapAt !== 0 && now - lastTapAt < BALANCE.feed.minTapIntervalMs) return;
     const cap = BALANCE.feed.comboCap;
     const wasViral = viralUntil > now;
     // 04 §13.8: while VIRAL, combo is frozen at comboCap (taps don't overfill); decay is paused.

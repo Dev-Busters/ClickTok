@@ -4,10 +4,10 @@ import type { SkillId } from "../../features/skills/types";
 import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { SequenceId } from "../../features/teb/types";
-import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningPulseModifier, type OpeningPulseModifierKind, type OpeningUpgradeId } from "../../features/onboarding/types";
+import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -128,21 +128,33 @@ export type PersistedV15 = Omit<PersistedV14, "version"> & {
 };
 
 export type PersistedV16 = Omit<PersistedV15, "version"> & { version: 16 };
+// v17/v18 carried a placeable "TEB editor" zone system, since removed (see PersistedV19).
+// Frozen migration-only shape — deliberately not sourced from current app types.
 type PersistedV17OpeningPulseModifier = {
-  id: "bonus_green_1" | OpeningPulseModifier["id"];
-  kind?: OpeningPulseModifierKind;
+  id: "bonus_green_1" | "passive_boost_1" | "blue_event_1";
+  kind?: "passive" | "event";
   centerDeg: number;
 };
 export type PersistedV17 = Omit<PersistedV16, "version"> & {
   version: 17;
   openingPulseModifiers: PersistedV17OpeningPulseModifier[];
 };
+type PersistedV18OpeningPulseModifier = {
+  id: "passive_boost_1" | "blue_event_1";
+  kind: "passive" | "event";
+  centerDeg: number;
+};
 export type PersistedV18 = Omit<PersistedV17, "version" | "openingPulseModifiers"> & {
   version: 18;
-  openingPulseModifiers: OpeningPulseModifier[];
+  openingPulseModifiers: PersistedV18OpeningPulseModifier[];
+};
+// 19: dropped the pulse-timing/zone-editor TEB system entirely — replaced by a
+// no-precision tap loop (combo heat + Shout-Out random bonus + Raid Squad passive).
+export type PersistedV19 = Omit<PersistedV18, "version" | "openingPulseModifiers"> & {
+  version: 19;
 };
 
-export type PersistedState = PersistedV18;
+export type PersistedState = PersistedV19;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -183,7 +195,6 @@ export function toPersistedState(state: FullState): PersistedState {
     activeOnboardingReveal: state.activeOnboardingReveal,
     onboardingTeachesSeen: state.onboardingTeachesSeen,
     openingUpgradeLevels: state.openingUpgradeLevels,
-    openingPulseModifiers: state.openingPulseModifiers,
     engagementFill: state.engagementFill,
     tapThreeCompletions: state.tapThreeCompletions,
     onboardingStepStartedAt: state.onboardingStepStartedAt,
@@ -215,7 +226,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17 | PersistedV18;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17 | PersistedV18 | PersistedV19;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -405,7 +416,7 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm", "complete_first_rhythm", "unlock_video_fyp"],
       activeOnboardingReveal: null,
       onboardingTeachesSeen: { studio_first_use: true, rhythm_first_hold: true, video_fyp_first_action: true, legacy_preserved: true },
-      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0 },
+      openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
       engagementFill: 0,
       tapThreeCompletions: 1,
       onboardingStepStartedAt: Date.now(),
@@ -439,7 +450,7 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
 
   if (version < 18) {
     const v17 = state as PersistedV17;
-    const openingPulseModifiers: OpeningPulseModifier[] = (v17.openingPulseModifiers ?? []).flatMap((modifier): OpeningPulseModifier[] => {
+    const openingPulseModifiers: PersistedV18OpeningPulseModifier[] = (v17.openingPulseModifiers ?? []).flatMap((modifier): PersistedV18OpeningPulseModifier[] => {
       if (modifier.id === "bonus_green_1" || modifier.id === "blue_event_1") return [{ id: "blue_event_1", kind: "event", centerDeg: modifier.centerDeg }];
       if (modifier.id === "passive_boost_1") return [{ id: "passive_boost_1", kind: "passive", centerDeg: modifier.centerDeg }];
       return [];
@@ -448,6 +459,17 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       ...v17,
       version: 18,
       openingPulseModifiers,
+    };
+  }
+
+  if (version < 19) {
+    const v18 = state as PersistedV18;
+    const { openingPulseModifiers: _drop, ...rest } = v18;
+    state = {
+      ...rest,
+      version: 19,
+      // v18 saves predate Raid Squad (the third opening upgrade) — start unowned.
+      openingUpgradeLevels: { ...v18.openingUpgradeLevels, raid_squad: v18.openingUpgradeLevels.raid_squad ?? 0 },
     };
   }
 

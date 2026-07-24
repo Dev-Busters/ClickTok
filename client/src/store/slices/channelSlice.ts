@@ -92,6 +92,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     if (stagedJourney) {
       get().decayCombo(dt);
       get().tickTebSession();
+      get().tickOpeningRaid(dt);
       return;
     }
     // 3.2: runs every frame (the meta loop always calls tick()), so this is

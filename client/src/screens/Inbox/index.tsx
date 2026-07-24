@@ -150,23 +150,23 @@ const ANALYTICS_TYPE_STYLE: Record<AnalyticsEntryType, { label: string; obtained
 
 function AnalyticsSection() {
   const followers = useGameStore(s => s.wallet.totalFollowers);
-  const pulseClaimed = useGameStore(s => s.completedOnboardingGoals.includes("meet_teb"));
+  const shoutOutClaimed = useGameStore(s => s.completedOnboardingGoals.includes("meet_teb"));
   const studioClaimed = useGameStore(s => s.completedOnboardingGoals.includes("unlock_studio"));
-  const claimPulse = useGameStore(s => s.claimPulseModifierAnalytics);
+  const claimShoutOut = useGameStore(s => s.claimShoutOutAnalytics);
   const claimStudio = useGameStore(s => s.claimCreatorStudioAnalytics);
   const setSheet = useGameStore(s => s.setSheet);
   const setTab = useGameStore(s => s.setTab);
   const reduced = useReducedMotion();
   const [celebrating, setCelebrating] = useState(false);
-  const [analyticsView, setAnalyticsView] = useState<"available" | "obtained">(pulseClaimed && studioClaimed ? "obtained" : "available");
+  const [analyticsView, setAnalyticsView] = useState<"available" | "obtained">(shoutOutClaimed && studioClaimed ? "obtained" : "available");
   const target = BALANCE.onboarding.studioFollowers;
-  const pulseTarget = BALANCE.onboarding.firstGoalFollowers;
-  const pulseReady = followers >= pulseTarget;
-  const ready = pulseClaimed && followers >= target;
+  const shoutOutTarget = BALANCE.onboarding.firstGoalFollowers;
+  const shoutOutReady = followers >= shoutOutTarget;
+  const ready = shoutOutClaimed && followers >= target;
   const type = ANALYTICS_TYPE_STYLE.feature;
 
-  const availableCount = Number(!pulseClaimed) + Number(!studioClaimed);
-  const obtainedCount = Number(pulseClaimed) + Number(studioClaimed);
+  const availableCount = Number(!shoutOutClaimed) + Number(!studioClaimed);
+  const obtainedCount = Number(shoutOutClaimed) + Number(studioClaimed);
 
   useEffect(() => {
     if (!celebrating) return;
@@ -194,7 +194,7 @@ function AnalyticsSection() {
           <h2 id="analytics-heading" style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--text)', letterSpacing: '.08em' }}>ANALYTICS</h2>
           <div style={{ marginTop: 2, fontFamily: 'var(--font-mono)', fontSize: 9, color: 'rgba(255,255,255,.58)', letterSpacing: '.08em' }}>ACHIEVEMENTS · UNLOCKS</div>
         </div>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: studioClaimed ? 'var(--gold)' : 'var(--dim)' }}>{Number(pulseClaimed) + Number(studioClaimed)} / 2</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: studioClaimed ? 'var(--gold)' : 'var(--dim)' }}>{Number(shoutOutClaimed) + Number(studioClaimed)} / 2</span>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -238,25 +238,25 @@ function AnalyticsSection() {
         </button>
       </div>
 
-      {(analyticsView === "available" ? !pulseClaimed : pulseClaimed) && <motion.article
-        data-analytics-entry="teb_editor"
+      {(analyticsView === "available" ? !shoutOutClaimed : shoutOutClaimed) && <motion.article
+        data-analytics-entry="shout_out"
         data-unlock-type="feature"
-        style={{ position: "relative", overflow: "hidden", padding: 12, marginBottom: 8, borderRadius: 12, border: `1px solid ${pulseClaimed || pulseReady ? "rgba(55,166,255,.62)" : "rgba(255,255,255,.13)"}`, background: "linear-gradient(145deg,rgba(12,24,38,.98),rgba(9,13,16,.98))", boxShadow: pulseReady && !pulseClaimed ? "0 0 20px rgba(55,166,255,.13)" : "none" }}
+        style={{ position: "relative", overflow: "hidden", padding: 12, marginBottom: 8, borderRadius: 12, border: `1px solid ${shoutOutClaimed || shoutOutReady ? "rgba(55,166,255,.62)" : "rgba(255,255,255,.13)"}`, background: "linear-gradient(145deg,rgba(12,24,38,.98),rgba(9,13,16,.98))", boxShadow: shoutOutReady && !shoutOutClaimed ? "0 0 20px rgba(55,166,255,.13)" : "none" }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "4px 7px", borderRadius: 999, border: "1px solid #37a6ff", color: "#65bdff", fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 900, letterSpacing: ".1em" }}>✦ FEATURE</span>
           <span style={{ color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900 }}>+5 GOLD</span>
         </div>
-        <h3 style={{ margin: "8px 0 2px", fontFamily: "var(--font-display)", fontSize: 22, color: "white", letterSpacing: ".04em" }}>TEB EDITOR</h3>
-        <p style={{ margin: "0 0 10px", color: "rgba(255,255,255,.68)", fontFamily: "var(--font-mono)", fontSize: 9, lineHeight: 1.4 }}>Unlock Passive Boost and Blue Event zone placement.</p>
-        <div style={{ height: 4, overflow: "hidden", borderRadius: 999, background: "rgba(255,255,255,.08)" }}><motion.div animate={{ width: `${Math.min(100, followers / pulseTarget * 100)}%` }} style={{ height: "100%", borderRadius: 999, background: pulseReady ? "#37a6ff" : "var(--cyan)", boxShadow: "0 0 10px currentColor" }} /></div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontFamily: "var(--font-mono)", fontSize: 8, color: pulseReady ? "#65bdff" : "rgba(255,255,255,.56)" }}><span>{Math.min(followers, pulseTarget)} / {pulseTarget} FOLLOWERS</span><span>{pulseClaimed ? "UNLOCKED" : pulseReady ? "READY" : "LOCKED"}</span></div>
+        <h3 style={{ margin: "8px 0 2px", fontFamily: "var(--font-display)", fontSize: 22, color: "white", letterSpacing: ".04em" }}>SHOUT-OUTS</h3>
+        <p style={{ margin: "0 0 10px", color: "rgba(255,255,255,.68)", fontFamily: "var(--font-mono)", fontSize: 9, lineHeight: 1.4 }}>Lucky taps get shouted out by a bigger creator for a big bonus.</p>
+        <div style={{ height: 4, overflow: "hidden", borderRadius: 999, background: "rgba(255,255,255,.08)" }}><motion.div animate={{ width: `${Math.min(100, followers / shoutOutTarget * 100)}%` }} style={{ height: "100%", borderRadius: 999, background: shoutOutReady ? "#37a6ff" : "var(--cyan)", boxShadow: "0 0 10px currentColor" }} /></div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontFamily: "var(--font-mono)", fontSize: 8, color: shoutOutReady ? "#65bdff" : "rgba(255,255,255,.56)" }}><span>{Math.min(followers, shoutOutTarget)} / {shoutOutTarget} FOLLOWERS</span><span>{shoutOutClaimed ? "UNLOCKED" : shoutOutReady ? "READY" : "LOCKED"}</span></div>
         <motion.button
-          whileTap={pulseReady || pulseClaimed ? { scale: .97 } : {}}
-          onClick={() => pulseClaimed ? setTab("home") : claimPulse()}
-          disabled={!pulseReady && !pulseClaimed}
-          style={{ width: "100%", marginTop: 10, padding: 10, border: 0, borderRadius: 999, background: pulseClaimed ? "rgba(55,166,255,.18)" : pulseReady ? "#37a6ff" : "rgba(255,255,255,.08)", color: pulseReady || pulseClaimed ? (pulseClaimed ? "#65bdff" : "#041008") : "rgba(255,255,255,.34)", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 900, letterSpacing: ".12em", cursor: pulseReady || pulseClaimed ? "pointer" : "default" }}
-        >{pulseClaimed ? "OPEN EDITOR →" : pulseReady ? "UNLOCK EDITOR · +5 GOLD" : `${pulseTarget} FOLLOWERS REQUIRED`}</motion.button>
+          whileTap={shoutOutReady || shoutOutClaimed ? { scale: .97 } : {}}
+          onClick={() => shoutOutClaimed ? setTab("home") : claimShoutOut()}
+          disabled={!shoutOutReady && !shoutOutClaimed}
+          style={{ width: "100%", marginTop: 10, padding: 10, border: 0, borderRadius: 999, background: shoutOutClaimed ? "rgba(55,166,255,.18)" : shoutOutReady ? "#37a6ff" : "rgba(255,255,255,.08)", color: shoutOutReady || shoutOutClaimed ? (shoutOutClaimed ? "#65bdff" : "#041008") : "rgba(255,255,255,.34)", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 900, letterSpacing: ".12em", cursor: shoutOutReady || shoutOutClaimed ? "pointer" : "default" }}
+        >{shoutOutClaimed ? "BACK TO HOME →" : shoutOutReady ? "UNLOCK SHOUT-OUTS · +5 GOLD" : `${shoutOutTarget} FOLLOWERS REQUIRED`}</motion.button>
       </motion.article>}
 
       {(analyticsView === "available" ? !studioClaimed : studioClaimed) && <motion.article
@@ -282,7 +282,7 @@ function AnalyticsSection() {
           <motion.div animate={{ width: `${Math.min(100, followers / target * 100)}%` }} style={{ height: '100%', borderRadius: 999, background: ready ? 'var(--gold)' : 'var(--cyan)', boxShadow: '0 0 10px currentColor' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontFamily: 'var(--font-mono)', fontSize: 8, color: ready ? 'var(--gold)' : 'rgba(255,255,255,.56)' }}><span>{Math.min(followers, target)} / {target} FOLLOWERS</span><span>{studioClaimed ? 'OBTAINED' : ready ? 'READY' : 'LOCKED'}</span></div>
-        <motion.button whileTap={ready || studioClaimed ? { scale: .97 } : {}} onClick={act} disabled={!ready && !studioClaimed} style={{ width: '100%', marginTop: 10, padding: 10, border: 0, borderRadius: 999, background: studioClaimed ? 'var(--cyan)' : ready ? 'var(--gold)' : 'rgba(255,255,255,.08)', color: ready || studioClaimed ? '#050608' : 'rgba(255,255,255,.34)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 900, letterSpacing: '.12em', cursor: ready || studioClaimed ? 'pointer' : 'default' }}>{studioClaimed ? 'OPEN STUDIO →' : ready ? 'OBTAIN · +5 GOLD' : !pulseClaimed ? 'COMPLETE FIRST ENTRY' : `${target} FOLLOWERS REQUIRED`}</motion.button>
+        <motion.button whileTap={ready || studioClaimed ? { scale: .97 } : {}} onClick={act} disabled={!ready && !studioClaimed} style={{ width: '100%', marginTop: 10, padding: 10, border: 0, borderRadius: 999, background: studioClaimed ? 'var(--cyan)' : ready ? 'var(--gold)' : 'rgba(255,255,255,.08)', color: ready || studioClaimed ? '#050608' : 'rgba(255,255,255,.34)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 900, letterSpacing: '.12em', cursor: ready || studioClaimed ? 'pointer' : 'default' }}>{studioClaimed ? 'OPEN STUDIO →' : ready ? 'OBTAIN · +5 GOLD' : !shoutOutClaimed ? 'COMPLETE FIRST ENTRY' : `${target} FOLLOWERS REQUIRED`}</motion.button>
       </motion.article>}
 
       {analyticsView === "available" && availableCount === 0 && (

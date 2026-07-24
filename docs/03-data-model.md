@@ -831,6 +831,7 @@ export type OnboardingSlice = {
   claimPulseModifierAnalytics: () => boolean; // explicit 5-Follower Analytics claim → Home editor + 5 Gold
   claimCreatorStudioAnalytics: () => boolean; // explicit 25-Follower Analytics obtain action
   setOpeningPulseModifier: (id: OpeningPulseModifierId, kind: OpeningPulseModifierKind, centerDeg: number) => boolean;
+  removeOpeningPulseModifier: (id: OpeningPulseModifierId) => boolean;
   addEngagement: (amount: number) => void;
   consumeEngagementForRhythm: () => boolean;
   resetOnboardingRevision: () => void; // development/release-controlled action

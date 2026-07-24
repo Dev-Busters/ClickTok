@@ -926,7 +926,7 @@ coherent table in docs/code/simulation; do not lower thresholds piecemeal to mak
 ### 17.2 TEB and upgrade formulas
 
 ```text
-pulseCycleMs = 1800
+pulseCycleMs = 2400
 greenArc = 48 degrees total, centered at 12 o'clock
 blueEventArc = 48 degrees total, default editor draft at 180 degrees
 passiveArc = 34 degrees total, default editor draft at 180 degrees

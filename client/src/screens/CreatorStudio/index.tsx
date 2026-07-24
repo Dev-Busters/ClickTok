@@ -6,7 +6,7 @@ import { CurrencyBar } from "../../components/CurrencyBar";
 import { UpgradeShop } from "../../components/UpgradeShop";
 import { SkillsPanel } from "../../components/SkillsPanel";
 import type { UpgradePillar } from "../../features/upgrades/types";
-import { openingFollowerAmount, engagementPerTap, openingUpgradeCost } from "../../features/onboarding/helpers";
+import { openingFollowerAmount, engagementPerTap, openingUpgradeCost, raidFollowersPerSec } from "../../features/onboarding/helpers";
 import type { OpeningUpgradeId } from "../../features/onboarding/types";
 import { formatCount } from "../../lib/format";
 
@@ -18,20 +18,51 @@ export function CreatorStudio({ onClose }: { onClose: () => void }) {
   return <FullCreatorStudio onClose={onClose} />;
 }
 
+const OPENING_UPGRADE_COPY: Record<OpeningUpgradeId, { title: string; body: string; unit: string; current: (level: number) => number; format: (n: number) => string }> = {
+  audience_reach: {
+    title: "AUDIENCE REACH",
+    body: "Every tap grants the full follower bonus — no timing required.",
+    unit: "FOLLOWERS / TAP",
+    current: openingFollowerAmount,
+    format: n => `${n}`,
+  },
+  engagement_rate: {
+    title: "MOMENTUM RATE",
+    body: "Fills Momentum faster per tap, so its bonus fires more often.",
+    unit: "MOMENTUM / TAP",
+    current: engagementPerTap,
+    format: n => n.toFixed(2),
+  },
+  raid_squad: {
+    title: "RAID SQUAD",
+    body: "Another creator's fans raid your channel — Followers trickle in even when you're not tapping.",
+    unit: "FOLLOWERS / SEC",
+    current: raidFollowersPerSec,
+    format: n => n.toFixed(2),
+  },
+};
+
 function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
   const wallet = useGameStore(state => state.wallet);
   const levels = useGameStore(state => state.openingUpgradeLevels);
   const levelUpgrade = useGameStore(state => state.levelOpeningUpgrade);
   const [changed, setChanged] = useState<{ id: OpeningUpgradeId; kind: "unlocked" | "leveled" } | null>(null);
-  const cards: OpeningUpgradeId[] = levels.audience_reach >= 1 ? ["audience_reach", "engagement_rate"] : ["audience_reach"];
+  const cards: OpeningUpgradeId[] = levels.engagement_rate >= 1
+    ? ["audience_reach", "engagement_rate", "raid_squad"]
+    : levels.audience_reach >= 1
+      ? ["audience_reach", "engagement_rate"]
+      : ["audience_reach"];
   const buy = (id: OpeningUpgradeId) => {
     const kind = levels[id] === 0 ? "unlocked" : "leveled";
     if (!levelUpgrade(id)) return;
     setChanged({ id, kind });
     window.setTimeout(() => setChanged(null), 900);
   };
-  return <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} style={{ position: "fixed", inset: 0, zIndex: 400, background: "var(--bg)", overflowY: "auto" }}>
-    <header style={{ position: "sticky", top: 0, zIndex: 2, padding: "14px 16px 10px", background: "rgba(7,8,12,.96)", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
+  // Header lives outside the scrollable region (flex layout), not `position: sticky`
+  // inside it — sticky inside a Framer Motion element that animates a transform is a
+  // known iOS Safari failure mode (the header can scroll out of reach with no way back).
+  return <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} style={{ position: "fixed", inset: 0, zIndex: 400, background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <header style={{ flexShrink: 0, zIndex: 2, padding: "14px 16px 10px", background: "rgba(7,8,12,.96)", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button onClick={onClose} aria-label="Back to Home" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.06)", color: "white" }}>←</button>
         <div><div style={{ fontFamily: "var(--font-display)", fontSize: 28, letterSpacing: ".06em" }}>CREATOR STUDIO</div><div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.4, color: "rgba(255,255,255,.72)" }}>MAKE YOUR NEXT TAP STRONGER</div></div>
@@ -39,25 +70,27 @@ function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
       </div>
       <div style={{ marginTop: 14, width: 64, paddingBottom: 8, borderBottom: "3px solid var(--cyan)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 800, textAlign: "center" }}>FYP</div>
     </header>
-    <div style={{ padding: "22px 16px 40px", maxWidth: 420, margin: "0 auto" }}>
+    <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "22px 16px 40px" }}>
+      <div style={{ maxWidth: 420, margin: "0 auto" }}>
       <AnimatePresence initial={false}>
         {cards.map(id => {
           const level = levels[id];
           const cost = openingUpgradeCost(id, level);
-          const audience = id === "audience_reach";
+          const copy = OPENING_UPGRADE_COPY[id];
           const isNew = level === 0;
           const justChanged = changed?.id === id;
           const accent = (isNew || (justChanged && changed.kind === "unlocked")) ? "var(--gold)" : "var(--cyan)";
-          const current = audience ? openingFollowerAmount(level) : engagementPerTap(level);
-          const next = audience ? openingFollowerAmount(level + 1) : engagementPerTap(level + 1);
+          const current = copy.format(copy.current(level));
+          const next = copy.format(copy.current(level + 1));
           return <motion.section key={id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0, boxShadow: justChanged ? (changed.kind === "unlocked" ? "0 0 34px rgba(255,210,0,.42)" : "0 0 28px rgba(37,244,238,.34)") : isNew ? "0 0 22px rgba(255,210,0,.12)" : "0 0 0 rgba(0,0,0,0)" }} style={{ marginBottom: 16, padding: 20, borderRadius: 16, border: `1px solid ${isNew ? "rgba(255,210,0,.58)" : "rgba(37,244,238,.3)"}`, background: "linear-gradient(145deg,rgba(26,29,38,.98),rgba(14,16,22,.98))" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}><strong style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1 }}>{audience ? "AUDIENCE REACH" : "ENGAGEMENT RATE"}</strong><span style={{ flexShrink: 0, padding: "5px 7px", borderRadius: 999, border: `1px solid ${accent}`, background: isNew ? "rgba(255,210,0,.12)" : "rgba(37,244,238,.1)", fontFamily: "var(--font-mono)", color: accent, fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{justChanged ? (changed.kind === "unlocked" ? "BONUS UNLOCKED" : `LEVEL ${level}`) : isNew ? "NEW BONUS" : `LEVEL ${level}`}</span></div>
-            <p style={{ margin: "10px 0 18px", color: "rgba(255,255,255,.78)", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.55 }}>{audience ? "Perfect green hits grant the full follower bonus. Added event zones keep their own reward rules." : "Fills the visible Engagement meter faster with every tap."}</p>
-            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 7px", fontFamily: "var(--font-display)", fontSize: 34, color: justChanged ? accent : "white" }}>{audience ? `${current} → ${next}` : `${current.toFixed(2)} → ${next.toFixed(2)}`} <small style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 800, letterSpacing: ".08em", color: "rgba(255,255,255,.68)" }}>{audience ? "FOLLOWERS / GREEN HIT" : "ENGAGEMENT / TAP"}</small></div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}><strong style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1 }}>{copy.title}</strong><span style={{ flexShrink: 0, padding: "5px 7px", borderRadius: 999, border: `1px solid ${accent}`, background: isNew ? "rgba(255,210,0,.12)" : "rgba(37,244,238,.1)", fontFamily: "var(--font-mono)", color: accent, fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{justChanged ? (changed.kind === "unlocked" ? "BONUS UNLOCKED" : `LEVEL ${level}`) : isNew ? "NEW BONUS" : `LEVEL ${level}`}</span></div>
+            <p style={{ margin: "10px 0 18px", color: "rgba(255,255,255,.78)", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.55 }}>{copy.body}</p>
+            <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: "4px 7px", fontFamily: "var(--font-display)", fontSize: 34, color: justChanged ? accent : "white" }}>{current} → {next} <small style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 800, letterSpacing: ".08em", color: "rgba(255,255,255,.68)" }}>{copy.unit}</small></div>
             <button disabled={wallet.coins < cost} onClick={() => buy(id)} style={{ width: "100%", marginTop: 18, padding: 14, border: 0, borderRadius: 999, background: wallet.coins >= cost ? (isNew ? "var(--gold)" : "var(--cyan)") : "rgba(255,255,255,.1)", color: wallet.coins >= cost ? "#040608" : "rgba(255,255,255,.48)", fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 900, letterSpacing: ".12em" }}>{isNew ? "UNLOCK BONUS" : "LEVEL UP"} · 🪙 {cost}</button>
           </motion.section>;
         })}
       </AnimatePresence>
+      </div>
     </div>
   </motion.div>;
 }

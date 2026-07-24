@@ -12,23 +12,13 @@ export type OnboardingStepId =
   | "unlock_video_fyp";
 
 export type OnboardingFeatureId =
-  | "pulse_modifier"
+  | "shout_out"
   | "creator_studio"
   | "engagement_meter"
   | "tap_three"
   | "video_fyp";
 
-export type OpeningUpgradeId = "audience_reach" | "engagement_rate";
-
-export type OpeningPulseModifierId = "passive_boost_1" | "blue_event_1";
-
-export type OpeningPulseModifierKind = "passive" | "event";
-
-export type OpeningPulseModifier = {
-  id: OpeningPulseModifierId;
-  kind: OpeningPulseModifierKind;
-  centerDeg: number;
-};
+export type OpeningUpgradeId = "audience_reach" | "engagement_rate" | "raid_squad";
 
 export type GoalRequirement =
   | { kind: "tap_count"; amount: number }

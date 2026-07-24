@@ -79,7 +79,9 @@ function resolveSession(set: (patch: Partial<FullState>) => void, get: () => Ful
     coinsEarned: state.coinsEarned + reward.coins,
     session: { phase: "result", sequence: session.chart.sequence, chargeQuality: session.chargeQuality,
       performanceQuality, completion, maxRhythmCombo: session.maxRhythmCombo, reward, resolvedAt: now },
-    tebReadyAt: opening ? 0 : now + BALANCE.teb.cooldownSec * 1000,
+    // Always a real cooldown now (previously 0 in opening, relying on the meter-fill gate
+    // that beginCharge no longer checks) — makes TAP THREE a legible periodic action.
+    tebReadyAt: now + BALANCE.teb.cooldownSec * 1000,
     tapThreeCompletions: opening && session.chart.sequence === "tap_three" ? state.tapThreeCompletions + 1 : state.tapThreeCompletions,
   });
   track("teb_interaction_judged", { sequence: session.chart.sequence, ...counts });
@@ -100,13 +102,17 @@ export const createTebSlice: StateCreator<FullState, [], [], TebSlice> = (set, g
   setReducedFeedback: value => set({ reducedFeedback: value }),
   setRhythmMuted: value => set({ rhythmMuted: value }),
 
+  // TAP THREE readiness is gated purely by unlock + cooldown (same shape in opening and
+  // legacy) — decoupled from Momentum, which now auto-fires/resets on its own (see
+  // onboardingSlice.openingTap). Momentum's job is the repeating tap-heartbeat; this is
+  // the periodic "hold for a bonus minigame" action.
   beginCharge: () => {
     const s = get();
     const opening = s.onboardingTeachesSeen.legacy_preserved !== true;
-    if (opening && (!isOnboardingFeatureAvailable("engagement_meter", s.completedOnboardingGoals) || s.engagementFill < BALANCE.onboarding.engagement.cap)) return;
+    if (opening && !isOnboardingFeatureAvailable("engagement_meter", s.completedOnboardingGoals)) return;
     if (opening && s.activeOnboardingReveal?.feature === "engagement_meter" && !s.activeOnboardingReveal.dismissed) return;
     if (!opening && !isFeatureUnlocked("element_stage", s.metricsReached)) return;
-    if (s.session || (!opening && Date.now() < s.tebReadyAt)) return;
+    if (s.session || Date.now() < s.tebReadyAt) return;
     if (opening && s.activeOnboardingReveal?.feature === "engagement_meter" && s.activeOnboardingReveal.dismissed) {
       s.completeOnboardingTeach("rhythm_first_hold");
     }
@@ -118,10 +124,6 @@ export const createTebSlice: StateCreator<FullState, [], [], TebSlice> = (set, g
     if (!session || session.phase !== "charging") return;
     const now = Date.now();
     const opening = get().onboardingTeachesSeen.legacy_preserved !== true;
-    if (opening && !get().consumeEngagementForRhythm()) {
-      set({ session: null });
-      return;
-    }
     const picked = pickSequence(sequenceBag, previousSequence, opening ? ["tap_three"] : undefined);
     sequenceBag = picked.bag;
     previousSequence = picked.sequence;

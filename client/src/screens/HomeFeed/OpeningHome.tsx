@@ -1,105 +1,73 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, isOpeningPulseModifierPlacementValid, OPENING_PULSE_MODIFIER_DEFAULT_DEG, OPENING_PULSE_ZONE_COST, openingPulseHit, openingPulseReward, requirementValue, type OpeningPulseZone } from "../../features/onboarding/helpers";
-import type { OpeningPulseModifierId, OpeningPulseModifierKind } from "../../features/onboarding/types";
+import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, requirementValue } from "../../features/onboarding/helpers";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
-import { OpeningPulseDial } from "./OpeningPulseDial";
-import { OpeningPulseModifierEditor } from "./OpeningPulseModifierEditor";
 
-type OpeningTebProps = {
-  manualEditing: boolean;
-  setManualEditing: (value: boolean) => void;
-  selectedModifierId: OpeningPulseModifierId;
-  setSelectedModifierId: (value: OpeningPulseModifierId) => void;
-  draftAngle: number;
-  setDraftAngle: (value: number) => void;
-};
+const COMBO_R = 100;
+const COMBO_CIRC = 2 * Math.PI * COMBO_R;
 
-function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSelectedModifierId, draftAngle, setDraftAngle }: OpeningTebProps) {
-  const wallet = useGameStore(state => state.wallet);
-  const openingTap = useGameStore(state => state.openingTap);
-  const updatePassivePulse = useGameStore(state => state.updateOpeningPulsePassive);
+function OpeningTeb() {
   const beginCharge = useGameStore(state => state.beginCharge);
   const releaseCharge = useGameStore(state => state.releaseCharge);
   const session = useGameStore(state => state.session);
   const fill = useGameStore(state => state.engagementFill);
+  const tebReadyAt = useGameStore(state => state.tebReadyAt);
   const completed = useGameStore(state => state.completedOnboardingGoals);
   const teaches = useGameStore(state => state.onboardingTeachesSeen);
   const reveal = useGameStore(state => state.activeOnboardingReveal);
-  const openingUpgradeLevels = useGameStore(state => state.openingUpgradeLevels);
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
-  const acknowledgeReveal = useGameStore(state => state.acknowledgeOnboardingReveal);
-  const modifiers = useGameStore(state => state.openingPulseModifiers);
-  const pulseDirection = useGameStore(state => state.openingPulseDirection);
-  const pulseOffsetDeg = useGameStore(state => state.openingPulseOffsetDeg);
-  const passiveArmed = useGameStore(state => state.openingPulsePassiveArmed);
-  const setModifier = useGameStore(state => state.setOpeningPulseModifier);
+  const openingCombo = useGameStore(state => state.openingCombo);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const nextReactionId = useRef(0);
   const activePointer = useRef<number | null>(null);
   const activeKey = useRef(false);
-  const [tapReactions, setTapReactions] = useState<Array<{ id: number; full: boolean; drift: number; zone: OpeningPulseZone; baseFollowers: number; bonusFollowers: number; passiveBoosted: boolean }>>([]);
-  const [pulseFeedback, setPulseFeedback] = useState<{ id: number; zone: OpeningPulseZone; passiveBoosted: boolean } | null>(null);
-  const [pausedAt, setPausedAt] = useState<number | null>(null);
+  const [tapReactions, setTapReactions] = useState<Array<{ id: number; kind: "normal" | "shout_out" | "momentum"; followers: number; drift: number }>>([]);
+  const [momentumPop, setMomentumPop] = useState(false);
+  const momentumPopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduced = useReducedMotion();
   const meterVisible = isOpeningEngagementAvailable(completed);
   const rhythmUnlocked = isOnboardingFeatureAvailable("engagement_meter", completed);
-  const meterFull = meterVisible && fill >= BALANCE.onboarding.engagement.cap;
-  const ready = rhythmUnlocked && meterFull;
-  const selectedKind: OpeningPulseModifierKind = selectedModifierId === "blue_event_1" ? "event" : "passive";
-  const selectedModifier = modifiers.find(item => item.id === selectedModifierId);
-  const selectedOwned = selectedModifier !== undefined;
-  const firstPlacement = reveal?.feature === "pulse_modifier";
-  const editing = firstPlacement || manualEditing;
-  const placementValid = isOpeningPulseModifierPlacementValid(draftAngle, modifiers, selectedModifierId, selectedKind);
-  const canAffordSelected = wallet.coins >= OPENING_PULSE_ZONE_COST;
-
-  useEffect(() => {
-    if (!firstPlacement) return;
-    setDraftAngle(selectedModifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
-  }, [firstPlacement, selectedModifier?.centerDeg, setDraftAngle]);
-
-  useEffect(() => {
-    if (editing) {
-      setPausedAt(current => current ?? Date.now());
-      return;
-    }
-    setPausedAt(null);
-  }, [editing]);
-
-  const selectZone = (id: OpeningPulseModifierId) => {
-    const existing = modifiers.find(item => item.id === id);
-    setSelectedModifierId(id);
-    setDraftAngle(existing?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
-  };
+  // TAP THREE readiness is a plain cooldown now (decoupled from Momentum, which
+  // auto-fires/resets on its own) — same shape as the main game's "HOLD READY".
+  const rhythmReady = rhythmUnlocked && !session && Date.now() >= tebReadyAt;
+  const comboFraction = Math.min(1, openingCombo / BALANCE.onboarding.combo.cap);
+  const momentumFraction = Math.min(1, fill / BALANCE.onboarding.engagement.cap);
 
   const start = useCallback(() => {
-    const now = pausedAt ?? Date.now();
-    const state = useGameStore.getState();
-    const hit = openingPulseHit(now, state.openingPulseModifiers, state.openingPulseDirection, state.openingPulseOffsetDeg);
-    const followers = openingTap(now);
-    const full = useGameStore.getState().engagementFill >= BALANCE.onboarding.engagement.cap;
-    const passiveBoosted = state.openingPulsePassiveArmed && state.openingPulsePassiveTarget !== null && hit.eventKey === state.openingPulsePassiveTarget;
-    const baseFollowers = openingPulseReward(openingUpgradeLevels.audience_reach, hit, false);
-    const bonusFollowers = passiveBoosted ? Math.max(0, followers - baseFollowers) : 0;
-    const id = nextReactionId.current++;
-    setPulseFeedback({ id, zone: hit.zone, passiveBoosted });
-    setTapReactions(current => [...current.slice(-5), { id, full, drift: (Math.random() - .5) * 72, zone: hit.zone, baseFollowers, bonusFollowers, passiveBoosted }]);
-    const timer = setTimeout(() => {
-      setTapReactions(current => current.filter(reaction => reaction.id !== id));
-      reactionTimers.current.delete(id);
-    }, full ? 1300 : 1100);
-    reactionTimers.current.set(id, timer);
-    if (!ready || session) return;
+    const now = Date.now();
+    const result = useGameStore.getState().openingTap(now);
+    if (result.followers > 0) {
+      const id = nextReactionId.current++;
+      const kind = result.shoutOut ? "shout_out" : "normal";
+      setTapReactions(current => [...current.slice(-5), { id, kind, followers: result.followers, drift: (Math.random() - .5) * 72 }]);
+      const timer = setTimeout(() => {
+        setTapReactions(current => current.filter(reaction => reaction.id !== id));
+        reactionTimers.current.delete(id);
+      }, result.shoutOut ? 1400 : 1100);
+      reactionTimers.current.set(id, timer);
+    }
+    if (result.momentumBonus > 0) {
+      const id = nextReactionId.current++;
+      setTapReactions(current => [...current.slice(-5), { id, kind: "momentum", followers: result.momentumBonus, drift: (Math.random() - .5) * 40 }]);
+      const timer = setTimeout(() => {
+        setTapReactions(current => current.filter(reaction => reaction.id !== id));
+        reactionTimers.current.delete(id);
+      }, 1300);
+      reactionTimers.current.set(id, timer);
+      setMomentumPop(true);
+      if (momentumPopTimer.current) clearTimeout(momentumPopTimer.current);
+      momentumPopTimer.current = setTimeout(() => setMomentumPop(false), 650);
+    }
+    if (!rhythmReady || session) return;
     holdTimer.current = setTimeout(() => {
       beginCharge();
       if (reveal?.feature === "engagement_meter" && reveal.dismissed && !teaches.rhythm_first_hold) completeTeach("rhythm_first_hold");
     }, BALANCE.teb.holdLaunchThresholdMs);
-  }, [beginCharge, completeTeach, openingTap, openingUpgradeLevels.audience_reach, pausedAt, ready, reveal, session, teaches.rhythm_first_hold]);
+  }, [beginCharge, completeTeach, reveal, rhythmReady, session, teaches.rhythm_first_hold]);
   const end = useCallback(() => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = null;
@@ -110,52 +78,42 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
     if (holdTimer.current) clearTimeout(holdTimer.current);
   }, []);
 
-  const confirmModifier = () => {
-    if (!setModifier(selectedModifierId, selectedKind, draftAngle)) return;
-    setManualEditing(false);
-    if (!firstPlacement) return;
-    acknowledgeReveal();
-    completeTeach("pulse_modifier_first_place");
-  };
-
   useEffect(() => () => {
     reactionTimers.current.forEach(clearTimeout);
     reactionTimers.current.clear();
+    if (momentumPopTimer.current) clearTimeout(momentumPopTimer.current);
   }, []);
 
   return (
-    <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: editing ? 160 : "52%", transform: editing ? "translateX(-50%)" : "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
-      <div style={{ position: "relative", width: 206, minHeight: editing ? 498 : 206, margin: "0 auto" }}>
-        <OpeningPulseDial
-          feedback={pulseFeedback}
-          modifiers={modifiers}
-          showTimingGuide={teaches.pulse_timing_first_perfect !== true}
-          direction={pulseDirection}
-          offsetDeg={pulseOffsetDeg}
-          passiveArmed={passiveArmed}
-          pausedAt={pausedAt ?? undefined}
-          onPulseFrame={editing ? undefined : updatePassivePulse}
-          editing={editing ? { id: selectedModifierId, kind: selectedKind, centerDeg: draftAngle, valid: placementValid } : undefined}
-        />
-        {editing && <OpeningPulseModifierEditor
-          angle={draftAngle}
-          valid={placementValid}
-          canAfford={canAffordSelected}
-          coins={wallet.coins}
-          dockBelow
-          firstPlacement={firstPlacement}
-          selectedId={selectedModifierId}
-          selectedKind={selectedKind}
-          selectedOwned={selectedOwned}
-          ownedIds={modifiers.map(modifier => modifier.id)}
-          onSelectZone={selectZone}
-          onAngleChange={setDraftAngle}
-          onConfirm={confirmModifier}
-          onCancel={() => { setDraftAngle(selectedModifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG); setManualEditing(false); }}
-        />}
+    <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
+      <div style={{ position: "relative", width: 206, minHeight: 206, margin: "0 auto" }}>
+        {/* Combo ring — fills with consecutive taps, previews the main game's feel from tap #1 */}
+        <svg aria-hidden width={206} height={206} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)", filter: openingCombo > 0 ? "drop-shadow(0 0 6px var(--cyan))" : "none" }}>
+          <circle cx={103} cy={103} r={COMBO_R} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth={3} />
+          <circle
+            cx={103} cy={103} r={COMBO_R} fill="none"
+            stroke="var(--cyan)" strokeWidth={3} strokeLinecap="round"
+            strokeDasharray={COMBO_CIRC} strokeDashoffset={COMBO_CIRC * (1 - comboFraction)}
+            style={{ transition: "stroke-dashoffset 0.1s linear" }}
+          />
+        </svg>
+        {/* TAP THREE ready cue — small pill, independent of Momentum's fill state */}
+        <AnimatePresence>
+          {rhythmReady && (
+            <motion.div
+              key="rhythm-ready"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: [0.55, 1, 0.55], y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+              style={{ position: "absolute", left: "50%", top: -6, transform: "translateX(-50%)", zIndex: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(245,166,35,.14)", border: "1px solid rgba(245,166,35,.4)", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900, letterSpacing: ".12em", color: "var(--gold)", whiteSpace: "nowrap" }}
+            >
+              HOLD FOR TAP THREE
+            </motion.div>
+          )}
+        </AnimatePresence>
         <motion.button
-        aria-label={ready ? "Ready. Hold Engagement to launch TAP THREE" : "Tap Engagement on the moving pulse to earn followers"}
-        disabled={editing}
+        aria-label={rhythmReady ? "Ready. Hold Engagement to launch TAP THREE" : "Tap Engagement to earn Followers"}
         onPointerDown={event => {
           if (!event.isPrimary || !["mouse", "touch", "pen"].includes(event.pointerType) || activePointer.current !== null) return;
           event.preventDefault();
@@ -196,8 +154,8 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
           activeKey.current = false;
           end();
         }}
-        animate={meterFull && !reduced ? { scale: [1, 1.055, 1], boxShadow: ["0 0 38px rgba(255,210,0,.42),inset 0 0 30px rgba(255,210,0,.2)", "0 0 68px rgba(255,210,0,.78),inset 0 0 46px rgba(255,210,0,.34)", "0 0 38px rgba(255,210,0,.42),inset 0 0 30px rgba(255,210,0,.2)"] } : { scale: 1 }}
-        transition={meterFull && !reduced ? { duration: 1.05, repeat: Infinity, ease: "easeInOut" } : { duration: .2 }}
+        animate={momentumPop && !reduced ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+        transition={momentumPop && !reduced ? { duration: 0.5, ease: "easeOut" } : { duration: .2 }}
         whileTap={{ scale: .96 }}
         style={{
           position: "absolute",
@@ -206,37 +164,36 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
           width: 188,
           height: 188,
           borderRadius: "50%",
-          cursor: editing ? "default" : "pointer",
+          cursor: "pointer",
           color: "white",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           border: "3px solid rgba(255,255,255,.12)",
-          background: meterFull ? "radial-gradient(circle at 50% 45%,rgba(255,210,0,.2),rgba(7,8,12,.97) 68%)" : "radial-gradient(circle at 38% 32%,rgba(255,255,255,.15),rgba(7,8,12,.96) 66%)",
-          boxShadow: meterFull ? "0 0 38px rgba(255,210,0,.42),inset 0 0 30px rgba(255,210,0,.2)" : "0 0 28px rgba(37,244,238,.18),inset 0 0 24px rgba(37,244,238,.12)",
+          background: "radial-gradient(circle at 38% 32%,rgba(255,255,255,.15),rgba(7,8,12,.96) 66%)",
+          boxShadow: momentumPop ? "0 0 40px rgba(37,244,238,.5),inset 0 0 26px rgba(37,244,238,.24)" : "0 0 28px rgba(37,244,238,.18),inset 0 0 24px rgba(37,244,238,.12)",
           overflow: "hidden",
           touchAction: "none",
           userSelect: "none",
+          transition: "box-shadow 0.3s",
         }}
       >
-        {meterVisible && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--gold) ${fill}%,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)" }} />}
-        <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: meterFull ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>THE</span>
-        <span style={{ display: "block", margin: "2px 0", fontFamily: "var(--font-display)", fontSize: 34, lineHeight: 1, letterSpacing: ".06em", color: meterFull ? "var(--gold)" : "white", textShadow: meterFull ? "0 0 18px rgba(255,210,0,.9),-2px 0 var(--red),2px 0 var(--cyan)" : "-2px 0 var(--cyan),2px 0 var(--red)" }}>ENGAGEMENT</span>
-        <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: meterFull ? "var(--gold)" : "var(--dim)", transform: "translateX(.14em)" }}>BUTTON</span>
+        {/* Momentum ring — fills every tap, pops + resets on its own at cap (see openingTap) */}
+        {meterVisible && <span aria-hidden style={{ position: "absolute", inset: 7, borderRadius: "50%", background: `conic-gradient(var(--cyan) ${momentumFraction * 360}deg,rgba(255,255,255,.08) 0)`, mask: "radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0)", transition: momentumPop ? "none" : "background 0.1s linear" }} />}
+        <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: "var(--dim)", transform: "translateX(.14em)" }}>THE</span>
+        <span style={{ display: "block", margin: "2px 0", fontFamily: "var(--font-display)", fontSize: 34, lineHeight: 1, letterSpacing: ".06em", color: "white", textShadow: "-2px 0 var(--cyan),2px 0 var(--red)" }}>ENGAGEMENT</span>
+        <span style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: ".28em", color: "var(--dim)", transform: "translateX(.14em)" }}>BUTTON</span>
         </motion.button>
       </div>
       <AnimatePresence>
-        {meterFull && <motion.div key="engagement-full" data-engagement-full initial={{ opacity: 0, scale: .45, y: 12 }} animate={{ opacity: 1, scale: reduced ? 1 : [.45, 1.24, 1], y: 0 }} transition={{ duration: reduced ? .2 : .7, ease: "easeOut" }} style={{ position: "absolute", left: "50%", top: -48, translate: "-50% 0", width: "max-content", padding: "7px 12px", borderRadius: 999, border: "1px solid var(--gold)", background: "rgba(35,28,2,.94)", boxShadow: "0 0 24px rgba(255,210,0,.42)", color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 900, letterSpacing: ".14em" }}>⚡ ENGAGEMENT FULL</motion.div>}
-      </AnimatePresence>
-      <AnimatePresence>
         {tapReactions.map(reaction => <motion.div
           key={`reaction-${reaction.id}`}
-          data-tap-reaction={reaction.baseFollowers + reaction.bonusFollowers > 0 ? "follower" : "miss"}
+          data-tap-reaction={reaction.kind}
           initial={{ opacity: 0, scale: .45, x: reaction.drift * .2, y: -92 }}
-          animate={{ opacity: [0, 1, 1, 0], scale: reaction.full ? [.45, 1.55, 1.25, 1.05] : [.45, 1.35, 1.12, 1], x: reaction.full ? reaction.drift * .35 : reaction.drift, y: reaction.full ? -236 : -218 }}
+          animate={{ opacity: [0, 1, 1, 0], scale: reaction.kind === "shout_out" ? [.45, 1.7, 1.35, 1.1] : reaction.kind === "momentum" ? [.45, 1.5, 1.2, 1] : [.45, 1.35, 1.12, 1], x: reaction.drift, y: reaction.kind === "momentum" ? -246 : -218 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reaction.full ? 1.2 : 1, ease: "easeOut" }}
+          transition={{ duration: reaction.kind === "shout_out" ? 1.3 : reaction.kind === "momentum" ? 1.2 : 1, ease: "easeOut" }}
           style={{
             position: "absolute",
             left: "50%",
@@ -246,29 +203,25 @@ function OpeningTeb({ manualEditing, setManualEditing, selectedModifierId, setSe
             pointerEvents: "none",
             whiteSpace: "nowrap",
             fontFamily: "var(--font-mono)",
-            fontSize: reaction.full ? (reaction.baseFollowers + reaction.bonusFollowers > 0 ? 16 : 30) : reaction.baseFollowers + reaction.bonusFollowers > 0 ? 18 : 30,
+            fontSize: reaction.kind === "shout_out" ? 20 : reaction.kind === "momentum" ? 17 : 18,
             fontWeight: 900,
-            letterSpacing: reaction.full && reaction.baseFollowers + reaction.bonusFollowers > 0 ? ".06em" : ".1em",
-            color: reaction.zone === "green" ? "#4dff9a" : reaction.zone === "blue" ? "#37a6ff" : reaction.zone === "passive" ? "#b56cff" : "var(--red)",
-            textShadow: reaction.passiveBoosted
-              ? "0 0 26px currentColor,0 0 38px rgba(181,108,255,.92),0 0 10px rgba(181,108,255,.82),0 2px 4px rgba(0,0,0,.9)"
-              : reaction.full
-                ? "0 0 26px currentColor,0 0 8px white,0 2px 4px rgba(0,0,0,.9)"
+            letterSpacing: ".06em",
+            color: reaction.kind === "shout_out" ? "var(--gold)" : reaction.kind === "momentum" ? "var(--cyan)" : "#4dff9a",
+            textShadow: reaction.kind === "shout_out"
+              ? "0 0 26px currentColor,0 0 38px rgba(255,210,0,.92),0 0 10px rgba(255,210,0,.82),0 2px 4px rgba(0,0,0,.9)"
+              : reaction.kind === "momentum"
+                ? "0 0 26px currentColor,0 0 10px rgba(37,244,238,.85),0 2px 4px rgba(0,0,0,.9)"
                 : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)",
           }}
         >
-          {reaction.zone === "passive"
-            ? "BOOST READY"
-            : reaction.baseFollowers + reaction.bonusFollowers > 0
-              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: reaction.zone === "blue" ? "#37a6ff" : "#4dff9a" }}>+{formatCount(reaction.baseFollowers)}</span>
-                  {reaction.bonusFollowers > 0 && <span style={{ color: "#d2a8ff", textShadow: "0 0 22px rgba(181,108,255,.92)" }}>+{formatCount(reaction.bonusFollowers)}</span>}
-                  {reaction.zone === "blue" && <span style={{ color: "#9fd4ff", fontSize: 11 }}>REVERSE</span>}
-                </span>
-              : "MISS"}
+          {reaction.kind === "shout_out"
+            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>SHOUT-OUT!</span><span>+{formatCount(reaction.followers)}</span></span>
+            : reaction.kind === "momentum"
+              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>MOMENTUM!</span><span>+{formatCount(reaction.followers)}</span></span>
+              : `+${formatCount(reaction.followers)}`}
         </motion.div>)}
       </AnimatePresence>
-      {meterVisible && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: meterFull ? 900 : 400, letterSpacing: ".1em", color: meterFull ? "var(--gold)" : "rgba(255,255,255,.72)", textShadow: meterFull ? "0 0 12px rgba(255,210,0,.72)" : "none" }}>ENGAGEMENT {Math.round(fill)} / 100{meterFull ? (rhythmUnlocked ? " · HOLD TO LAUNCH" : " · FULL · TAP THREE LOCKED") : !rhythmUnlocked ? " · BUILDING FOR TAP THREE" : ""}</div>}
+      {meterVisible && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: ".1em", color: "rgba(255,255,255,.72)" }}>MOMENTUM {Math.round(fill)} / {BALANCE.onboarding.engagement.cap}{!rhythmUnlocked ? " · BUILDING FOR TAP THREE" : rhythmReady ? " · TAP THREE READY" : session ? "" : " · TAP THREE ON COOLDOWN"}</div>}
     </div>
   );
 }
@@ -279,12 +232,17 @@ function RevealCard() {
   const setSheet = useGameStore(state => state.setSheet);
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const reduced = useReducedMotion();
-  if (!reveal || reveal.dismissed || reveal.feature === "pulse_modifier") return null;
-  const copy = reveal.feature === "creator_studio" ? ["CREATOR STUDIO UNLOCKED", "Turn Coins into stronger taps"]
-    : reveal.feature === "engagement_meter" ? ["TAP THREE UNLOCKED", "Fill Engagement, then hold the button"]
+  if (!reveal || reveal.dismissed) return null;
+  const copy = reveal.feature === "shout_out" ? ["SHOUT-OUTS UNLOCKED", "Lucky taps now trigger a big bonus"]
+    : reveal.feature === "creator_studio" ? ["CREATOR STUDIO UNLOCKED", "Turn Coins into stronger taps"]
+    : reveal.feature === "engagement_meter" ? ["TAP THREE UNLOCKED", "Hold the button whenever it's ready"]
     : ["YOUR FYP IS READY", "Meet your audience"];
   const showReveal = () => {
     acknowledge();
+    if (reveal.feature === "shout_out") {
+      completeTeach("shout_out_seen");
+      return;
+    }
     if (reveal.feature !== "creator_studio") return;
     setSheet("creatorStudio");
     completeTeach("studio_first_use");
@@ -292,7 +250,7 @@ function RevealCard() {
   return <motion.div initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} style={{ position: "absolute", top: 76, right: 14, zIndex: 30, width: 238, padding: 14, borderRadius: 14, background: "rgba(8,10,15,.96)", border: "1px solid var(--cyan)", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
     <strong style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: ".06em" }}>{copy[0]}</strong>
     <span style={{ display: "block", margin: "4px 0 12px", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>{copy[1]}</span>
-    <button onClick={showReveal} style={{ width: "100%", padding: "9px 12px", borderRadius: 999, border: 0, background: "var(--cyan)", color: "#050608", fontFamily: "var(--font-mono)", fontWeight: 800, letterSpacing: ".12em" }}>{reveal.feature === "creator_studio" ? "TAKE ME THERE" : "SHOW ME"}</button>
+    <button onClick={showReveal} style={{ width: "100%", padding: "9px 12px", borderRadius: 999, border: 0, background: "var(--cyan)", color: "#050608", fontFamily: "var(--font-mono)", fontWeight: 800, letterSpacing: ".12em" }}>{reveal.feature === "creator_studio" ? "TAKE ME THERE" : "GOT IT"}</button>
   </motion.div>;
 }
 
@@ -305,46 +263,23 @@ export function OpeningHome() {
   const levels = useGameStore(state => state.openingUpgradeLevels);
   const viewsTotal = useGameStore(state => state.viewsTotal);
   const tapThreeCompletions = useGameStore(state => state.tapThreeCompletions);
-  const engagementFill = useGameStore(state => state.engagementFill);
   const setSheet = useGameStore(state => state.setSheet);
-  const modifiers = useGameStore(state => state.openingPulseModifiers);
-  const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const session = useGameStore(state => state.session);
-  const [manualEditing, setManualEditing] = useState(false);
-  const [selectedModifierId, setSelectedModifierId] = useState<OpeningPulseModifierId>("blue_event_1");
-  const [draftAngle, setDraftAngle] = useState(OPENING_PULSE_MODIFIER_DEFAULT_DEG);
   const rhythm = session?.phase === "count_in" || session?.phase === "playing" || session?.phase === "result";
   const studio = isOnboardingFeatureAvailable("creator_studio", completed);
   const goal = goalById(step);
   const progress = requirementValue(goal.requirement, { viewsTotal, totalFollowers: wallet.totalFollowers, openingUpgradeLevels: levels, tapThreeCompletions });
   const studioReadyToClaim = goal.id === "unlock_studio" && progress.current >= progress.target;
-  const modifierTeachActive = reveal?.feature === "pulse_modifier";
+  const shoutOutTeachActive = reveal?.feature === "shout_out" && !reveal.dismissed;
   const analyticsUnlocked = wallet.totalFollowers >= BALANCE.onboarding.analyticsFollowers;
   const analyticsOpened = teaches.analytics_first_open === true;
-  const pulseModifierReadyToClaim = goal.id === "meet_teb" && progress.current >= progress.target;
+  const shoutOutReadyToClaim = goal.id === "meet_teb" && progress.current >= progress.target;
   const openingChapterComplete = completed.includes("complete_first_rhythm");
-  const editorUnlocked = completed.includes("meet_teb");
-  const firstPlacement = reveal?.feature === "pulse_modifier";
-  const editing = firstPlacement || manualEditing;
-
-  useEffect(() => {
-    if (!firstPlacement) return;
-    const selectedModifier = modifiers.find(item => item.id === selectedModifierId);
-    setDraftAngle(selectedModifier?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
-  }, [firstPlacement, modifiers, selectedModifierId]);
 
   const openStudio = () => {
     if (reveal?.feature === "creator_studio" && !reveal.dismissed) return;
     setSheet("creatorStudio");
-    if (reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use) completeTeach("studio_first_use");
-  };
-
-  const openEditor = () => {
-    const nextId = modifiers[0]?.id ?? selectedModifierId;
-    const existing = modifiers.find(item => item.id === nextId);
-    setSelectedModifierId(nextId);
-    setDraftAngle(existing?.centerDeg ?? OPENING_PULSE_MODIFIER_DEFAULT_DEG);
-    setManualEditing(true);
+    if (reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use) useGameStore.getState().completeOnboardingTeach("studio_first_use");
   };
 
   return <main data-onboarding="pre-video-home" style={{ position: "relative", height: "100%", minHeight: "100%", overflow: "hidden", background: "radial-gradient(circle at 50% 44%,rgba(37,244,238,.09),transparent 32%),linear-gradient(155deg,#11131a,#06070a 58%,#16070c)" }}>
@@ -354,20 +289,12 @@ export function OpeningHome() {
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)", letterSpacing: ".16em" }}>FOLLOWERS</span>
       {studio && <><strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 24 }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>GOLD</span></>}
     </header>
-    <div data-onboarding="goal" style={{ position: "absolute", top: 72, left: 14, right: studio || (editorUnlocked && !editing) ? 112 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
-      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: studioReadyToClaim || pulseModifierReadyToClaim ? "var(--gold)" : "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "REFILL ENGAGEMENT · PLAY TAP THREE" : modifierTeachActive ? "PLACE YOUR FIRST TEB ZONE" : analyticsUnlocked && !analyticsOpened ? "ANALYTICS UNLOCKED · OPEN INBOX" : pulseModifierReadyToClaim ? "CLAIM TEB EDITOR · INBOX → ANALYTICS" : studioReadyToClaim ? "CLAIM STUDIO · INBOX → ANALYTICS" : goal.label}</div>
-      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? `${Math.round(engagementFill)} / ${BALANCE.onboarding.engagement.cap} · REPEATABLE GOLD` : modifierTeachActive ? "CHOOSE PASSIVE OR BLUE · DRAG THE GHOST" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: TEB EDITOR · +5 GOLD" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
+    <div data-onboarding="goal" style={{ position: "absolute", top: 72, left: 14, right: studio || (reveal && !reveal.dismissed) ? 112 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: studioReadyToClaim || shoutOutReadyToClaim ? "var(--gold)" : "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "PLAY TAP THREE · REPEATABLE GOLD" : shoutOutTeachActive ? "SHOUT-OUTS UNLOCKED" : analyticsUnlocked && !analyticsOpened ? "ANALYTICS UNLOCKED · OPEN INBOX" : shoutOutReadyToClaim ? "CLAIM SHOUT-OUTS · INBOX → ANALYTICS" : studioReadyToClaim ? "CLAIM STUDIO · INBOX → ANALYTICS" : goal.label}</div>
+      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? "HOLD TEB WHEN READY" : shoutOutTeachActive ? "LUCKY TAPS NOW PAY A BIG BONUS" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: SHOUT-OUTS · +5 GOLD" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
     </div>
     {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 72, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
-    {editorUnlocked && !editing && <motion.button data-open-pulse-modifier initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .22 }} onClick={openEditor} style={{ position: "absolute", top: studio ? 114 : 72, right: 14, zIndex: 11, minHeight: 34, padding: "7px 11px", borderRadius: 999, border: "1px solid rgba(55,166,255,.44)", background: "rgba(55,166,255,.09)", color: "#65bdff", fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 900, letterSpacing: ".12em", cursor: "pointer" }}>✦ TEB EDITOR</motion.button>}
-    {!rhythm && <OpeningTeb
-      manualEditing={manualEditing}
-      setManualEditing={setManualEditing}
-      selectedModifierId={selectedModifierId}
-      setSelectedModifierId={setSelectedModifierId}
-      draftAngle={draftAngle}
-      setDraftAngle={setDraftAngle}
-    />}
+    {!rhythm && <OpeningTeb />}
     <AnimatePresence>{rhythm && <RhythmPlayfield />}</AnimatePresence>
     <RevealCard />
   </main>;

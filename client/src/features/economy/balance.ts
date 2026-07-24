@@ -89,6 +89,9 @@ export const BALANCE = {
 
   // Phase 7 — The Feed (04 §13)
   feed: {
+    // Anti-autoclicker: same rate cap as the onboarding tap (see `onboarding.minTapIntervalMs`)
+    // applied to the main-game engageTap — taps faster than this are silently dropped.
+    minTapIntervalMs: 90,
     // §13.1 combo
     comboPerTap: 0.005,            // comboMult = 1 + min(combo, comboCap) × this
     comboCap: 100,                 // → max ×1.5
@@ -276,8 +279,22 @@ export const BALANCE = {
     videoFypFollowers: 10000,
     audienceReach: { baseCost: 5, costGrowth: 1.4, followerAmountAddPerLevel: 1 },
     engagementRate: { baseCost: 18, costGrowth: 1.9, fillAddPerLevel: 0.25 },
-    engagement: { cap: 100, baseFillPerTap: 1 },
-    goalCoins: { unlockPulseModifier: 5, unlockStudio: 5, buyAudienceReach: 0, reach700: 25, ownThreeFypLevels: 35, reach1200: 40 },
+    // Raid Squad — passive followers/sec (the "auto-tap" analog, themed as another
+    // creator's fans raiding your channel while you're away).
+    raidSquad: { baseCost: 15, costGrowth: 1.7, followersPerSecPerLevel: 0.2 },
+    // Momentum: fills every tap, auto-fires a Follower bonus and resets at cap — an
+    // active repeating heartbeat, not a one-time gate. bonusMult scales off the
+    // triggering tap's own (combo-boosted) gain, so a sustained streak pays bigger.
+    engagement: { cap: 25, baseFillPerTap: 1, bonusMult: 8 },
+    goalCoins: { unlockShoutOut: 5, unlockStudio: 5, buyAudienceReach: 0, reach700: 25, ownThreeFypLevels: 35, reach1200: 40 },
     tapThreeCoins: { completionBase: 12, qualityBonusMax: 8 },
+    // Shout-Out — the crit analog: a lucky tap gets shouted out by a bigger creator.
+    shoutOut: { chance: 0.08, mult: 4 },
+    // Onboarding tap combo — consecutive taps within `windowMs` build a small escalating
+    // multiplier (scaled-down version of the main game's feed combo).
+    combo: { windowMs: 900, perTap: 0.04, cap: 10 },
+    // Anti-autoclicker: taps faster than this are silently dropped (no gain/combo/progress).
+    // ~11 taps/sec — above any sustained human rate, so it's invisible at real speed.
+    minTapIntervalMs: 90,
   },
 } as const;

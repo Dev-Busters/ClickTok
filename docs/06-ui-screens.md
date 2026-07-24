@@ -394,10 +394,12 @@ clear of TEB and be no taller than two short lines at 320px width.
 
 Before 5 Followers the Inbox control is locked. At 5, Home announces Analytics, the Inbox control
 activates/pulses, and Analytics opens with a compact `TEB EDITOR` first entry. Claiming it grants
-5 Gold and returns to Home's inline editor. The editor offers two 5-Gold zone cards: Passive Boost
-and Blue Event. The selected translucent ghost starts at 6 o'clock, follows pointer drag or arrow
+5 Gold and returns to Home's dedicated full-screen editor. The editor offers two 5-Gold zone cards:
+Passive Boost and Blue Event. It shows a static perimeter only, with no live pulse or active
+Engagement Button. The selected translucent ghost starts at 6 o'clock, follows pointer drag or arrow
 keys around the dial, turns fully red over occupied zones, and disables placement until valid.
-After placement, `OPEN TEB EDITOR` reopens the same editor without a modal.
+Owned zones can be moved or removed. After placement, `TEB EDITOR` reopens the same full-screen
+editor without a modal.
 
 Before the first PERFECT, place `PERFECT 100%` outside and above the top timing zone; never overlap
 the ring. Remove the guide permanently after the first PERFECT. The
