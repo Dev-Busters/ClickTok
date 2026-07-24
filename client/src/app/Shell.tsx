@@ -11,6 +11,7 @@ import { Inbox } from "../screens/Inbox";
 import { Profile } from "../screens/Profile";
 import { CreateSheet } from "../screens/Create";
 import { CreatorStudio } from "../screens/CreatorStudio";
+import { VideoStudio } from "../screens/VideoStudio";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
 import { CelebrationLayer } from "../components/fx/CelebrationLayer";
@@ -43,6 +44,14 @@ export function Shell() {
       setIdleReport(report);
     }
   }, [applyIdleIncome]);
+
+  // Authoring entry point. Deliberately NOT dev-gated: base charts get authored against
+  // the deployed build on a real phone, which is the only place touch timing is honest.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("videoStudio")) {
+      useGameStore.getState().setSheet("videoStudio");
+    }
+  }, []);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -190,6 +199,12 @@ export function Shell() {
           <AnimatePresence>
             {openSheet === 'creatorStudio' && (
               <CreatorStudio onClose={() => setSheet(null)} />
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {openSheet === 'videoStudio' && (
+              <VideoStudio onClose={() => setSheet(null)} />
             )}
           </AnimatePresence>
         </>

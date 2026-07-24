@@ -93,6 +93,8 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
       get().decayCombo(dt);
       get().tickTebSession();
       get().tickOpeningRaid(dt);
+      get().decayOpeningCombo(dt);
+      get().tickOpeningBubbles();
       return;
     }
     // 3.2: runs every frame (the meta loop always calls tick()), so this is

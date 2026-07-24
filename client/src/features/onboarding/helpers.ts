@@ -83,14 +83,17 @@ export function isRateLimited(lastTapAt: number, now: number): boolean {
   return lastTapAt !== 0 && now - lastTapAt < BALANCE.onboarding.minTapIntervalMs;
 }
 
-// Onboarding tap combo — consecutive taps within the window build a small escalating
-// multiplier (same shape as the main game's comboPerTap/comboCap, scaled for the opening).
+// Onboarding tap combo — builds per tap, decays while idle (see decayOpeningCombo).
 export function openingComboMult(combo: number): number {
   return 1 + Math.min(combo, BALANCE.onboarding.combo.cap) * BALANCE.onboarding.combo.perTap;
 }
 
-export function withinOpeningComboWindow(lastTapAt: number, now: number): boolean {
-  return lastTapAt !== 0 && now - lastTapAt <= BALANCE.onboarding.combo.windowMs;
+export function isOpeningViral(viralUntil: number, now: number): boolean {
+  return viralUntil > now;
+}
+
+export function openingViralMult(viralUntil: number, now: number): number {
+  return isOpeningViral(viralUntil, now) ? BALANCE.onboarding.viral.mult : 1;
 }
 
 export function rollShoutOut(): boolean {

@@ -290,9 +290,28 @@ export const BALANCE = {
     tapThreeCoins: { completionBase: 12, qualityBonusMax: 8 },
     // Shout-Out — the crit analog: a lucky tap gets shouted out by a bigger creator.
     shoutOut: { chance: 0.08, mult: 4 },
-    // Onboarding tap combo — consecutive taps within `windowMs` build a small escalating
-    // multiplier (scaled-down version of the main game's feed combo).
-    combo: { windowMs: 900, perTap: 0.04, cap: 10 },
+    // Onboarding tap combo — builds per tap and DECAYS while idle (same shape as the
+    // main game's feed combo). Sustained tapping is what holds the multiplier up.
+    combo: { perTap: 0.05, cap: 20, decayDelayMs: 1500, decayPerSec: 7 },
+    // VIRAL — filling the combo bar tips the video over; everything pays double and the
+    // comment feed floods for a few seconds. The payoff moment of the tap loop.
+    viral: { durationMs: 7000, mult: 2, spawnRateMult: 3, exitCombo: 6 },
+    // The engagement feed — comments/likes/gifts drift up the screen and are tappable
+    // for bonuses. Deliberately forgiving: big targets, seconds of dwell, zero precision.
+    // Ignoring them costs nothing except the bonus (haters excepted).
+    bubbles: {
+      baseSpawnMs: 2400,      // average gap between spawns at 1× rate
+      minSpawnMs: 700,        // floor once rate multipliers stack
+      lifetimeMs: 5200,       // bottom → top drift time
+      maxActive: 7,
+      likeFollowerMult: 3,    // × per-tap follower amount
+      likeComboBonus: 3,      // combo points — lets bubbles sustain a streak
+      commentFollowerMult: 5,
+      commentMomentum: 4,
+      giftCoins: { min: 2, max: 5 },
+      haterDrainPct: 0.02,    // followers lost if a hater reaches the top untapped
+      haterFollowerMult: 4,   // reward for popping one in time
+    },
     // Anti-autoclicker: taps faster than this are silently dropped (no gain/combo/progress).
     // ~11 taps/sec — above any sustained human rate, so it's invisible at real speed.
     minTapIntervalMs: 90,

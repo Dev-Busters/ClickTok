@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BALANCE } from "../../features/economy/balance";
-import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, requirementValue } from "../../features/onboarding/helpers";
+import { goalById, isOnboardingFeatureAvailable, isOpeningEngagementAvailable, openingComboMult, requirementValue } from "../../features/onboarding/helpers";
 import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
+import { EngagementBubbles } from "./EngagementBubbles";
+import { FypFrame } from "./FypFrame";
 
 const COMBO_R = 100;
 const COMBO_CIRC = 2 * Math.PI * COMBO_R;
@@ -20,12 +22,13 @@ function OpeningTeb() {
   const reveal = useGameStore(state => state.activeOnboardingReveal);
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const openingCombo = useGameStore(state => state.openingCombo);
+  const viralUntil = useGameStore(state => state.openingViralUntil);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const nextReactionId = useRef(0);
   const activePointer = useRef<number | null>(null);
   const activeKey = useRef(false);
-  const [tapReactions, setTapReactions] = useState<Array<{ id: number; kind: "normal" | "shout_out" | "momentum"; followers: number; drift: number }>>([]);
+  const [tapReactions, setTapReactions] = useState<Array<{ id: number; kind: "normal" | "shout_out" | "momentum" | "viral"; followers: number; drift: number }>>([]);
   const [momentumPop, setMomentumPop] = useState(false);
   const momentumPopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduced = useReducedMotion();
@@ -36,6 +39,9 @@ function OpeningTeb() {
   const rhythmReady = rhythmUnlocked && !session && Date.now() >= tebReadyAt;
   const comboFraction = Math.min(1, openingCombo / BALANCE.onboarding.combo.cap);
   const momentumFraction = Math.min(1, fill / BALANCE.onboarding.engagement.cap);
+  const isViral = viralUntil > Date.now();
+  const comboMult = openingComboMult(Math.floor(openingCombo)) * (isViral ? BALANCE.onboarding.viral.mult : 1);
+  const comboColor = isViral ? "var(--gold)" : "var(--cyan)";
 
   const start = useCallback(() => {
     const now = Date.now();
@@ -48,6 +54,15 @@ function OpeningTeb() {
         setTapReactions(current => current.filter(reaction => reaction.id !== id));
         reactionTimers.current.delete(id);
       }, result.shoutOut ? 1400 : 1100);
+      reactionTimers.current.set(id, timer);
+    }
+    if (result.viralStarted) {
+      const id = nextReactionId.current++;
+      setTapReactions(current => [...current.slice(-5), { id, kind: "viral", followers: 0, drift: 0 }]);
+      const timer = setTimeout(() => {
+        setTapReactions(current => current.filter(reaction => reaction.id !== id));
+        reactionTimers.current.delete(id);
+      }, 1500);
       reactionTimers.current.set(id, timer);
     }
     if (result.momentumBonus > 0) {
@@ -87,16 +102,27 @@ function OpeningTeb() {
   return (
     <div data-onboarding="teb" style={{ position: "absolute", left: "50%", top: "52%", transform: "translate(-50%,-50%)", zIndex: 5, textAlign: "center" }}>
       <div style={{ position: "relative", width: 206, minHeight: 206, margin: "0 auto" }}>
-        {/* Combo ring — fills with consecutive taps, previews the main game's feel from tap #1 */}
-        <svg aria-hidden width={206} height={206} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)", filter: openingCombo > 0 ? "drop-shadow(0 0 6px var(--cyan))" : "none" }}>
+        {/* Combo ring — builds per tap and visibly bleeds back down while idle. */}
+        <svg aria-hidden width={206} height={206} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)", filter: isViral ? "drop-shadow(0 0 14px var(--gold))" : openingCombo > 0 ? "drop-shadow(0 0 6px var(--cyan))" : "none" }}>
           <circle cx={103} cy={103} r={COMBO_R} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth={3} />
           <circle
             cx={103} cy={103} r={COMBO_R} fill="none"
-            stroke="var(--cyan)" strokeWidth={3} strokeLinecap="round"
+            stroke={comboColor} strokeWidth={isViral ? 5 : 3} strokeLinecap="round"
             strokeDasharray={COMBO_CIRC} strokeDashoffset={COMBO_CIRC * (1 - comboFraction)}
-            style={{ transition: "stroke-dashoffset 0.1s linear" }}
+            style={{ transition: "stroke-dashoffset 0.1s linear, stroke 0.3s, stroke-width 0.3s" }}
           />
         </svg>
+
+        {/* Live multiplier readout — makes the decaying bar legible as a number. */}
+        <div style={{
+          position: "absolute", left: "50%", top: -34, transform: "translateX(-50%)",
+          fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 900, letterSpacing: ".08em",
+          color: openingCombo > 0 || isViral ? comboColor : "rgba(255,255,255,.35)",
+          textShadow: isViral ? "0 0 14px var(--gold)" : "none",
+          transition: "color .3s", pointerEvents: "none", whiteSpace: "nowrap",
+        }}>
+          ×{comboMult.toFixed(2)}
+        </div>
         {/* TAP THREE ready cue — small pill, independent of Momentum's fill state */}
         <AnimatePresence>
           {rhythmReady && (
@@ -203,23 +229,59 @@ function OpeningTeb() {
             pointerEvents: "none",
             whiteSpace: "nowrap",
             fontFamily: "var(--font-mono)",
-            fontSize: reaction.kind === "shout_out" ? 20 : reaction.kind === "momentum" ? 17 : 18,
+            fontSize: reaction.kind === "viral" ? 26 : reaction.kind === "shout_out" ? 20 : reaction.kind === "momentum" ? 17 : 18,
             fontWeight: 900,
             letterSpacing: ".06em",
-            color: reaction.kind === "shout_out" ? "var(--gold)" : reaction.kind === "momentum" ? "var(--cyan)" : "#4dff9a",
-            textShadow: reaction.kind === "shout_out"
+            color: reaction.kind === "shout_out" || reaction.kind === "viral" ? "var(--gold)" : reaction.kind === "momentum" ? "var(--cyan)" : "#4dff9a",
+            textShadow: reaction.kind === "shout_out" || reaction.kind === "viral"
               ? "0 0 26px currentColor,0 0 38px rgba(255,210,0,.92),0 0 10px rgba(255,210,0,.82),0 2px 4px rgba(0,0,0,.9)"
               : reaction.kind === "momentum"
                 ? "0 0 26px currentColor,0 0 10px rgba(37,244,238,.85),0 2px 4px rgba(0,0,0,.9)"
                 : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)",
           }}
         >
-          {reaction.kind === "shout_out"
-            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>SHOUT-OUT!</span><span>+{formatCount(reaction.followers)}</span></span>
-            : reaction.kind === "momentum"
-              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>MOMENTUM!</span><span>+{formatCount(reaction.followers)}</span></span>
-              : `+${formatCount(reaction.followers)}`}
+          {reaction.kind === "viral"
+            ? "🔥 GOING VIRAL"
+            : reaction.kind === "shout_out"
+              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>SHOUT-OUT!</span><span>+{formatCount(reaction.followers)}</span></span>
+              : reaction.kind === "momentum"
+                ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>MOMENTUM!</span><span>+{formatCount(reaction.followers)}</span></span>
+                : `+${formatCount(reaction.followers)}`}
         </motion.div>)}
+      </AnimatePresence>
+
+      {/* VIRAL window banner with a draining timer bar. */}
+      <AnimatePresence>
+        {isViral && (
+          <motion.div
+            key="viral-banner"
+            data-viral-banner
+            initial={{ opacity: 0, y: -8, scale: .9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: .9 }}
+            transition={{ type: "spring", stiffness: 400, damping: 24 }}
+            style={{
+              position: "absolute", left: "50%", top: -78, translate: "-50% 0",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              padding: "5px 14px", borderRadius: 999,
+              background: "rgba(35,28,2,.92)", border: "1px solid var(--gold)",
+              boxShadow: "0 0 22px rgba(255,210,0,.5)", pointerEvents: "none", whiteSpace: "nowrap",
+            }}
+          >
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 15, letterSpacing: ".1em", color: "var(--gold)", textShadow: "0 0 10px var(--gold)" }}>
+              🔥 VIRAL ×{BALANCE.onboarding.viral.mult}
+            </span>
+            <div style={{ width: 92, height: 3, borderRadius: 2, background: "rgba(255,255,255,.15)", overflow: "hidden" }}>
+              <motion.div
+                key={viralUntil}
+                initial={{ width: "100%" }}
+                animate={{ width: "0%" }}
+                transition={{ duration: BALANCE.onboarding.viral.durationMs / 1000, ease: "linear" }}
+                style={{ height: "100%", background: "var(--gold)" }}
+              />
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
       {meterVisible && <div style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: ".1em", color: "rgba(255,255,255,.72)" }}>MOMENTUM {Math.round(fill)} / {BALANCE.onboarding.engagement.cap}{!rhythmUnlocked ? " · BUILDING FOR TAP THREE" : rhythmReady ? " · TAP THREE READY" : session ? "" : " · TAP THREE ON COOLDOWN"}</div>}
     </div>
@@ -294,6 +356,8 @@ export function OpeningHome() {
       <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? "HOLD TEB WHEN READY" : shoutOutTeachActive ? "LUCKY TAPS NOW PAY A BIG BONUS" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: SHOUT-OUTS · +5 GOLD" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
     </div>
     {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 72, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
+    {!rhythm && <EngagementBubbles />}
+    {!rhythm && <FypFrame />}
     {!rhythm && <OpeningTeb />}
     <AnimatePresence>{rhythm && <RhythmPlayfield />}</AnimatePresence>
     <RevealCard />

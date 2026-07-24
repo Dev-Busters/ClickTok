@@ -1,11 +1,17 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
-import { canClaimCreatorStudioAnalytics, canClaimShoutOutAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, isRateLimited, openingComboMult, openingFollowerAmount, openingUpgradeCost, isOpeningEngagementAvailable, isOnboardingFeatureAvailable, raidFollowersPerSec, rollShoutOut, withinOpeningComboWindow } from "../../features/onboarding/helpers";
+import { canClaimCreatorStudioAnalytics, canClaimShoutOutAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, isRateLimited, openingComboMult, openingFollowerAmount, openingUpgradeCost, openingViralMult, isOpeningEngagementAvailable, isOnboardingFeatureAvailable, raidFollowersPerSec, rollShoutOut } from "../../features/onboarding/helpers";
+import { availableBubbleKinds, makeBubble, nextSpawnDelay, type Bubble, type BubbleKind } from "../../features/onboarding/bubbles";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import { track } from "../../lib/telemetry";
 import type { FullState } from "../index";
 
-export type OpeningTapResult = { followers: number; shoutOut: boolean; combo: number; momentumBonus: number };
+export type OpeningTapResult = { followers: number; shoutOut: boolean; combo: number; momentumBonus: number; viralStarted: boolean };
+
+export type BubblePopResult = { kind: BubbleKind; followers: number; coins: number } | null;
+
+// Monotonic bubble id — ephemeral, never persisted (the feed is rebuilt each session).
+let nextBubbleId = 1;
 
 export type OnboardingSlice = {
   onboardingRevision: typeof ONBOARDING_REVISION;
@@ -16,6 +22,9 @@ export type OnboardingSlice = {
   openingUpgradeLevels: Record<OpeningUpgradeId, number>;
   openingCombo: number;
   openingLastTapAt: number;
+  openingViralUntil: number;
+  openingBubbles: Bubble[];
+  openingNextSpawnAt: number;
   engagementFill: number;
   tapThreeCompletions: number;
   onboardingStepStartedAt: number;
@@ -24,6 +33,9 @@ export type OnboardingSlice = {
   completeOnboardingTeach: (teachId: string) => void;
   openingTap: (now?: number) => OpeningTapResult;
   tickOpeningRaid: (dt: number) => void;
+  decayOpeningCombo: (dt: number) => void;
+  tickOpeningBubbles: (now?: number) => void;
+  popOpeningBubble: (id: number) => BubblePopResult;
   openOpeningAnalytics: () => boolean;
   claimShoutOutAnalytics: () => boolean;
   claimCreatorStudioAnalytics: () => boolean;
@@ -59,6 +71,9 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
   openingCombo: 0,
   openingLastTapAt: 0,
+  openingViralUntil: 0,
+  openingBubbles: [],
+  openingNextSpawnAt: 0,
   engagementFill: 0,
   tapThreeCompletions: 0,
   onboardingStepStartedAt: Date.now(),
@@ -97,19 +112,28 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     queueMicrotask(() => get().checkOnboardingGoal());
   },
 
-  // Every tap always hits — no timing/placement check. Combo heat (short window,
-  // decays fast) plus a random Shout-Out bonus supply the excitement instead.
+  // Every tap always hits — no timing/placement check. Combo heat (which decays while
+  // idle), a random Shout-Out crit, and the VIRAL payoff supply the excitement instead.
   openingTap: (now = Date.now()) => {
     const state = get();
-    const blocked: OpeningTapResult = { followers: 0, shoutOut: false, combo: state.openingCombo, momentumBonus: 0 };
+    const blocked: OpeningTapResult = { followers: 0, shoutOut: false, combo: state.openingCombo, momentumBonus: 0, viralStarted: false };
     if (state.session) return blocked;
     if (isRateLimited(state.openingLastTapAt, now)) return blocked; // anti-autoclicker: silent no-op
 
-    const combo = withinOpeningComboWindow(state.openingLastTapAt, now) ? state.openingCombo + 1 : 0;
+    const comboCap = BALANCE.onboarding.combo.cap;
+    const wasViral = state.openingViralUntil > now;
+    // While VIRAL the bar is pinned at cap; taps can't overfill and decay is paused.
+    const combo = wasViral ? comboCap : Math.min(comboCap, Math.floor(state.openingCombo) + 1);
+    // Filling the bar (not already viral) tips the video over.
+    const viralStarted = !wasViral && combo >= comboCap;
+
     const shoutOutActive = isOnboardingFeatureAvailable("shout_out", state.completedOnboardingGoals);
     const shoutOut = shoutOutActive && rollShoutOut();
     const base = openingFollowerAmount(state.openingUpgradeLevels.audience_reach);
-    const followers = Math.max(1, Math.round(base * openingComboMult(combo) * (shoutOut ? BALANCE.onboarding.shoutOut.mult : 1)));
+    const viralMult = viralStarted || wasViral ? BALANCE.onboarding.viral.mult : 1;
+    const followers = Math.max(1, Math.round(
+      base * openingComboMult(combo) * viralMult * (shoutOut ? BALANCE.onboarding.shoutOut.mult : 1),
+    ));
 
     // Momentum: fills every tap; at full it auto-fires a bonus and resets on the spot —
     // an active, repeating heartbeat rather than a one-time gate that just sits full.
@@ -130,10 +154,125 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       openingLastTapAt: now,
       openingCombo: combo,
       engagementFill: nextFill,
+      ...(viralStarted ? { openingViralUntil: now + BALANCE.onboarding.viral.durationMs } : {}),
     });
     if (momentumFired) track("onboarding_momentum_fired", { bonus: momentumBonus });
+    if (viralStarted) track("onboarding_viral_started", { combo });
     get().checkOnboardingGoal();
-    return { followers, shoutOut, combo, momentumBonus };
+    return { followers, shoutOut, combo, momentumBonus, viralStarted };
+  },
+
+  // Combo bleeds off after a short grace period, so the bar reflects what the player is
+  // doing right now instead of freezing at full forever (and VIRAL pauses the bleed).
+  decayOpeningCombo: (dt) => {
+    const { openingCombo, openingLastTapAt, openingViralUntil } = get();
+    const now = Date.now();
+    if (openingViralUntil > 0 && now >= openingViralUntil) {
+      // VIRAL just ended — settle to a partial bar and resume normal decay.
+      set({ openingCombo: BALANCE.onboarding.viral.exitCombo, openingViralUntil: 0, openingLastTapAt: now });
+      return;
+    }
+    if (openingViralUntil > now) return;
+    if (openingCombo <= 0) return;
+    if (now - openingLastTapAt < BALANCE.onboarding.combo.decayDelayMs) return;
+    set({ openingCombo: Math.max(0, openingCombo - BALANCE.onboarding.combo.decayPerSec * dt) });
+  },
+
+  // Spawns and expires the engagement feed. Haters that reach the top untapped take a
+  // small bite out of followers — the only downside in the loop, and an avoidable one.
+  tickOpeningBubbles: (now = Date.now()) => {
+    const state = get();
+    // The rhythm minigame owns the whole play area, and a full-screen sheet (Studio,
+    // Video Studio) hides the feed entirely — in both cases stop the feed rather than
+    // let unreachable haters quietly drain followers behind the overlay.
+    if (state.session || state.openSheet !== null || state.activeTab !== "home") {
+      if (state.openingBubbles.length) set({ openingBubbles: [], openingNextSpawnAt: 0 });
+      return;
+    }
+    const b = BALANCE.onboarding.bubbles;
+    let bubbles = state.openingBubbles;
+    let followerLoss = 0;
+
+    const expired = bubbles.filter(bubble => bubble.expiresAt <= now);
+    if (expired.length) {
+      for (const bubble of expired) {
+        if (bubble.kind === "hater") followerLoss += state.wallet.followers * b.haterDrainPct;
+      }
+      bubbles = bubbles.filter(bubble => bubble.expiresAt > now);
+    }
+
+    const kinds = availableBubbleKinds(state.completedOnboardingGoals);
+    const viral = state.openingViralUntil > now;
+    const rateMult = viral ? BALANCE.onboarding.viral.spawnRateMult : 1;
+    let nextSpawnAt = state.openingNextSpawnAt;
+    if (nextSpawnAt === 0) {
+      nextSpawnAt = now + nextSpawnDelay(rateMult);
+    } else if (now >= nextSpawnAt) {
+      if (bubbles.length < b.maxActive) {
+        bubbles = [...bubbles, makeBubble(nextBubbleId++, kinds, now)];
+      }
+      nextSpawnAt = now + nextSpawnDelay(rateMult);
+    }
+
+    if (bubbles === state.openingBubbles && nextSpawnAt === state.openingNextSpawnAt && followerLoss === 0) return;
+    set({
+      openingBubbles: bubbles,
+      openingNextSpawnAt: nextSpawnAt,
+      ...(followerLoss > 0 ? {
+        wallet: { ...state.wallet, followers: Math.max(0, state.wallet.followers - followerLoss) },
+      } : {}),
+    });
+  },
+
+  popOpeningBubble: (id) => {
+    const state = get();
+    const bubble = state.openingBubbles.find(item => item.id === id);
+    if (!bubble) return null;
+    const b = BALANCE.onboarding.bubbles;
+    const now = Date.now();
+    const base = openingFollowerAmount(state.openingUpgradeLevels.audience_reach);
+    const viralMult = openingViralMult(state.openingViralUntil, now);
+
+    let followers = 0;
+    let coins = 0;
+    let comboBonus = 0;
+    let momentum = 0;
+    switch (bubble.kind) {
+      case "like":
+        followers = Math.round(base * b.likeFollowerMult * viralMult);
+        comboBonus = b.likeComboBonus;
+        break;
+      case "comment":
+        followers = Math.round(base * b.commentFollowerMult * viralMult);
+        momentum = b.commentMomentum;
+        break;
+      case "gift":
+        coins = Math.round((b.giftCoins.min + Math.random() * (b.giftCoins.max - b.giftCoins.min)) * viralMult);
+        break;
+      case "hater":
+        followers = Math.round(base * b.haterFollowerMult * viralMult);
+        break;
+    }
+
+    const cap = BALANCE.onboarding.engagement.cap;
+    set({
+      openingBubbles: state.openingBubbles.filter(item => item.id !== id),
+      wallet: {
+        ...state.wallet,
+        followers: state.wallet.followers + followers,
+        totalFollowers: state.wallet.totalFollowers + followers,
+        coins: state.wallet.coins + coins,
+      },
+      coinsEarned: state.coinsEarned + coins,
+      ...(comboBonus ? {
+        openingCombo: Math.min(BALANCE.onboarding.combo.cap, state.openingCombo + comboBonus),
+        openingLastTapAt: now,
+      } : {}),
+      ...(momentum ? { engagementFill: Math.min(cap, state.engagementFill + momentum) } : {}),
+    });
+    track("onboarding_bubble_popped", { kind: bubble.kind, followers, coins });
+    get().checkOnboardingGoal();
+    return { kind: bubble.kind, followers, coins };
   },
 
   // Raid Squad passive income — ticks while onboarding is active (see channelSlice.tick).
@@ -226,6 +365,9 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
     openingCombo: 0,
     openingLastTapAt: 0,
+    openingViralUntil: 0,
+    openingBubbles: [],
+    openingNextSpawnAt: 0,
     engagementFill: 0,
     tapThreeCompletions: 0,
     onboardingStepStartedAt: Date.now(),
