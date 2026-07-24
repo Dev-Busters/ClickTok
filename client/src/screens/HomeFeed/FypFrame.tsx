@@ -66,7 +66,9 @@ export function FypFrame() {
       <div
         data-fyp-rail
         style={{
-          position: "absolute", right: 10, bottom: 116, zIndex: 7,
+          // Sits just above the nav like TikTok's rail — its bottom control lines up
+          // with the caption block rather than floating in the middle of the video.
+          position: "absolute", right: 10, bottom: 26, zIndex: 7,
           display: "flex", flexDirection: "column", alignItems: "center", gap: 18,
           pointerEvents: "auto",
         }}
@@ -112,7 +114,9 @@ export function FypFrame() {
       <div
         data-fyp-caption
         style={{
-          position: "absolute", left: 14, right: 78, bottom: 116, zIndex: 7,
+          // TikTok anchors the handle/caption block hard against the bottom nav, not
+          // partway up the video — keep the gap tight so the layout reads correctly.
+          position: "absolute", left: 14, right: 78, bottom: 14, zIndex: 7,
           display: "flex", flexDirection: "column", gap: 6,
           pointerEvents: "none",
         }}
