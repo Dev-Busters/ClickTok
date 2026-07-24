@@ -5,9 +5,10 @@ import type { InboxNotification } from "../../features/inbox/types";
 import type { ElementId } from "../../features/elements/types";
 import type { SequenceId } from "../../features/teb/types";
 import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
+import type { MomentumBonusId } from "../../features/onboarding/momentumBonuses";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -153,8 +154,14 @@ export type PersistedV18 = Omit<PersistedV17, "version" | "openingPulseModifiers
 export type PersistedV19 = Omit<PersistedV18, "version" | "openingPulseModifiers"> & {
   version: 19;
 };
+// 20: Momentum fills now roll one of several bonuses; which ones the player owns is
+// progress and must survive a reload.
+export type PersistedV20 = Omit<PersistedV19, "version"> & {
+  version: 20;
+  unlockedMomentumBonuses: MomentumBonusId[];
+};
 
-export type PersistedState = PersistedV19;
+export type PersistedState = PersistedV20;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -195,6 +202,7 @@ export function toPersistedState(state: FullState): PersistedState {
     activeOnboardingReveal: state.activeOnboardingReveal,
     onboardingTeachesSeen: state.onboardingTeachesSeen,
     openingUpgradeLevels: state.openingUpgradeLevels,
+    unlockedMomentumBonuses: state.unlockedMomentumBonuses,
     engagementFill: state.engagementFill,
     tapThreeCompletions: state.tapThreeCompletions,
     onboardingStepStartedAt: state.onboardingStepStartedAt,
@@ -226,7 +234,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17 | PersistedV18 | PersistedV19;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17 | PersistedV18 | PersistedV19 | PersistedV20;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -470,6 +478,17 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
       version: 19,
       // v18 saves predate Raid Squad (the third opening upgrade) — start unowned.
       openingUpgradeLevels: { ...v18.openingUpgradeLevels, raid_squad: v18.openingUpgradeLevels.raid_squad ?? 0 },
+    };
+  }
+
+  if (version < 20) {
+    const v19 = state as PersistedV19;
+    state = {
+      ...v19,
+      version: 20,
+      // v19 saves predate rollable Momentum bonuses — everyone starts with just the
+      // free Follower Surge (represented by an empty owned list).
+      unlockedMomentumBonuses: [],
     };
   }
 

@@ -7,6 +7,7 @@ import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
 import { EngagementBubbles } from "./EngagementBubbles";
 import { FypFrame } from "./FypFrame";
+import { momentumBonusById } from "../../features/onboarding/momentumBonuses";
 
 const COMBO_R = 100;
 const COMBO_CIRC = 2 * Math.PI * COMBO_R;
@@ -28,7 +29,7 @@ function OpeningTeb() {
   const nextReactionId = useRef(0);
   const activePointer = useRef<number | null>(null);
   const activeKey = useRef(false);
-  const [tapReactions, setTapReactions] = useState<Array<{ id: number; kind: "normal" | "shout_out" | "momentum" | "viral"; followers: number; drift: number }>>([]);
+  const [tapReactions, setTapReactions] = useState<Array<{ id: number; kind: "normal" | "shout_out" | "momentum" | "viral"; followers: number; drift: number; label?: string; color?: string }>>([]);
   const [momentumPop, setMomentumPop] = useState(false);
   const momentumPopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduced = useReducedMotion();
@@ -43,9 +44,9 @@ function OpeningTeb() {
   const comboMult = openingComboMult(Math.floor(openingCombo)) * (isViral ? BALANCE.onboarding.viral.mult : 1);
   const comboColor = isViral ? "var(--gold)" : "var(--cyan)";
 
-  const start = useCallback(() => {
+  const start = useCallback((at?: { x: number; y: number }) => {
     const now = Date.now();
-    const result = useGameStore.getState().openingTap(now);
+    const result = useGameStore.getState().openingTap(now, at);
     if (result.followers > 0) {
       const id = nextReactionId.current++;
       const kind = result.shoutOut ? "shout_out" : "normal";
@@ -65,13 +66,22 @@ function OpeningTeb() {
       }, 1500);
       reactionTimers.current.set(id, timer);
     }
-    if (result.momentumBonus > 0) {
+    if (result.bonus) {
+      const def = momentumBonusById(result.bonus.id);
       const id = nextReactionId.current++;
-      setTapReactions(current => [...current.slice(-5), { id, kind: "momentum", followers: result.momentumBonus, drift: (Math.random() - .5) * 40 }]);
+      // Non-follower bonuses (storms, duets, pushes) still get a callout so the player
+      // always learns which one rolled, even when nothing lands in the wallet.
+      const amount = result.bonus.coins > 0 ? `+${formatCount(result.bonus.coins)} 🪙`
+        : result.bonus.followers > 0 ? `+${formatCount(result.bonus.followers)}`
+        : "";
+      setTapReactions(current => [...current.slice(-5), {
+        id, kind: "momentum", followers: result.bonus!.followers,
+        drift: (Math.random() - .5) * 40, label: `${def.callout}${amount ? ` ${amount}` : ""}`, color: def.color,
+      }]);
       const timer = setTimeout(() => {
         setTapReactions(current => current.filter(reaction => reaction.id !== id));
         reactionTimers.current.delete(id);
-      }, 1300);
+      }, 1400);
       reactionTimers.current.set(id, timer);
       setMomentumPop(true);
       if (momentumPopTimer.current) clearTimeout(momentumPopTimer.current);
@@ -151,7 +161,7 @@ function OpeningTeb() {
             // Synthetic automation events may not own a native pointer. A normal
             // click still supplies pointerup on the button; real touch/mouse input captures.
           }
-          start();
+          start({ x: event.clientX, y: event.clientY });
         }}
         onPointerUp={event => {
           if (activePointer.current !== event.pointerId) return;
@@ -232,7 +242,7 @@ function OpeningTeb() {
             fontSize: reaction.kind === "viral" ? 26 : reaction.kind === "shout_out" ? 20 : reaction.kind === "momentum" ? 17 : 18,
             fontWeight: 900,
             letterSpacing: ".06em",
-            color: reaction.kind === "shout_out" || reaction.kind === "viral" ? "var(--gold)" : reaction.kind === "momentum" ? "var(--cyan)" : "#4dff9a",
+            color: reaction.color ?? (reaction.kind === "shout_out" || reaction.kind === "viral" ? "var(--gold)" : reaction.kind === "momentum" ? "var(--cyan)" : "#4dff9a"),
             textShadow: reaction.kind === "shout_out" || reaction.kind === "viral"
               ? "0 0 26px currentColor,0 0 38px rgba(255,210,0,.92),0 0 10px rgba(255,210,0,.82),0 2px 4px rgba(0,0,0,.9)"
               : reaction.kind === "momentum"
@@ -244,8 +254,8 @@ function OpeningTeb() {
             ? "🔥 GOING VIRAL"
             : reaction.kind === "shout_out"
               ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>SHOUT-OUT!</span><span>+{formatCount(reaction.followers)}</span></span>
-              : reaction.kind === "momentum"
-                ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>MOMENTUM!</span><span>+{formatCount(reaction.followers)}</span></span>
+              : reaction.label
+                ? reaction.label
                 : `+${formatCount(reaction.followers)}`}
         </motion.div>)}
       </AnimatePresence>

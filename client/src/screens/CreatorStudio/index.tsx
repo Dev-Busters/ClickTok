@@ -7,6 +7,7 @@ import { UpgradeShop } from "../../components/UpgradeShop";
 import { SkillsPanel } from "../../components/SkillsPanel";
 import type { UpgradePillar } from "../../features/upgrades/types";
 import { openingFollowerAmount, engagementPerTap, openingUpgradeCost, raidFollowersPerSec } from "../../features/onboarding/helpers";
+import { MOMENTUM_BONUSES } from "../../features/onboarding/momentumBonuses";
 import type { OpeningUpgradeId } from "../../features/onboarding/types";
 import { formatCount } from "../../lib/format";
 
@@ -52,6 +53,8 @@ function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
     : levels.audience_reach >= 1
       ? ["audience_reach", "engagement_rate"]
       : ["audience_reach"];
+  // The bonus shop only means anything once the player owns a Momentum meter to fill.
+  const momentumUnlocked = levels.engagement_rate >= 1;
   const buy = (id: OpeningUpgradeId) => {
     const kind = levels[id] === 0 ? "unlocked" : "leveled";
     if (!levelUpgrade(id)) return;
@@ -90,9 +93,68 @@ function OpeningCreatorStudio({ onClose }: { onClose: () => void }) {
           </motion.section>;
         })}
       </AnimatePresence>
+
+      {/* Momentum bonuses — one-off unlocks that widen the roll pool rather than
+          replacing what came before, so filling the bar stays varied. */}
+      {momentumUnlocked && <MomentumBonusShop />}
       </div>
     </div>
   </motion.div>;
+}
+
+function MomentumBonusShop() {
+  const wallet = useGameStore(state => state.wallet);
+  const unlocked = useGameStore(state => state.unlockedMomentumBonuses);
+  const unlock = useGameStore(state => state.unlockMomentumBonus);
+  const buyable = MOMENTUM_BONUSES.filter(bonus => bonus.cost > 0);
+  const ownedCount = 1 + buyable.filter(bonus => unlocked.includes(bonus.id)).length;
+
+  return (
+    <section style={{ marginTop: 26 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+        <strong style={{ fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: ".05em" }}>MOMENTUM BONUSES</strong>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>{ownedCount} / {buyable.length + 1}</span>
+      </div>
+      <p style={{ margin: "0 0 14px", fontFamily: "var(--font-mono)", fontSize: 10, lineHeight: 1.5, color: "rgba(255,255,255,.6)" }}>
+        Filling the Momentum ring rolls one of these at random. Owning more means more variety.
+      </p>
+
+      {buyable.map(bonus => {
+        const owned = unlocked.includes(bonus.id);
+        const affordable = wallet.coins >= bonus.cost;
+        return (
+          <div
+            key={bonus.id}
+            data-momentum-bonus={bonus.id}
+            style={{
+              marginBottom: 10, padding: 14, borderRadius: 14,
+              border: `1px solid ${owned ? bonus.color : "rgba(255,255,255,.12)"}`,
+              background: owned ? `color-mix(in srgb, ${bonus.color} 10%, rgba(14,16,22,.98))` : "linear-gradient(145deg,rgba(26,29,38,.98),rgba(14,16,22,.98))",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <strong style={{ fontFamily: "var(--font-display)", fontSize: 19, color: owned ? bonus.color : "#fff" }}>{bonus.name}</strong>
+              {owned && <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 900, color: bonus.color }}>OWNED</span>}
+            </div>
+            <p style={{ margin: "7px 0 12px", fontFamily: "var(--font-mono)", fontSize: 11, lineHeight: 1.5, color: "rgba(255,255,255,.74)" }}>{bonus.blurb}</p>
+            {!owned && (
+              <button
+                onClick={() => unlock(bonus.id)}
+                disabled={!affordable}
+                style={{
+                  width: "100%", padding: 12, border: 0, borderRadius: 999,
+                  background: affordable ? bonus.color : "rgba(255,255,255,.1)",
+                  color: affordable ? "#040608" : "rgba(255,255,255,.45)",
+                  fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 900, letterSpacing: ".1em",
+                  cursor: affordable ? "pointer" : "not-allowed",
+                }}
+              >UNLOCK · 🪙 {bonus.cost}</button>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
 }
 
 function FullCreatorStudio({ onClose }: { onClose: () => void }) {

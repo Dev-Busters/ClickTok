@@ -2,11 +2,22 @@ import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
 import { canClaimCreatorStudioAnalytics, canClaimShoutOutAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, isRateLimited, openingComboMult, openingFollowerAmount, openingUpgradeCost, openingViralMult, isOpeningEngagementAvailable, isOnboardingFeatureAvailable, raidFollowersPerSec, rollShoutOut } from "../../features/onboarding/helpers";
 import { availableBubbleKinds, makeBubble, nextSpawnDelay, type Bubble, type BubbleKind } from "../../features/onboarding/bubbles";
+import { momentumBonusById, resolveMomentumBonus, rollMomentumBonus, type MomentumBonusId, type MomentumBonusResult } from "../../features/onboarding/momentumBonuses";
+import { computeIntegritySignals, pushSample, type IntegritySignals, type TapSample } from "../../features/integrity/signals";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import { track } from "../../lib/telemetry";
 import type { FullState } from "../index";
 
-export type OpeningTapResult = { followers: number; shoutOut: boolean; combo: number; momentumBonus: number; viralStarted: boolean };
+export type OpeningTapResult = {
+  followers: number;
+  shoutOut: boolean;
+  combo: number;
+  viralStarted: boolean;
+  /** Followers paid by a Momentum fill this tap (0 if it didn't fill). */
+  momentumBonus: number;
+  /** Which bonus rolled, if the bar filled. */
+  bonus: MomentumBonusResult | null;
+};
 
 export type BubblePopResult = { kind: BubbleKind; followers: number; coins: number } | null;
 
@@ -20,18 +31,30 @@ export type OnboardingSlice = {
   activeOnboardingReveal: OnboardingReveal | null;
   onboardingTeachesSeen: Record<string, true>;
   openingUpgradeLevels: Record<OpeningUpgradeId, number>;
+  unlockedMomentumBonuses: MomentumBonusId[];
   openingCombo: number;
   openingLastTapAt: number;
   openingViralUntil: number;
   openingBubbles: Bubble[];
   openingNextSpawnAt: number;
+  /** Wall-clock rate limiter for Momentum fill (see engagement.maxFillPerSec). */
+  openingFillWindowStart: number;
+  openingFillInWindow: number;
+  /** Token bucket gating base follower payout (see tapPayout). */
+  openingTapTokens: number;
+  openingTokensAt: number;
+  /** Armed by momentum bonuses. */
+  openingDuetTaps: number;
+  openingPushUntil: number;
+  /** Rolling input-shape buffer — ephemeral, never persisted. */
+  openingTapSamples: TapSample[];
   engagementFill: number;
   tapThreeCompletions: number;
   onboardingStepStartedAt: number;
   checkOnboardingGoal: () => void;
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
-  openingTap: (now?: number) => OpeningTapResult;
+  openingTap: (now?: number, at?: { x: number; y: number }) => OpeningTapResult;
   tickOpeningRaid: (dt: number) => void;
   decayOpeningCombo: (dt: number) => void;
   tickOpeningBubbles: (now?: number) => void;
@@ -40,6 +63,8 @@ export type OnboardingSlice = {
   claimShoutOutAnalytics: () => boolean;
   claimCreatorStudioAnalytics: () => boolean;
   levelOpeningUpgrade: (id: OpeningUpgradeId) => boolean;
+  unlockMomentumBonus: (id: MomentumBonusId) => boolean;
+  readIntegritySignals: () => IntegritySignals;
   addEngagement: (amount: number) => void;
   resetOnboardingRevision: () => void;
 };
@@ -69,11 +94,19 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   activeOnboardingReveal: null,
   onboardingTeachesSeen: {},
   openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
+  unlockedMomentumBonuses: [],
   openingCombo: 0,
   openingLastTapAt: 0,
   openingViralUntil: 0,
   openingBubbles: [],
   openingNextSpawnAt: 0,
+  openingFillWindowStart: 0,
+  openingFillInWindow: 0,
+  openingTapTokens: BALANCE.onboarding.tapPayout.capacity,
+  openingTokensAt: 0,
+  openingDuetTaps: 0,
+  openingPushUntil: 0,
+  openingTapSamples: [],
   engagementFill: 0,
   tapThreeCompletions: 0,
   onboardingStepStartedAt: Date.now(),
@@ -114,9 +147,9 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
 
   // Every tap always hits — no timing/placement check. Combo heat (which decays while
   // idle), a random Shout-Out crit, and the VIRAL payoff supply the excitement instead.
-  openingTap: (now = Date.now()) => {
+  openingTap: (now = Date.now(), at) => {
     const state = get();
-    const blocked: OpeningTapResult = { followers: 0, shoutOut: false, combo: state.openingCombo, momentumBonus: 0, viralStarted: false };
+    const blocked: OpeningTapResult = { followers: 0, shoutOut: false, combo: state.openingCombo, viralStarted: false, momentumBonus: 0, bonus: null };
     if (state.session) return blocked;
     if (isRateLimited(state.openingLastTapAt, now)) return blocked; // anti-autoclicker: silent no-op
 
@@ -127,40 +160,103 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     // Filling the bar (not already viral) tips the video over.
     const viralStarted = !wasViral && combo >= comboCap;
 
+    const pushActive = state.openingPushUntil > now;
     const shoutOutActive = isOnboardingFeatureAvailable("shout_out", state.completedOnboardingGoals);
-    const shoutOut = shoutOutActive && rollShoutOut();
+    // ALGORITHM PUSH guarantees the crit for its window.
+    const shoutOut = shoutOutActive && (pushActive || rollShoutOut());
+    // Token bucket: sustained payout is capped at refillPerSec while `capacity` absorbs
+    // human bursts. A macro drains the bucket in ~1s and then earns exactly what a
+    // sustained human earns; honest tapping never touches the floor.
+    const bucket = BALANCE.onboarding.tapPayout;
+    const tokensElapsed = state.openingTokensAt === 0 ? 0 : (now - state.openingTokensAt) / 1000;
+    const tokensAvailable = Math.min(bucket.capacity, state.openingTapTokens + tokensElapsed * bucket.refillPerSec);
+    const paid = tokensAvailable >= 1;
+    const tokensLeft = paid ? tokensAvailable - 1 : tokensAvailable;
+
     const base = openingFollowerAmount(state.openingUpgradeLevels.audience_reach);
     const viralMult = viralStarted || wasViral ? BALANCE.onboarding.viral.mult : 1;
-    const followers = Math.max(1, Math.round(
-      base * openingComboMult(combo) * viralMult * (shoutOut ? BALANCE.onboarding.shoutOut.mult : 1),
-    ));
+    const duetMult = state.openingDuetTaps > 0 ? BALANCE.onboarding.momentumBonuses.duetMult : 1;
+    const followers = paid
+      ? Math.max(1, Math.round(
+          base * openingComboMult(combo) * viralMult * duetMult * (shoutOut ? BALANCE.onboarding.shoutOut.mult : 1),
+        ))
+      : 0;
 
-    // Momentum: fills every tap; at full it auto-fires a bonus and resets on the spot —
-    // an active, repeating heartbeat rather than a one-time gate that just sits full.
+    // Momentum fill is rate-limited in WALL-CLOCK time, not per tap. Because the fill
+    // drives the bonus — the dominant earner — this is what makes tapping faster than a
+    // human worthless. Fair players never reach the ceiling; automation gains nothing.
     const momentumAvailable = isOpeningEngagementAvailable(state.completedOnboardingGoals);
-    const momentumPerTap = momentumAvailable ? engagementPerTap(state.openingUpgradeLevels.engagement_rate) : 0;
+    const rawPerTap = momentumAvailable ? engagementPerTap(state.openingUpgradeLevels.engagement_rate) : 0;
+    const windowElapsed = now - state.openingFillWindowStart;
+    const inNewWindow = state.openingFillWindowStart === 0 || windowElapsed >= 1000;
+    const usedThisWindow = inNewWindow ? 0 : state.openingFillInWindow;
+    const fillBudget = Math.max(0, BALANCE.onboarding.engagement.maxFillPerSec - usedThisWindow);
+    const momentumPerTap = Math.min(rawPerTap, fillBudget);
+
     const cap = BALANCE.onboarding.engagement.cap;
     const filledFill = state.engagementFill + momentumPerTap;
     const momentumFired = momentumPerTap > 0 && filledFill >= cap;
-    // Bonus scales with this tap's own combo-boosted gain, so a sustained streak pays bigger.
-    const momentumBonus = momentumFired ? Math.round(followers * BALANCE.onboarding.engagement.bonusMult) : 0;
+
+    // Roll one of the unlocked bonuses instead of always paying the same burst.
+    const bonus = momentumFired
+      ? resolveMomentumBonus(rollMomentumBonus(state.unlockedMomentumBonuses), followers)
+      : null;
     const nextFill = momentumFired ? Math.min(cap, filledFill - cap) : filledFill;
-    const totalFollowerGain = followers + momentumBonus;
+    const totalFollowerGain = followers + (bonus?.followers ?? 0);
+    const coinGain = bonus?.coins ?? 0;
 
     set({
-      wallet: { ...state.wallet, followers: state.wallet.followers + totalFollowerGain, totalFollowers: state.wallet.totalFollowers + totalFollowerGain },
+      wallet: {
+        ...state.wallet,
+        followers: state.wallet.followers + totalFollowerGain,
+        totalFollowers: state.wallet.totalFollowers + totalFollowerGain,
+        coins: state.wallet.coins + coinGain,
+      },
+      coinsEarned: state.coinsEarned + coinGain,
       viewsTotal: state.viewsTotal + 1,
       lastTapAt: now,
       openingLastTapAt: now,
       openingCombo: combo,
       engagementFill: nextFill,
+      openingFillWindowStart: inNewWindow ? now : state.openingFillWindowStart,
+      openingFillInWindow: usedThisWindow + momentumPerTap,
+      openingTapTokens: tokensLeft,
+      openingTokensAt: now,
+      openingDuetTaps: bonus?.duetTaps ? bonus.duetTaps : Math.max(0, state.openingDuetTaps - 1),
+      ...(bonus?.pushMs ? { openingPushUntil: now + bonus.pushMs } : {}),
       ...(viralStarted ? { openingViralUntil: now + BALANCE.onboarding.viral.durationMs } : {}),
+      // Advisory input-shape evidence only — never used to gate rewards client-side.
+      ...(at ? { openingTapSamples: pushSample(state.openingTapSamples, { at: now, x: at.x, y: at.y }) } : {}),
     });
-    if (momentumFired) track("onboarding_momentum_fired", { bonus: momentumBonus });
+
+    // COMMENT STORM drops its bubbles immediately so the payoff is visible at once.
+    if (bonus?.spawnBubbles) {
+      const kinds = availableBubbleKinds(get().completedOnboardingGoals);
+      const spawned = Array.from({ length: bonus.spawnBubbles }, () => makeBubble(nextBubbleId++, kinds, now));
+      set({ openingBubbles: [...get().openingBubbles, ...spawned] });
+    }
+
+    if (bonus) track("onboarding_momentum_fired", { bonus: bonus.id, followers: bonus.followers, coins: bonus.coins });
     if (viralStarted) track("onboarding_viral_started", { combo });
     get().checkOnboardingGoal();
-    return { followers, shoutOut, combo, momentumBonus, viralStarted };
+    return { followers, shoutOut, combo, viralStarted, momentumBonus: bonus?.followers ?? 0, bonus };
   },
+
+  unlockMomentumBonus: id => {
+    const state = get();
+    const def = momentumBonusById(id);
+    if (def.cost === 0 || state.unlockedMomentumBonuses.includes(id)) return false;
+    if (state.wallet.coins < def.cost) return false;
+    set({
+      wallet: { ...state.wallet, coins: state.wallet.coins - def.cost },
+      unlockedMomentumBonuses: [...state.unlockedMomentumBonuses, id],
+      statPulseAt: Date.now(),
+    });
+    track("onboarding_momentum_bonus_unlocked", { id, cost: def.cost });
+    return true;
+  },
+
+  readIntegritySignals: () => computeIntegritySignals(get().openingTapSamples),
 
   // Combo bleeds off after a short grace period, so the bar reflects what the player is
   // doing right now instead of freezing at full forever (and VIRAL pauses the bleed).
@@ -203,7 +299,10 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
 
     const kinds = availableBubbleKinds(state.completedOnboardingGoals);
     const viral = state.openingViralUntil > now;
-    const rateMult = viral ? BALANCE.onboarding.viral.spawnRateMult : 1;
+    const pushing = state.openingPushUntil > now;
+    // VIRAL and ALGORITHM PUSH stack — a push landing mid-viral floods the feed.
+    const rateMult = (viral ? BALANCE.onboarding.viral.spawnRateMult : 1)
+      * (pushing ? BALANCE.onboarding.momentumBonuses.algorithmPushSpawnMult : 1);
     let nextSpawnAt = state.openingNextSpawnAt;
     if (nextSpawnAt === 0) {
       nextSpawnAt = now + nextSpawnDelay(rateMult);
@@ -363,11 +462,19 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     activeOnboardingReveal: null,
     onboardingTeachesSeen: {},
     openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
+    unlockedMomentumBonuses: [],
     openingCombo: 0,
     openingLastTapAt: 0,
     openingViralUntil: 0,
     openingBubbles: [],
     openingNextSpawnAt: 0,
+    openingFillWindowStart: 0,
+    openingFillInWindow: 0,
+    openingTapTokens: BALANCE.onboarding.tapPayout.capacity,
+    openingTokensAt: 0,
+    openingDuetTaps: 0,
+    openingPushUntil: 0,
+    openingTapSamples: [],
     engagementFill: 0,
     tapThreeCompletions: 0,
     onboardingStepStartedAt: Date.now(),

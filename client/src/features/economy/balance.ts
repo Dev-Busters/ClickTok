@@ -282,10 +282,22 @@ export const BALANCE = {
     // Raid Squad — passive followers/sec (the "auto-tap" analog, themed as another
     // creator's fans raiding your channel while you're away).
     raidSquad: { baseCost: 15, costGrowth: 1.7, followersPerSecPerLevel: 0.2 },
-    // Momentum: fills every tap, auto-fires a Follower bonus and resets at cap — an
-    // active repeating heartbeat, not a one-time gate. bonusMult scales off the
-    // triggering tap's own (combo-boosted) gain, so a sustained streak pays bigger.
-    engagement: { cap: 25, baseFillPerTap: 1, bonusMult: 8 },
+    // Momentum: fills every tap, rolls one of the player's unlocked bonuses at cap and
+    // resets — an active repeating heartbeat, not a one-time gate.
+    // `maxFillPerSec` is an integrity measure as much as a balance one: the bonus is the
+    // dominant earner, so capping how fast the bar can fill in WALL-CLOCK time means
+    // tapping faster than a human comfortably can buys nothing. A fair player at 5–7
+    // taps/sec never reaches the ceiling; a macro at 30/sec earns exactly the same.
+    engagement: { cap: 25, baseFillPerTap: 1, bonusMult: 8, maxFillPerSec: 8 },
+    momentumBonuses: {
+      surgeMult: 8,                 // follower_surge: × the tap that filled the bar
+      goldRush: { min: 4, max: 9 },
+      commentStormBubbles: 5,
+      duetTaps: 15,
+      duetMult: 3,
+      algorithmPushMs: 8000,
+      algorithmPushSpawnMult: 3,
+    },
     goalCoins: { unlockShoutOut: 5, unlockStudio: 5, buyAudienceReach: 0, reach700: 25, ownThreeFypLevels: 35, reach1200: 40 },
     tapThreeCoins: { completionBase: 12, qualityBonusMax: 8 },
     // Shout-Out — the crit analog: a lucky tap gets shouted out by a bigger creator.
@@ -312,8 +324,16 @@ export const BALANCE = {
       haterDrainPct: 0.02,    // followers lost if a hater reaches the top untapped
       haterFollowerMult: 4,   // reward for popping one in time
     },
-    // Anti-autoclicker: taps faster than this are silently dropped (no gain/combo/progress).
-    // ~11 taps/sec — above any sustained human rate, so it's invisible at real speed.
-    minTapIntervalMs: 90,
+    // Crude backstop only — blocks absurd input rates. Deliberately permissive (~18/sec)
+    // so a two-finger human burst still registers and feels responsive; the economic
+    // limiting is the token bucket below, which is the control that actually matters.
+    minTapIntervalMs: 55,
+    // Token bucket on base follower payout. The interval floor alone still let a macro
+    // register ~11 taps/sec against a human's ~7, worth ~22% more income — a real edge on
+    // a leaderboard. The bucket caps SUSTAINED payout at `refillPerSec` while `capacity`
+    // absorbs genuine human bursts, so honest fast tapping is untouched and a 30/sec macro
+    // converges to exactly the sustained human rate. Unpaid taps still feel normal
+    // (combo, animation) — they simply pay nothing.
+    tapPayout: { refillPerSec: 8, capacity: 24 },
   },
 } as const;
