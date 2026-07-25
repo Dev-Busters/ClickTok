@@ -2266,6 +2266,22 @@ TikTok FYP chrome, stand up video chart authoring, and make automation economica
   > note: `viral.exitCombo` deleted. With VIRAL no longer pinning the combo bar, combo decays
   > under every condition and there is nothing to settle back to.
 
+- [x] **19.8 — Feed playtest pass #1 (`16` §2b, §3, §3.1).** From the 2026-07-25 phone playtest:
+  bubbles drifted under the creator rail (hard to hit, stray taps fired rail controls) → all
+  bubbles now ride a single measured lane left of TEB, `RAIL_SAFE_PX` backstop, verified at
+  375×812 and 320×640. Comments no longer spawn from tap one — the feed starts **empty** and
+  comments unlock at `meet_teb`. Cadence halved (`baseSpawnMs` 2400→5200, `maxActive` 7→4,
+  measured median gap ~5.4s). Letters are now caught **in order** V→I→R→A→L with one live at
+  a time and a per-letter window that refreshes on each catch (`setWindowMs` → `letterWindowMs`
+  30s), so missing a bubble just brings the same letter back. Tracker only renders while a
+  chain is live. Motion profiles no longer stall mid-flight. Added trails, colour-morphing
+  rings and pop particles.
+  > note: found a real bug while verifying — the tracker was off-centre because Framer Motion
+  > writes the element's `transform` for `y`/`scale` and clobbered `transform: translateX(-50%)`.
+  > Use the standalone `translate` CSS property for centring on any animated element.
+  > note: a right-hand lane is geometrically impossible — TEB's button is 188px and centred,
+  > leaving ~2px between it and the rail at 320px wide. Single left lane is not a shortcut.
+
 **Phase 19 exit criteria:** the opening loop has multiple interacting layers with no precision
 requirement; docs describe what is actually built; automation earns less than honest play.
 

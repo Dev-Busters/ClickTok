@@ -9,11 +9,10 @@ import type { OnboardingStepId } from "./types";
  * pulse system).
  *
  * `viral_letter` is the deliberate exception: letters move faster and along varied
- * paths, and collecting the whole word is the ONLY way to go viral (16 §2b). That's the
- * one place in the opening where reaction is asked for — and it is entirely optional.
+ * paths, and spelling the whole word **in order** is the only way to go viral (16 §2b).
  *
- * Kinds unlock one at a time alongside the onboarding journey so the screen gets busier
- * as the player grows, rather than dumping four mechanics at once.
+ * Nothing spawns at all until the first kind unlocks — the opening screen starts empty
+ * and gets busier one kind at a time as the player grows.
  */
 export type BubbleKind = "comment" | "gift" | "hater" | "viral_letter";
 
@@ -23,6 +22,9 @@ export type ViralLetter = (typeof VIRAL_LETTERS)[number];
 /**
  * How a bubble travels. Ambient kinds always drift (`float`); letters roll one of the
  * five, which is what stops the set from being five identical taps.
+ *
+ * Every profile must keep MOVING for its whole life — a bubble that coasts to a stop
+ * partway up is a free tap, which is what the first pass accidentally shipped.
  */
 export type BubbleMotion = "float" | "sway" | "zigzag" | "dart" | "bob";
 
@@ -31,9 +33,13 @@ const LETTER_MOTIONS: readonly BubbleMotion[] = ["float", "sway", "zigzag", "dar
 export type Bubble = {
   id: number;
   kind: BubbleKind;
-  /** normalized 0..1 horizontal position of the drift channel */
-  x: number;
-  /** horizontal sway amplitude, normalized */
+  /**
+   * Position WITHIN the safe lane, 0..1 — not a fraction of the screen. The renderer
+   * owns the geometry (it's the only side that can measure the play area), which is how
+   * a bubble is guaranteed never to drift under TEB or the creator rail.
+   */
+  lane: number;
+  /** horizontal sway amplitude, 0..1 of the lane's width */
   sway: number;
   spawnedAt: number;
   expiresAt: number;
@@ -44,6 +50,8 @@ export type Bubble = {
   motion: BubbleMotion;
   /** bottom→top travel time; letters vary, ambient kinds use `bubbles.lifetimeMs` */
   lifeMs: number;
+  /** per-bubble colour-drift seed, so no two bubbles morph through the same phase */
+  hue: number;
 };
 
 const COMMENT_TEXTS = [
@@ -57,12 +65,18 @@ const HATER_TEXTS = [
 ];
 
 /**
- * Kinds available at a given point in the opening journey. Likes are deliberately absent
- * — the heart bubble was retired when VIRAL moved onto the letter set, and the like
- * mechanic is parked until the real FYP feed needs it.
+ * Kinds available at a given point in the opening journey.
+ *
+ * **Nothing is available at the start.** The first minute is TEB and nothing else, so the
+ * player learns one thing before the screen starts moving (playtest 2026-07-25 — comments
+ * from tap one were both too early and too frequent).
+ *
+ * Likes are absent by design: the heart bubble was retired when VIRAL moved onto the
+ * letter set, and the like mechanic is parked until the real FYP feed needs it.
  */
 export function availableBubbleKinds(completed: readonly OnboardingStepId[]): BubbleKind[] {
-  const kinds: BubbleKind[] = ["comment"];
+  const kinds: BubbleKind[] = [];
+  if (completed.includes("meet_teb")) kinds.push("comment");
   if (completed.includes("unlock_studio")) kinds.push("gift");
   if (completed.includes("buy_audience_reach")) kinds.push("hater");
   if (completed.includes("reach_700")) kinds.push("viral_letter");
@@ -72,6 +86,15 @@ export function availableBubbleKinds(completed: readonly OnboardingStepId[]): Bu
 /** Whether the V·I·R·A·L letter set is part of the loop yet. */
 export function areViralLettersAvailable(completed: readonly OnboardingStepId[]): boolean {
   return completed.includes("reach_700");
+}
+
+/**
+ * The single letter the player may catch right now. Letters are collected strictly in
+ * order, so only one is ever live: miss a `V` and the next letter bubble is another `V`.
+ * Returns null once the word is complete (the set fires on the spot, so this is transient).
+ */
+export function nextViralLetter(collected: readonly ViralLetter[]): ViralLetter | null {
+  return VIRAL_LETTERS[collected.length] ?? null;
 }
 
 /** Gifts and haters stay rare; comments carry the ambient rhythm, letters push ahead of both. */
@@ -92,36 +115,26 @@ function pickKind(kinds: BubbleKind[]): BubbleKind {
   return kinds[kinds.length - 1];
 }
 
-/**
- * Spawn channels hug the left and right edges so bubbles never cover TEB in the
- * centre of the play area (and so a bubble tap can never be mistaken for a TEB tap).
- * Letters get slightly wider, more outboard channels because their motion profiles
- * swing them further sideways than an ambient drift ever does.
- */
-function pickChannel(letter: boolean): { x: number; sway: number } {
-  const left = Math.random() < 0.5;
-  if (letter) {
-    const base = left ? 0.07 + Math.random() * 0.13 : 0.80 + Math.random() * 0.13;
-    return { x: base, sway: 0.04 + Math.random() * 0.06 };
-  }
-  const base = left ? 0.10 + Math.random() * 0.16 : 0.74 + Math.random() * 0.16;
-  return { x: base, sway: 0.02 + Math.random() * 0.03 };
-}
-
 function pick<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
 /**
- * `missingLetters` are the letters the player still needs. Spawning only from that set
- * means a run at the word always converges — the challenge is catching fast, erratic
- * targets before the set window expires, not waiting for the right letter to appear.
+ * `nextLetter` is the only letter that may spawn (see `nextViralLetter`). When the word
+ * is momentarily complete the roll falls back to an ambient kind rather than dropping the
+ * spawn, so the feed never stalls.
+ *
+ * Returns null when nothing is unlocked yet — the caller must not spawn.
  */
-export function makeBubble(id: number, kinds: BubbleKind[], now: number, missingLetters: readonly ViralLetter[] = VIRAL_LETTERS): Bubble {
+export function makeBubble(id: number, kinds: BubbleKind[], now: number, nextLetter: ViralLetter | null): Bubble | null {
+  if (kinds.length === 0) return null;
   const picked = pickKind(kinds);
-  const kind: BubbleKind = picked === "viral_letter" && missingLetters.length === 0 ? "comment" : picked;
+  const letterBlocked = picked === "viral_letter" && nextLetter === null;
+  const fallback = kinds.find(k => k !== "viral_letter");
+  const kind: BubbleKind = letterBlocked ? (fallback ?? picked) : picked;
+  if (kind === "viral_letter" && nextLetter === null) return null;
+
   const isLetter = kind === "viral_letter";
-  const { x, sway } = pickChannel(isLetter);
   const v = BALANCE.onboarding.viralLetters;
   const lifeMs = isLetter
     ? BALANCE.onboarding.bubbles.lifetimeMs * (v.minLifetimeMult + Math.random() * (v.maxLifetimeMult - v.minLifetimeMult))
@@ -130,12 +143,14 @@ export function makeBubble(id: number, kinds: BubbleKind[], now: number, missing
   return {
     id,
     kind,
-    x,
-    sway,
+    // Letters range wider across the lane and swing harder; ambient kinds hold a line.
+    lane: isLetter ? Math.random() : 0.15 + Math.random() * 0.7,
+    sway: isLetter ? 0.35 + Math.random() * 0.45 : 0.1 + Math.random() * 0.2,
     spawnedAt: now,
     expiresAt: now + lifeMs,
     lifeMs,
-    letter: isLetter ? pick(missingLetters) : null,
+    hue: Math.random() * 360,
+    letter: isLetter ? nextLetter : null,
     motion: isLetter ? pick(LETTER_MOTIONS) : "float",
     text: kind === "comment" ? pick(COMMENT_TEXTS)
       : kind === "hater" ? pick(HATER_TEXTS)

@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
 import { canClaimCreatorStudioAnalytics, canClaimShoutOutAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, isRateLimited, openingComboMult, openingFollowerAmount, openingUpgradeCost, openingViralMult, isOpeningEngagementAvailable, isOnboardingFeatureAvailable, raidFollowersPerSec, rollShoutOut } from "../../features/onboarding/helpers";
-import { availableBubbleKinds, makeBubble, nextSpawnDelay, VIRAL_LETTERS, type Bubble, type BubbleKind, type ViralLetter } from "../../features/onboarding/bubbles";
+import { availableBubbleKinds, makeBubble, nextSpawnDelay, nextViralLetter, VIRAL_LETTERS, type Bubble, type BubbleKind, type ViralLetter } from "../../features/onboarding/bubbles";
 import { momentumBonusById, resolveMomentumBonus, rollMomentumBonus, type MomentumBonusId, type MomentumBonusResult } from "../../features/onboarding/momentumBonuses";
 import { computeIntegritySignals, pushSample, type IntegritySignals, type TapSample } from "../../features/integrity/signals";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
@@ -33,13 +33,9 @@ export type BubblePopResult = {
 // Monotonic bubble id — ephemeral, never persisted (the feed is rebuilt each session).
 let nextBubbleId = 1;
 
-/**
- * Letters the player still needs. Spawning only from this set guarantees a run at the
- * word converges — the challenge is catching erratic targets before the window lapses,
- * not waiting for the algorithm to finally offer the letter you're missing.
- */
-function missingViralLetters(collected: readonly ViralLetter[]): ViralLetter[] {
-  return VIRAL_LETTERS.filter(letter => !collected.includes(letter));
+/** Push a freshly-made bubble onto a list, skipping the spawn if nothing is unlocked. */
+function withBubble(bubbles: Bubble[], made: Bubble | null): Bubble[] {
+  return made ? [...bubbles, made] : bubbles;
 }
 
 export type OnboardingSlice = {
@@ -253,9 +249,14 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     if (bonus?.spawnBubbles) {
       const next = get();
       const kinds = availableBubbleKinds(next.completedOnboardingGoals);
-      const missing = missingViralLetters(next.openingViralLetters);
-      const spawned = Array.from({ length: bonus.spawnBubbles }, () => makeBubble(nextBubbleId++, kinds, now, missing));
-      set({ openingBubbles: [...next.openingBubbles, ...spawned] });
+      // Only ever one letter is live, so a storm drops ambient bubbles around it rather
+      // than five copies of the same letter.
+      const letter = next.openingBubbles.some(b => b.kind === "viral_letter") ? null : nextViralLetter(next.openingViralLetters);
+      let spawned = next.openingBubbles;
+      for (let i = 0; i < bonus.spawnBubbles; i++) {
+        spawned = withBubble(spawned, makeBubble(nextBubbleId++, kinds, now, i === 0 ? letter : null));
+      }
+      if (spawned !== next.openingBubbles) set({ openingBubbles: spawned });
     }
 
     if (bonus) track("onboarding_momentum_fired", { bonus: bonus.id, followers: bonus.followers, coins: bonus.coins });
@@ -319,7 +320,9 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       bubbles = bubbles.filter(bubble => bubble.expiresAt > now);
     }
 
-    // Set window ran out — wipe the collected letters and start over.
+    // The chain went cold — the player caught a letter and then let the clock run out
+    // without catching the next. Missing individual bubbles costs nothing; only going
+    // quiet does. Resets the word back to V.
     const setLapsed = state.openingLetterSetExpiresAt !== 0 && now >= state.openingLetterSetExpiresAt;
     const letters = setLapsed ? [] : state.openingViralLetters;
     if (setLapsed) track("onboarding_viral_set_lapsed", { collected: state.openingViralLetters.length });
@@ -330,12 +333,17 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     // VIRAL and ALGORITHM PUSH stack — a push landing mid-viral floods the feed.
     const rateMult = (viral ? BALANCE.onboarding.viral.spawnRateMult : 1)
       * (pushing ? BALANCE.onboarding.momentumBonuses.algorithmPushSpawnMult : 1);
+    // Exactly one letter may be in flight — the next one the player needs. Anything else
+    // would let them bank a letter out of order.
+    const letterLive = bubbles.some(bubble => bubble.kind === "viral_letter");
+    const offerLetter = letterLive ? null : nextViralLetter(letters);
+
     let nextSpawnAt = state.openingNextSpawnAt;
     if (nextSpawnAt === 0) {
       nextSpawnAt = now + nextSpawnDelay(rateMult);
     } else if (now >= nextSpawnAt) {
       if (bubbles.length < b.maxActive) {
-        bubbles = [...bubbles, makeBubble(nextBubbleId++, kinds, now, missingViralLetters(letters))];
+        bubbles = withBubble(bubbles, makeBubble(nextBubbleId++, kinds, now, offerLetter));
       }
       nextSpawnAt = now + nextSpawnDelay(rateMult);
     }
@@ -381,14 +389,17 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
         break;
     }
 
-    // V·I·R·A·L set bookkeeping — completing the word is the only way to go viral.
+    // V·I·R·A·L set bookkeeping — spelling the word IN ORDER is the only way to go viral.
+    // A letter only counts if it's the one the chain is actually waiting for; a stale
+    // duplicate still pays its followers but doesn't advance the word.
     let letters = state.openingViralLetters;
     let setExpiresAt = state.openingLetterSetExpiresAt;
     let viralStarted = false;
-    if (bubble.kind === "viral_letter" && bubble.letter && !letters.includes(bubble.letter)) {
+    if (bubble.kind === "viral_letter" && bubble.letter && bubble.letter === nextViralLetter(letters)) {
       letters = [...letters, bubble.letter];
-      // The countdown starts on the FIRST letter, not on each one.
-      if (letters.length === 1) setExpiresAt = now + BALANCE.onboarding.viralLetters.setWindowMs;
+      // Refreshed on EVERY catch — the clock measures the gap between letters, not the
+      // length of the whole word, so a long chain is never punished for being long.
+      setExpiresAt = now + BALANCE.onboarding.viralLetters.letterWindowMs;
       if (letters.length >= VIRAL_LETTERS.length) {
         viralStarted = true;
         letters = [];

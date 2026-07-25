@@ -15,7 +15,9 @@ import { formatCount } from "../../lib/format";
  * which video's data feeds it.
  */
 
-const DESCRIPTION = "welcome to your first post — tap THE ENGAGEMENT BUTTON to grow. keep tapping, and grab the comments and gifts floating by.";
+// Deliberately promises nothing but the tap: the feed is empty until `meet_teb` unlocks
+// comments, and a caption naming bubbles that aren't there yet reads as a broken game.
+const DESCRIPTION = "welcome to your first post — tap THE ENGAGEMENT BUTTON to grow. the more you tap, the more the algorithm notices you.";
 
 /* ── Rail glyphs ──────────────────────────────────────────────────────────────
    Filled white shapes, matching TikTok's rail. Sized to ~34px like the real app,

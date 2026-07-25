@@ -59,17 +59,23 @@ made the loop's biggest moment something the player *received* rather than *did*
 the one earned payoff in the opening chapter:
 
 - Letter bubbles (`viral_letter`) spawn in the engagement feed once `reach_700` completes.
-  Each carries one of **V · I · R · A · L**; tapping it collects that letter.
-- The spawner only ever offers **letters the player still needs**, so a run at the word
-  always converges. The challenge is catching the targets, never waiting for the right one.
-- The **first** letter starts `viralLetters.setWindowMs` (22000). Miss the deadline and
-  collected progress is wiped. Without that window enough patience always spells the word,
-  and the mechanic degenerates into a formality.
-- Completing the set fires the VIRAL window: `viral.durationMs` (7000) of `viral.mult` (×2)
-  on everything and `spawnRateMult` (×3) on bubble spawns. Letters still in flight are
-  cleared so the next set starts clean.
-- Leaving Home, opening a sheet, or starting a rhythm session drops a half-collected set
+- **Strictly in order: V → I → R → A → L.** Exactly ONE letter is live at any moment — the
+  one the chain is waiting for. Miss it and the next letter bubble is *another copy of the
+  same letter*, so a missed bubble costs time and nothing else.
+- A stale duplicate (a second `V` still in flight when `V` is already caught) pays its
+  followers but does **not** advance the chain.
+- `viralLetters.letterWindowMs` (30000) is the idle timeout for the **next** letter and
+  **refreshes on every catch**. It measures the gap between letters, not the length of the
+  word, so a long chain is never punished for being long. Letting it lapse resets to `V`.
+- Completing the word fires the VIRAL window: `viral.durationMs` (7000) of `viral.mult`
+  (×2) on everything and `spawnRateMult` (×3) on bubble spawns.
+- Leaving Home, opening a sheet, or starting a rhythm session drops a half-spelled word
   along with the feed — a countdown must never run behind an overlay the player can't tap.
+
+**The tracker is only on screen while a chain is running** (first letter caught → word
+complete or chain cold). A permanent five-slot row was pure chrome in a screen that has no
+spare room; its *appearance* is now the feedback that a chain started, and the next letter
+is outlined so the player knows what to hunt.
 
 Letters are the **only** part of the opening that asks for reaction, and they remain fully
 optional: ignoring them costs the ×2 window and nothing else. This does not contradict §0 —
@@ -77,28 +83,54 @@ there is no timing *grade*. A letter is either caught or it isn't; no tap is eve
 
 ## §3 — The engagement feed
 
-Comments, gifts, haters and VIRAL letters drift bottom→top in two side channels that never
-overlap TEB. Tapping one pays out.
+Comments, gifts, haters and VIRAL letters drift bottom→top. Tapping one pays out.
 
-The **ambient kinds are forgiving by design**: 54px targets, `bubbles.lifetimeMs` (5200ms)
+The **ambient kinds are forgiving by design**: 44px targets, `bubbles.lifetimeMs` (5200ms)
 of dwell, no timing check. They add a second thing to *do* without a second thing to
 *concentrate on* — the distinction the retired pulse system failed.
 
 | Kind | Unlocks at | Effect |
 |---|---|---|
-| `comment` | start | Followers ×5 base, +4 Momentum (once the meter exists) |
+| — | start | **nothing** — the opening screen is TEB and nothing else |
+| `comment` | `meet_teb` | Followers ×5 base, +4 Momentum (once the meter exists) |
 | `gift` | `unlock_studio` | **Gold** — first repeatable Gold source |
 | `hater` | `buy_audience_reach` | Popping pays ×4 base; **ignoring costs 2% of Followers** |
-| `viral_letter` | `reach_700` | Followers ×2 base; collect all five → VIRAL (§2b) |
+| `viral_letter` | `reach_700` | Followers ×2 base; spell the word → VIRAL (§2b) |
+
+**The feed starts completely empty** (playtest 2026-07-25 — comments from tap one were both
+too early and too frequent). The player learns TEB before anything else moves.
 
 **`like` was removed 2026-07-24.** The heart bubble was retired when VIRAL moved onto the
 letter set; the like mechanic is parked until the real FYP feed needs it. Do not
 reintroduce it as ambient decoration.
 
 Letters are the one kind that breaks the forgiveness rule, deliberately: they run at
-`viralLetters.minLifetimeMult`–`maxLifetimeMult` (0.5–0.95) of the base lifetime and roll
-one of five motion profiles — `float`, `sway`, `zigzag`, `dart`, `bob`. The variety is the
-challenge; five identical taps would not be one.
+`viralLetters.minLifetimeMult`–`maxLifetimeMult` (0.55–1.0) of the base lifetime and roll
+one of five motion profiles — `float`, `sway`, `zigzag`, `dart`, `bob`.
+
+**Every profile must keep moving for its whole life.** The first pass gave `bob` two hang
+frames and faded bubbles out at 85% of their travel, which made letters look like they rose
+to a fixed height and parked there — a free tap. Vertical progress is now strictly
+monotonic and the fade happens in the last 7%. If a profile ever appears to stall, that is
+the bug.
+
+### §3.1 — Lane geometry (why the store doesn't own `x`)
+
+Bubbles must miss **both** TEB and the creator rail: a bubble under the rail is hard to hit
+and a stray tap fires a rail control instead; a bubble over TEB reads as a TEB tap.
+
+TEB's button is 188px and centred, so on a 375px phone the free columns are ~94px on the
+left and ~30px on the right — and at 320px the right-hand gap is about **2px**. There is no
+symmetric solution. **All bubbles ride a single lane to the left of TEB.**
+
+The lane is computed in `EngagementBubbles` from the measured play area, not in the store,
+which can't see the viewport. The store supplies `lane` (0..1 *within* the lane) and `sway`
+(a fraction of the lane's width), and the renderer clamps both. `RAIL_SAFE_PX` (70) is a
+redundant backstop on the right.
+
+Verified at 375×812 and 320×640 with live bubbles: zero overlap with the rail or the TEB
+button, ~8px clearance at the tighter size. **Re-verify if TEB, the rail or bubble size
+changes.**
 
 Haters are the only downside in the loop and are fully avoidable. The feed pauses and
 clears whenever a sheet is open, a rhythm session is active, or the player leaves Home —
@@ -153,11 +185,25 @@ THREE's is a periodic skill opportunity. Conflating them made both illegible.
 
 Unresolved as of 2026-07-24 — needs playtest data, not more theory:
 
-- Bubble spawn rate (`baseSpawnMs` 2400) — too sparse or too busy?
 - Hater frequency (weight 10) and drain (2%) — good tension or annoying?
 - Momentum cap 25 — fires roughly every 25 taps; right cadence?
 - Bonus weights — does `follower_surge` still dominate in felt play?
-- **Letter set window (22s) and spawn weight (34)** — how often does a real player actually
-  complete V·I·R·A·L? Target feel is "most sets land, a missed one stings"; if the word is
-  never finished the window is too tight, and if it's never missed the window is theatre.
-- **`dart` letters** — the fastest profile at 0.5× lifetime. Fair, or a cheap miss?
+- **Spawn cadence** — `baseSpawnMs` was halved 2400 → 5200 and `maxActive` cut 7 → 4 after
+  the "everything happens too much/often" playtest. Measured median gap is now ~5.4s
+  (range 3.5–7.0s). Too sparse now?
+- **Letter window (30s) and spawn weight (34)** — at the current cadence a letter surfaces
+  roughly every 15s, so a full word is ~75s. Does the chain hold attention that long?
+- **`dart` letters** — the fastest profile at 0.55× lifetime. Fair, or a cheap miss?
+
+### Feed density as a purchasable axis (designed, NOT built)
+
+The slow floor above exists to leave headroom worth buying into — the user's call on
+2026-07-25: *"this is an opportunity for purchased upgrades, to increase the frequency of
+different events, and their return."*
+
+The hook already exists: `tickOpeningBubbles` multiplies its spawn delay by `rateMult`,
+which today only VIRAL (×3) and ALGORITHM PUSH (×3) touch. A Studio upgrade line would feed
+the same multiplier, and a parallel yield multiplier would cover "and their return".
+
+**Not designed yet** — needs cost curve, per-kind vs global scope, and how it interacts
+with `maxActive`. Do not invent those numbers; ask first.

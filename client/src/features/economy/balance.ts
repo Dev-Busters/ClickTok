@@ -311,26 +311,31 @@ export const BALANCE = {
     viral: { durationMs: 7000, mult: 2, spawnRateMult: 3 },
     // The V·I·R·A·L letter set — the only source of VIRAL, unlocked at `reach_700`.
     viralLetters: {
-      // Countdown from the FIRST letter of a set; missing it wipes collected progress.
-      // This is what makes the set a challenge rather than an inevitability — without
-      // it, enough patience always completes the word.
-      setWindowMs: 22000,
+      // Letters must be caught IN ORDER (V→I→R→A→L), so only ONE letter is ever live.
+      // Missing a bubble is free — another copy of the same letter comes around.
+      // `letterWindowMs` is the idle timeout for the NEXT letter and REFRESHES on every
+      // catch, so the pressure is "keep the chain going", not "beat one long clock".
+      letterWindowMs: 30000,
       spawnWeight: 34,        // vs the ambient kinds (see KIND_WEIGHT in bubbles.ts)
       followerMult: 2,        // × per-tap follower amount, per letter popped
       // Letters travel faster than ambient bubbles and along varied paths, so the set
       // costs attention rather than time. Multiplies `bubbles.lifetimeMs`.
-      minLifetimeMult: 0.5,
-      maxLifetimeMult: 0.95,
+      minLifetimeMult: 0.55,
+      maxLifetimeMult: 1,
     },
     // The engagement feed — comments, gifts, haters and VIRAL letters drift up the screen
     // and are tappable for bonuses. The ambient kinds are deliberately forgiving: big
     // targets, seconds of dwell, zero precision. Ignoring them costs nothing except the
     // bonus (haters excepted). Letters are the one kind that asks for reaction.
+    //
+    // Cadence is deliberately SLOW (playtest 2026-07-25: "everything happens too much/too
+    // often, especially for the very start"). Feed density is meant to become a purchasable
+    // axis — see `16` §7 — so the floor has to leave headroom worth buying into.
     bubbles: {
-      baseSpawnMs: 2400,      // average gap between spawns at 1× rate
-      minSpawnMs: 700,        // floor once rate multipliers stack
+      baseSpawnMs: 5200,      // average gap between spawns at 1× rate
+      minSpawnMs: 1600,       // floor once rate multipliers stack
       lifetimeMs: 5200,       // bottom → top drift time
-      maxActive: 7,
+      maxActive: 4,
       commentFollowerMult: 5,
       commentMomentum: 4,
       giftCoins: { min: 2, max: 5 },
