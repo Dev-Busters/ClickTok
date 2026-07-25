@@ -773,20 +773,31 @@ export type OnboardingStepId =
   | "unlock_video_fyp";
 
 export type OnboardingFeatureId =
-  | "pulse_modifier"
+  | "shout_out"          // replaced "pulse_modifier" — see `16` §0
   | "creator_studio"
   | "engagement_meter"
   | "tap_three"
   | "video_fyp";
 
-export type OpeningUpgradeId = "audience_reach" | "engagement_rate";
+export type OpeningUpgradeId = "audience_reach" | "engagement_rate" | "raid_squad";
 
-export type OpeningPulseModifierId = "passive_boost_1" | "blue_event_1";
-export type OpeningPulseModifierKind = "passive" | "event";
-export type OpeningPulseModifier = {
-  id: OpeningPulseModifierId;
-  kind: OpeningPulseModifierKind;
-  centerDeg: number;
+// The pulse/zone system (OpeningPulseModifier*) was DELETED 2026-07-24. Do not
+// reintroduce it; the loop is specified in `16`. Its only surviving trace is the frozen
+// migration-shape types in meta.ts needed to upgrade v17/v18 saves.
+
+export type MomentumBonusId =
+  | "follower_surge" | "gold_rush" | "comment_storm" | "duet_boost" | "algorithm_push";
+
+export type BubbleKind = "like" | "comment" | "gift" | "hater";
+
+export type Bubble = {
+  id: number;
+  kind: BubbleKind;
+  x: number;        // normalized channel position
+  sway: number;
+  spawnedAt: number;
+  expiresAt: number;
+  text: string | null;
 };
 
 export type GoalRequirement =
@@ -820,20 +831,40 @@ export type OnboardingSlice = {
   completedOnboardingGoals: OnboardingStepId[];
   activeOnboardingReveal: OnboardingReveal | null;
   onboardingTeachesSeen: Record<string, true>;
-  openingPulseModifiers: OpeningPulseModifier[]; // persisted; non-overlapping circular arc centers
+  openingUpgradeLevels: Record<OpeningUpgradeId, number>;   // persisted
+  unlockedMomentumBonuses: MomentumBonusId[];               // persisted (v20)
   engagementFill: number; // persisted; clamp 0..BALANCE.onboarding.engagement.cap
   tapThreeCompletions: number;
+
+  // --- ephemeral runtime (never persisted) ---
+  openingCombo: number;          // float; decays (see `16` §2)
+  openingLastTapAt: number;
+  openingViralUntil: number;
+  openingBubbles: Bubble[];
+  openingNextSpawnAt: number;
+  openingFillWindowStart: number; // Momentum wall-clock fill cap
+  openingFillInWindow: number;
+  openingTapTokens: number;       // token bucket on base payout (`15` §1)
+  openingTokensAt: number;
+  openingDuetTaps: number;        // armed by duet_boost
+  openingPushUntil: number;       // armed by algorithm_push
+  openingTapSamples: TapSample[]; // integrity evidence only (`15` §4)
 
   checkOnboardingGoal: () => void;
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
   openOpeningAnalytics: () => boolean; // gated at 5 Followers; marks first open
-  claimPulseModifierAnalytics: () => boolean; // explicit 5-Follower Analytics claim → Home editor + 5 Gold
+  claimShoutOutAnalytics: () => boolean;     // 5-Follower Analytics claim → Shout-Outs + 5 Gold
   claimCreatorStudioAnalytics: () => boolean; // explicit 25-Follower Analytics obtain action
-  setOpeningPulseModifier: (id: OpeningPulseModifierId, kind: OpeningPulseModifierKind, centerDeg: number) => boolean;
-  removeOpeningPulseModifier: (id: OpeningPulseModifierId) => boolean;
+  openingTap: (now?: number, at?: { x: number; y: number }) => OpeningTapResult;
+  decayOpeningCombo: (dt: number) => void;
+  tickOpeningBubbles: (now?: number) => void;
+  popOpeningBubble: (id: number) => BubblePopResult;
+  tickOpeningRaid: (dt: number) => void;
+  levelOpeningUpgrade: (id: OpeningUpgradeId) => boolean;
+  unlockMomentumBonus: (id: MomentumBonusId) => boolean;
+  readIntegritySignals: () => IntegritySignals;
   addEngagement: (amount: number) => void;
-  consumeEngagementForRhythm: () => boolean;
   resetOnboardingRevision: () => void; // development/release-controlled action
 };
 ```
@@ -842,6 +873,7 @@ Opening feature availability derives from completed ordered goals, not `metricsR
 metric flags must not unlock fresh-opening UI in parallel. Once `video_fyp` is complete, later
 chapters may bridge back into authored metrics or additional ordered goal catalogs.
 
-Phase 18 originally bumped the save through v16. The post-phase TEB modifier passes bump through
-**v18** and persist typed `openingPulseModifiers`; editor drafts, active pointers, pulse direction,
-passive-arm state, and judgement state remain ephemeral.
+Phase 18 originally bumped the save through v16; the retired TEB modifier passes reached **v18**.
+**v19** dropped `openingPulseModifiers` with the pulse system. **v20** persists
+`unlockedMomentumBonuses`. Combo, VIRAL, bubbles, rate-limiter buckets, duet/push timers, and
+integrity samples are all ephemeral and must stay out of `toPersistedState`.

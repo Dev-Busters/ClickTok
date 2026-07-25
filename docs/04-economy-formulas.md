@@ -901,12 +901,14 @@ onboarding: {
     fillAddPerLevel: 0.25,
   },
   engagement: {
-    cap: 100,
+    cap: 25,
     baseFillPerTap: 1,
+    bonusMult: 8,
+    maxFillPerSec: 8,          // integrity ceiling — see `15` §1 / `16` §5
   },
 
   goalCoins: {
-    unlockPulseModifier: 5,    // funds exactly one first TEB editor zone
+    unlockShoutOut: 5,         // funds exactly Audience Reach Lv1
     unlockStudio: 5,           // exactly Audience Reach Lv1
     buyAudienceReach: 0,       // first purchase must not fund the second immediately
     reach700: 25,              // funds Audience Reach Lv2 + Engagement Rate Lv1 after active play
@@ -925,47 +927,51 @@ coherent table in docs/code/simulation; do not lower thresholds piecemeal to mak
 
 ### 17.2 TEB and upgrade formulas
 
+> **The pulse/zone timing model documented here previously is deleted** (2026-07-24).
+> Full loop spec in `16`; do not reimplement pulse grading.
+
 ```text
-pulseCycleMs = 2400
-greenArc = 48 degrees total, centered at 12 o'clock
-blueEventArc = 48 degrees total, default editor draft at 180 degrees
-passiveArc = 34 degrees total, default editor draft at 180 degrees
-zoneCost = 5 Gold
-bonusPlacementGap = 4 degrees
+# Base tap — always succeeds, no timing check
+baseFollowers = 1 + audienceReachLevel × audienceReach.followerAmountAddPerLevel
+comboMult     = 1 + min(floor(combo), combo.cap) × combo.perTap        # cap ⇒ ×2.0
+viralMult     = viral active ? viral.mult : 1                          # ×2
+duetMult      = duetTapsRemaining > 0 ? momentumBonuses.duetMult : 1   # ×3
+shoutOutMult  = shoutOut rolled ? shoutOut.mult : 1                    # ×4
 
-greenFollowerGain = 1 + audienceReachLevel × audienceReach.followerAmountAddPerLevel
-blueEventFollowerGain = 2
-passiveFollowerGain = 0 immediately; passing through it arms the next event for +1 Follower
-redFollowerGain = 0
+followers = paidByTokenBucket
+          ? max(1, round(baseFollowers × comboMult × viralMult × duetMult × shoutOutMult))
+          : 0          # unpaid taps still build combo and animate; they pay nothing
 
-zone placement is valid when the selected zone width plus the 4-degree gap does not overlap the
-authored top green zone or another placed modifier. The blue event zone is tapped like an event:
-it grants 2 Followers and reverses pulse direction when used. The passive zone arms as the pulse
-travels through it; only the first event reached after that pass can pay the +1 Follower bonus, and
-missing that first event clears the bonus.
+# Combo decays — a frozen bar was the bug that made the loop feel dead
+combo' = tapped ? min(cap, floor(combo) + 1)
+                : (idle > combo.decayDelayMs ? max(0, combo - combo.decayPerSec × dt) : combo)
 
-engagementPerTap = engagement mechanic unlocked
-                  ? engagement.baseFillPerTap
-                    + engagementRateLevel × engagementRate.fillAddPerLevel
-                  : 0
+# Token bucket (integrity, `15` §1) — sustained payout ceiling with burst headroom
+tokens' = min(tapPayout.capacity, tokens + elapsedSec × tapPayout.refillPerSec)
+paid    = tokens' >= 1
 
-engagementFill' = min(engagement.cap, engagementFill + engagementPerTap)
+# Momentum — wall-clock fill ceiling, then roll a bonus and reset
+momentumPerTap = min(engagementPerTap(level), remaining budget this second)
+engagementFill' = filled >= cap ? min(cap, filled - cap) : filled
+on fill: roll one unlocked bonus (weights in momentumBonuses.ts) and apply it
 
 openingUpgradeCost(baseCost, growth, currentLevel)
   = round(baseCost × growth^currentLevel)
+
+raidFollowersPerSec = raidSquadLevel × raidSquad.followersPerSecPerLevel
 ```
 
-Opening taps do not apply `postCoinConversion`, `postLikeConversion`, feed combo, VIRAL, catalog,
-or passive-income modifiers. `audience_reach` must change timed-hit Follower amount only;
-`engagement_rate` must change engagement fill/tap only. This separation is what makes each purchase
-legible.
+Opening taps do not apply `postCoinConversion`, `postLikeConversion`, the *feed* combo/VIRAL, catalog,
+or passive-income modifiers — the opening has its own combo and VIRAL (`16` §2). `audience_reach`
+changes base Follower amount per tap only; `engagement_rate` changes Momentum fill per tap only;
+`raid_squad` adds passive Followers/sec only. This separation is what makes each purchase legible.
 
 ### 17.3 Ordered Creator Goals
 
 | Goal | Requirement | Coins | Reveal |
 |---|---:|---:|---|
 | Analytics surface | 5 total Followers | 0 | Inbox Analytics becomes available |
-| `meet_teb` | explicit Analytics claim at 10 total Followers | 0 | complete second timing zone + placement teach |
+| `meet_teb` | explicit Analytics claim at 5 total Followers | 5 | Shout-Outs (random ×4 tap bonus) |
 | `unlock_studio` | claim in Analytics at 25 total Followers | 5 | Creator Studio + Gold |
 | `buy_audience_reach` | Audience Reach Lv1 | 0 | Engagement Rate + Audience Reach Lv2+ |
 | `reach_700` | 700 total Followers | 25 | funds the two newly available purchases |
@@ -975,8 +981,8 @@ legible.
 | `complete_first_rhythm` | 1 TAP THREE completion | chart payout | repeatable Coin loop |
 
 The ordered requirement is mandatory. Neither `meet_teb` nor `unlock_studio` auto-resolves from
-wallet totals: Analytics owns both explicit obtain actions and sends the first entry directly into
-the Home timing-zone editor.
+wallet totals: Analytics owns both explicit obtain actions. Bubble kinds unlock alongside these
+goals (`16` §3), so the screen gets busier one step at a time rather than all at once.
 
 ### 17.4 First rhythm reward
 
@@ -986,8 +992,9 @@ tapThreeCoins = completionBase + round(qualityBonusMax × performanceQuality)
 
 `performanceQuality` is the existing clamped Phase 17 value. A completed chart therefore pays
 12–20 Coins. It pays no opening Followers or Likes; those rewards would obscure the new Coin-source
-lesson. Launch consumes a full engagement meter, so remove the old 18-second-only cooldown from the
-opening loop. A result/animation lock may still prevent double launch.
+lesson. **Launch is gated by the 18s cooldown only** — it is fully decoupled from Momentum, which
+auto-fires and resets on its own (`16` §4/§6). The earlier "launch consumes a full meter" rule is
+retired: conflating the two made both illegible.
 
 ### 17.5 Pacing simulation acceptance
 

@@ -8,6 +8,9 @@ mechanics where players affect each other.
 
 ## Locked design decisions (do not relitigate without the user)
 
+0. **The core clicker loop contains NO precision-timing requirement.** (Locked 2026-07-24 after
+   playtest.) Skill expression belongs to the rhythm/video layer. See `docs/16` §0 for why the
+   pulse/zone system was deleted — do not reintroduce timing grading to the base tap.
 1. **Run loop = "live feed + react."** A livestream is a roguelike "run." A real-time feed of
    comments, gifts, and events scrolls in; the player reacts. See `docs/01-game-design.md`.
 2. **Economy = meta gates/scales runs.** The clicker/channel layer (followers, skills, gear)
@@ -40,6 +43,15 @@ your training data. Read in this order, and only the parts a task references:
 5. `docs/05-roadmap.md` — **the task list.** Phased, atomic, with acceptance criteria. Start here
    when implementing.
 6. `docs/06-ui-screens.md` — per-screen TikTok-faithful UI specs.
+
+**Current-state docs (read these before touching the opening chapter — they supersede older
+descriptions in 01/04/06/14):**
+
+7. `docs/16-teb-engagement-loop.md` — **the TEB loop as actually built.** The pulse/timing-zone
+   system it replaced is deleted; do not reimplement it.
+8. `docs/17-video-charts.md` — authored chart format + Video Studio (built, not yet in the FYP).
+9. `docs/15-integrity-and-anticheat.md` — anti-automation architecture. Read before anything
+   competitive or leaderboard-shaped.
 
 ## Workflow for implementing a task (read this if you are an implementer)
 

@@ -2219,6 +2219,50 @@ Rhythm uses TEB's free interaction space without blacking out or removing the su
 
 ---
 
+## PHASE 19 — TEB loop rebuild + integrity foundation (design LOCKED 2026-07-24; specs in `16`, `17`, `15`)
+
+Goal: replace the pulse/zone timing model with a layered no-precision clicker loop, restore the
+TikTok FYP chrome, stand up video chart authoring, and make automation economically pointless.
+**All tasks below are DONE and shipped to production**; recorded for history and doc traceability.
+
+- [x] **19.1 — Delete the pulse/zone system (`16` §0).** Removed `OpeningPulseDial`,
+  `OpeningPulseModifierEditor`, all pulse helpers/state/actions. SAVE_VERSION 18→19 drops
+  `openingPulseModifiers`. Analytics entry 1 becomes Shout-Outs.
+  > note: root cause of the "one note" complaint was compounded by a real bug — `openingCombo`
+  > had NO decay anywhere, so the bar filled in ~10 taps and froze at 100% forever.
+
+- [x] **19.2 — Layered tap loop (`16` §1–§4).** Decaying combo, VIRAL at combo cap, Shout-Out
+  crit analog, Raid Squad passive income, and the engagement bubble feed (like/comment/gift/hater,
+  staged unlocks). Momentum auto-fires and resets instead of gating.
+
+- [x] **19.3 — Momentum bonus roll (`16` §4).** Five bonuses (surge/gold/storm/duet/push), one-off
+  Studio unlocks, weighted random roll on each fill. SAVE_VERSION 19→20.
+
+- [x] **19.4 — FYP chrome (`06` §14).** Creator rail + caption anchored to the bottom nav.
+  > note: first pass used `bottom: 116`, leaving a dead gap; corrected to 14/26 after user
+  > screenshot. Also fixed Creator Studio's header scrolling out of reach on iOS — `position:
+  > sticky` inside a Framer Motion transform is a known WebKit failure mode.
+
+- [x] **19.5 — Video chart authoring (`17`).** Format, editor, playback preview, JSON export,
+  separate localStorage key. **Not wired into the game loop or FYP** — Studio preview only.
+
+- [x] **19.6 — Integrity foundation (`15`).** Token bucket on base payout, wall-clock Momentum
+  fill cap, relaxed interval floor, input-shape signal collection, architecture doc.
+  > note: an initial claim that rate caps neutralised macros was WRONG and caught by adversarial
+  > testing — Momentum was capped but base payout was not, leaving +22.4%. The token bucket brings
+  > a 30/sec macro to -11.5% over 10 minutes while fully paying human bursts at 12–15/sec.
+
+**Phase 19 exit criteria:** the opening loop has multiple interacting layers with no precision
+requirement; docs describe what is actually built; automation earns less than honest play.
+
+### Next up (not started, no design lock yet)
+- Wire authored charts into the FYP pager and the reward economy (`17` §5).
+- Server-authoritative ranked figure + plausibility validation — **required before any
+  leaderboard ships** (`15` §7 step 2).
+- Playtest tuning pass on `16` §7 open questions.
+
+---
+
 ## How to update this file
 When you finish a task: change `[ ]`→`[x]`, and if you deviated from the spec, add a one-line
 `> note:` under it explaining what changed and why (so the next model and the docs stay honest).

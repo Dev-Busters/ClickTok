@@ -1,5 +1,12 @@
 # 14 — Staged Onboarding & Progression Reset (Phase 18)
 
+> ## ⚠ PARTIALLY SUPERSEDED (2026-07-24)
+> The **staged-reveal journey structure** in this doc is still correct and in force.
+> **Everything describing HOW A TAP SCORES is obsolete** — the pulse, timing zones, green/red
+> arcs, PERFECT/OFF BEAT grading, and the zone editor were deleted from the codebase.
+> For the loop as actually built read **`16-teb-engagement-loop.md`**; for why it was removed,
+> `16` §0. Where this doc and `16` disagree, `16` wins.
+
 > **Why this exists.** The live Phase 17 build exposes too many systems in the opening minutes.
 > Repeated TEB taps cross several thresholds back-to-back, newly visible controls are not taught,
 > and the player can no longer tell what changed or why. Phase 18 replaces that opening with a
@@ -43,7 +50,7 @@ Follower requirements read monotonic `wallet.totalFollowers`, never the spendabl
 | Order | Step | Player objective | Reward / reveal |
 |---:|---|---|---|
 | — | Analytics gate | Reach 5 Followers | Inbox Analytics becomes available; Studio entry remains a 25-Follower target |
-| 1 | `meet_teb` | Reach 10 Followers, then claim the first Analytics entry | Add a complete second timing zone opposite the crest and teach drag/place editing |
+| 1 | `meet_teb` | Reach 5 Followers, then claim the first Analytics entry | Unlock Shout-Outs (random ×4 tap bonus) + 5 Gold |
 | 2 | `unlock_studio` | Reach 25 Followers, then obtain the Analytics entry | Feature-unlock animation; Creator Studio + 5 Gold; card becomes a Studio link |
 | 3 | `buy_audience_reach` | Open Studio and buy the only visible upgrade | Unlock `engagement_rate` Lv1 and `audience_reach` Lv2+ |
 | 4 | `reach_700` | Use the stronger TEB to reach 700 Followers | Award Coins for another FYP upgrade |
@@ -91,7 +98,12 @@ progress fills → goal complete → reward lands → reveal ceremony (if any)
 → TAKE ME THERE / SHOW ME focus → first-use teach → next goal becomes active
 ```
 
-### TEB editor zones
+### TEB editor zones — SUPERSEDED (2026-07-24)
+
+> **This entire subsection is obsolete.** The pulse dial, timing zones, and zone editor were
+> deleted from the codebase. The opening TEB loop is specified in `16`. The 5-Follower Analytics
+> entry now grants **Shout-Outs**, not the editor. Kept only as a record of what was tried.
+
 
 Claiming the first Analytics entry at 5 Followers unlocks the TEB editor, grants 5 Gold, and returns
 to Home. The editor offers two 5-Gold starter choices:
@@ -107,9 +119,7 @@ Dragging anywhere on the dial updates its circular center; keyboard arrows move 
 starting zone or another modifier. Confirmed positions persist; edit drafts, active pointers, pulse
 direction, and passive-arm state do not.
 
-Before the first PERFECT tap, `PERFECT 100%` sits outside the top ring. It disappears permanently on
-that first PERFECT. The orbiting pulse uses an electrical core, color-matched tail, moving waveform
-sparks, and particles keyed to the current red/green/blue/purple zone.
+*(Deleted 2026-07-24 — PERFECT guide, orbiting pulse and zone-coloured particles no longer exist.)*
 
 - While a reveal is active, further progress may accumulate but no later goal resolves.
 - `TAKE ME THERE` opens Creator Studio immediately; `SHOW ME` moves focus to the exact new
@@ -123,14 +133,11 @@ sparks, and particles keyed to the current red/green/blue/purple zone.
 
 ### Followers
 
-- Every quick TEB tap grades the orbiting pulse at the 12 o'clock crest and increments lifetime
-  taps whether it scores or not. The 48° green zone grants the full Audience Reach amount; red grants
-  zero. Placed event zones define their own rewards.
-- The orbiting burst and scoring use the same pulse phase so the visible hit location is the scored
-  location, including blue-zone direction reversals. Every tap emits immediate PERFECT / BLUE /
-  BOOST ARMED / OFF BEAT ring and text feedback.
+- **SUPERSEDED (2026-07-24) — see `16`.** Taps no longer grade against a pulse. Every tap always
+  succeeds and pays `base × combo × viral × duet × shoutOut`, subject to the token-bucket ceiling.
+  Lifetime taps still increment on every registered tap.
 - Followers are the headline growth number and unlock gate. They are not spent in Phase 18.
-- `audience_reach` increases the full green-hit Follower amount by 1 per level.
+- `audience_reach` increases the base per-tap Follower amount by 1 per level.
 
 ### Coins
 
@@ -165,21 +172,21 @@ Canonical opening upgrades:
 
 | id | Display name | Effect | First reveal |
 |---|---|---|---|
-| `audience_reach` | Audience Reach | Adds 1 Follower to perfect green hits | Studio opens |
+| `audience_reach` | Audience Reach | Adds 1 Follower per tap | Studio opens |
 | `engagement_rate` | Engagement Rate | Adds engagement-meter fill per quick TEB tap | Buy Audience Reach Lv1 |
 
 Every upgrade card must show:
 
 - current level and next cost;
 - a plain-language sentence describing the behavior it changes;
-- an exact current → next value (`1 → 2 Followers / green hit`, for example);
+- an exact current → next value (`1 → 2 Followers / tap`, for example);
 - the affected on-screen control highlighted in the purchase result;
 - a locked reason only after the card has been introduced.
 
 Do not use the current generic `postPower` copy in opening UI: it bundles unrelated outputs and
 does not tell a new player what will change.
 
-Audience Reach begins at 1 Follower per green hit. Every level adds exactly 1 Follower. Its first costs
+Audience Reach begins at 1 Follower per tap. Every level adds exactly 1 Follower. Its first costs
 are 5, 7, and 10 Gold (`round(5 × 1.4^level)`), so the Analytics reward buys Lv1 immediately.
 
 ## §E — Engagement meter and first rhythm loop

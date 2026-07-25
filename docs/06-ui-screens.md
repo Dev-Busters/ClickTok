@@ -379,33 +379,30 @@ feed. Render only:
 
 1. Followers hero at the top; add the Coin pill only when Studio reveals it.
 2. One compact current-goal chip with action, progress, and reward.
-3. The TEB system centered in the large free interaction field, labeled **ENGAGEMENT** during the
-   staged opening. Its waveform dial shows the authored top green timing zone, the orbiting burst,
-   and any earned passive/blue event zones. Every press emits PERFECT / BLUE / BOOST ARMED /
-   OFF BEAT feedback.
-4. Ambient background motion with no fake video metadata.
-5. A Studio edge button only after its reveal.
+3. The TEB system centered in the large free interaction field, labeled **ENGAGEMENT**. Around it:
+   the combo ring (fills per tap, visibly bleeds down while idle), the live `×N.NN` multiplier
+   above it, and the Momentum arc inside its rim once unlocked. See `16` for the mechanics.
+4. The engagement feed — likes/comments/gifts/haters drifting bottom→top in two side channels that
+   never overlap TEB. Transform-only animation (§3 perf rule).
+5. The FYP chrome (§14): creator rail and caption block, anchored to the bottom nav.
+6. Ambient background motion.
+7. A Studio edge button only after its reveal.
 
-Do not render hidden feature placeholders, social rail, video caption, creator avatar, currency
-pills at zero, passive-income copy, or a scrollable milestone list. Keep BottomNav visible from the
-start. Home always returns to the FYP; Inbox opens Analytics; Profile exposes available channel
+Do not render hidden feature placeholders, currency pills at zero, passive-income copy, or a
+scrollable milestone list. Keep BottomNav visible from the start. Home always returns to the FYP; Inbox opens Analytics; Profile exposes available channel
 stats and reset controls. Discover and Create remain disabled. The current goal chip must stay
 clear of TEB and be no taller than two short lines at 320px width.
 
 Before 5 Followers the Inbox control is locked. At 5, Home announces Analytics, the Inbox control
-activates/pulses, and Analytics opens with a compact `TEB EDITOR` first entry. Claiming it grants
-5 Gold and returns to Home's dedicated full-screen editor. The editor offers two 5-Gold zone cards:
-Passive Boost and Blue Event. It shows a static perimeter only, with no live pulse or active
-Engagement Button. The selected translucent ghost starts at 6 o'clock, follows pointer drag or arrow
-keys around the dial, turns fully red over occupied zones, and disables placement until valid.
-Owned zones can be moved or removed. After placement, `TEB EDITOR` reopens the same full-screen
-editor without a modal.
+activates/pulses, and Analytics opens with a compact `SHOUT-OUTS` first entry. Claiming it grants
+5 Gold and unlocks the random ×4 tap bonus.
 
-Before the first PERFECT, place `PERFECT 100%` outside and above the top timing zone; never overlap
-the ring. Remove the guide permanently after the first PERFECT. The
-orbiting indicator is an electrical pulse rather than a plain dot: bright core, short color-matched
-tail, waveform energy dashes, and trailing sparks that inherit red/green/blue/purple from the live
-zone.
+> **Deleted 2026-07-24:** the full-screen TEB zone editor, the timing dial, the orbiting pulse,
+> and PERFECT/OFF BEAT grading. Do not reimplement — rationale in `16` §0.
+
+Payoff callouts float above TEB and are colour-coded per source: green for a plain tap, gold for
+SHOUT-OUT and VIRAL, and each Momentum bonus in its own colour with its own callout text, so the
+player always learns which bonus rolled — including bonuses that pay no currency.
 
 ### 13.2 Reveal and teaching pattern
 
@@ -443,7 +440,7 @@ text and an opaque card backing. Do not show locked future categories or cards.
 Audience Reach copy spells out `Engagement Button`; never render the redundant phrase `a TEB tap`.
 Buying Audience Reach reveals the second card but grants no Coins. The player earns its purchase
 budget from the subsequent 700-Follower goal by using the improved timed-hit payout.
-Audience Reach starts at `1 → 2 Followers / green hit` for 5 Gold. Each level adds 1; initial
+Audience Reach starts at `1 → 2 Followers / tap` for 5 Gold. Each level adds 1; initial
 costs rise `5 → 7 → 10` Gold.
 
 ### 13.4 Engagement-ready TEB
@@ -562,3 +559,23 @@ continues normal engagement while the launch cooldown runs.
 - A `reducedFeedback` setting removes haptics, strong flash, and screen-scale completion bloom.
 - Keyboard fallback is visible only after keyboard input or in accessibility settings.
 - All chart text maintains 4.5:1 contrast against the darkest keyline/backing treatment.
+
+## 14. FYP chrome in the opening (added 2026-07-24)
+
+The opening now renders real TikTok furniture around TEB. The tutorial "video" the player is
+watching is **their own first post**, so the avatar and handle are the player's.
+
+**Creator rail** (`data-fyp-rail`, right edge, `bottom: 26`):
+avatar with `+` follow badge → LIKE (live, toggles) → COMMENT → SHARE.
+Comment and Share are rendered but inert placeholders until the feed pager exists.
+
+**Caption block** (`data-fyp-caption`, left, `bottom: 14`):
+`@handle`, tutorial description, then `♪ original sound — @handle`.
+
+**Anchoring rule (learned the hard way):** both blocks sit hard against the bottom nav, matching
+TikTok. An earlier `bottom: 116` left a dead gap and read as floating mid-video. Verified with
+bounding boxes at 393×852 and 320×640: no overlap between TEB, caption, rail, or goal chip, with
+32px TEB→caption clearance at the tighter size. **Re-verify both sizes when touching either block.**
+
+This is deliberately the same furniture a real FYP card needs, so when the pager lands only the
+data source changes.
