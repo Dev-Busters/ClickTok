@@ -305,19 +305,32 @@ export const BALANCE = {
     // Onboarding tap combo — builds per tap and DECAYS while idle (same shape as the
     // main game's feed combo). Sustained tapping is what holds the multiplier up.
     combo: { perTap: 0.05, cap: 20, decayDelayMs: 1500, decayPerSec: 7 },
-    // VIRAL — filling the combo bar tips the video over; everything pays double and the
-    // comment feed floods for a few seconds. The payoff moment of the tap loop.
-    viral: { durationMs: 7000, mult: 2, spawnRateMult: 3, exitCombo: 6 },
-    // The engagement feed — comments/likes/gifts drift up the screen and are tappable
-    // for bonuses. Deliberately forgiving: big targets, seconds of dwell, zero precision.
-    // Ignoring them costs nothing except the bonus (haters excepted).
+    // VIRAL — no longer a combo-bar side effect. The player earns it by collecting the
+    // letters V·I·R·A·L out of the engagement feed (16 §2b). While it runs everything
+    // pays double and the feed floods. The payoff moment of the tap loop.
+    viral: { durationMs: 7000, mult: 2, spawnRateMult: 3 },
+    // The V·I·R·A·L letter set — the only source of VIRAL, unlocked at `reach_700`.
+    viralLetters: {
+      // Countdown from the FIRST letter of a set; missing it wipes collected progress.
+      // This is what makes the set a challenge rather than an inevitability — without
+      // it, enough patience always completes the word.
+      setWindowMs: 22000,
+      spawnWeight: 34,        // vs the ambient kinds (see KIND_WEIGHT in bubbles.ts)
+      followerMult: 2,        // × per-tap follower amount, per letter popped
+      // Letters travel faster than ambient bubbles and along varied paths, so the set
+      // costs attention rather than time. Multiplies `bubbles.lifetimeMs`.
+      minLifetimeMult: 0.5,
+      maxLifetimeMult: 0.95,
+    },
+    // The engagement feed — comments, gifts, haters and VIRAL letters drift up the screen
+    // and are tappable for bonuses. The ambient kinds are deliberately forgiving: big
+    // targets, seconds of dwell, zero precision. Ignoring them costs nothing except the
+    // bonus (haters excepted). Letters are the one kind that asks for reaction.
     bubbles: {
       baseSpawnMs: 2400,      // average gap between spawns at 1× rate
       minSpawnMs: 700,        // floor once rate multipliers stack
       lifetimeMs: 5200,       // bottom → top drift time
       maxActive: 7,
-      likeFollowerMult: 3,    // × per-tap follower amount
-      likeComboBonus: 3,      // combo points — lets bubbles sustain a streak
       commentFollowerMult: 5,
       commentMomentum: 4,
       giftCoins: { min: 2, max: 5 },

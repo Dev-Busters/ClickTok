@@ -2252,6 +2252,20 @@ TikTok FYP chrome, stand up video chart authoring, and make automation economica
   > testing — Momentum was capped but base payout was not, leaving +22.4%. The token bucket brings
   > a 30/sec macro to -11.5% over 10 minutes while fully paying human bursts at 12–15/sec.
 
+- [x] **19.7 — VIRAL letter set + FYP layout pass (`16` §2b, §3).** VIRAL moved off the combo
+  cap onto a collectible **V·I·R·A·L** letter set in the engagement feed, unlocked at
+  `reach_700` with its own reveal card and a first-letter teach. Letters spawn only from the
+  letters still missing, run at 0.5–0.95× lifetime, and roll one of five motion profiles
+  (`float`/`sway`/`zigzag`/`dart`/`bob`). A 22s window from the first letter wipes progress if
+  the word isn't finished. `like` bubbles removed; `comment` is now the ambient base kind.
+  Alongside it, the FYP chrome was brought closer to the real app: TikTok top tab row
+  (LIVE · Following · For You · search), rail rebuilt with filled SVG glyphs + counts for
+  heart/comment/bookmark/share plus the spinning sound record, and a solid-black bottom nav.
+  > note: no SAVE_VERSION bump — letter progress is per-session ephemeral state, like the
+  > bubbles themselves. Only the unlock (a `completedOnboardingGoals` entry) persists.
+  > note: `viral.exitCombo` deleted. With VIRAL no longer pinning the combo bar, combo decays
+  > under every condition and there is nothing to settle back to.
+
 **Phase 19 exit criteria:** the opening loop has multiple interacting layers with no precision
 requirement; docs describe what is actually built; automation earns less than honest play.
 

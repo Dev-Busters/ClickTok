@@ -560,22 +560,39 @@ continues normal engagement while the launch cooldown runs.
 - Keyboard fallback is visible only after keyboard input or in accessibility settings.
 - All chart text maintains 4.5:1 contrast against the darkest keyline/backing treatment.
 
-## 14. FYP chrome in the opening (added 2026-07-24)
+## 14. FYP chrome in the opening (added 2026-07-24, layout pass same day)
 
-The opening now renders real TikTok furniture around TEB. The tutorial "video" the player is
+The opening renders real TikTok furniture around TEB. The tutorial "video" the player is
 watching is **their own first post**, so the avatar and handle are the player's.
 
-**Creator rail** (`data-fyp-rail`, right edge, `bottom: 26`):
-avatar with `+` follow badge → LIKE (live, toggles) → COMMENT → SHARE.
-Comment and Share are rendered but inert placeholders until the feed pager exists.
+**Top tab row** (`data-fyp-topbar`, `top: 0`, height 48): LIVE glyph at the left, centred
+`Following` / `For You` tabs with a short 22px underline under the active one, search glyph at
+the right. This is the single biggest fidelity cue — without it the screen reads as a game with
+a video behind it rather than as TikTok. The game's follower/Gold readout drops in *underneath*
+at `top: 48`; it must never take the top row's place.
 
-**Caption block** (`data-fyp-caption`, left, `bottom: 14`):
-`@handle`, tutorial description, then `♪ original sound — @handle`.
+**Creator rail** (`data-fyp-rail`, right edge, `bottom: 14`):
+avatar with `+` follow badge → heart (live, toggles) → comment → bookmark → share → spinning
+sound record. Icons are **filled white SVG glyphs at ~34px with a drop shadow**, each over a
+12px bold count — emoji read as a mock-up, not as the app. Everything below the heart is an
+inert placeholder until the feed pager exists. The record at the bottom is not decoration:
+TikTok's rail always ends on it, and its absence was immediately visible.
+
+**Caption block** (`data-fyp-caption`, left, `bottom: 12`):
+`@handle` (16px/800), tutorial description, then `♪ original sound — @handle`.
+
+**Bottom nav:** solid `#000` with a hairline top border. TikTok's nav has no visible divider;
+the colour change is the separation.
 
 **Anchoring rule (learned the hard way):** both blocks sit hard against the bottom nav, matching
 TikTok. An earlier `bottom: 116` left a dead gap and read as floating mid-video. Verified with
-bounding boxes at 393×852 and 320×640: no overlap between TEB, caption, rail, or goal chip, with
-32px TEB→caption clearance at the tighter size. **Re-verify both sizes when touching either block.**
+bounding boxes at 393×852 and 320×640: no overlap between top bar, goal chip, VIRAL tracker,
+TEB, caption, rail, or nav. At the tighter size the margins are thin — 4px tracker→TEB, 11px
+TEB→caption, 2px TEB→rail. **Re-verify both sizes when touching any of those blocks.**
+
+> Measuring in the browser preview: rAF is throttled there, so the nav's entry animation
+> (`initial={{ y: 24 }}` in `Shell.tsx`) never resolves and every `nav` rect reads 24px low.
+> Subtract it before concluding the nav is clipped.
 
 This is deliberately the same furniture a real FYP card needs, so when the pager lands only the
 data source changes.

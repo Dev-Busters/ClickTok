@@ -25,8 +25,10 @@ export function BottomNav({ opening = false }: { opening?: boolean }) {
         alignItems: 'flex-start',
         justifyContent: 'space-around',
         padding: '6px 4px calc(6px + env(safe-area-inset-bottom))',
-        borderTop: '1px solid var(--dim)',
-        background: 'var(--bg2)',
+        // TikTok's nav is a solid black bar with no divider — the only separation from
+        // the video is the colour change itself.
+        borderTop: '1px solid rgba(255,255,255,.06)',
+        background: '#000',
         flexShrink: 0,
       }}
     >

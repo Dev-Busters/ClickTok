@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
 import { canClaimCreatorStudioAnalytics, canClaimShoutOutAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, isRateLimited, openingComboMult, openingFollowerAmount, openingUpgradeCost, openingViralMult, isOpeningEngagementAvailable, isOnboardingFeatureAvailable, raidFollowersPerSec, rollShoutOut } from "../../features/onboarding/helpers";
-import { availableBubbleKinds, makeBubble, nextSpawnDelay, type Bubble, type BubbleKind } from "../../features/onboarding/bubbles";
+import { availableBubbleKinds, makeBubble, nextSpawnDelay, VIRAL_LETTERS, type Bubble, type BubbleKind, type ViralLetter } from "../../features/onboarding/bubbles";
 import { momentumBonusById, resolveMomentumBonus, rollMomentumBonus, type MomentumBonusId, type MomentumBonusResult } from "../../features/onboarding/momentumBonuses";
 import { computeIntegritySignals, pushSample, type IntegritySignals, type TapSample } from "../../features/integrity/signals";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
@@ -12,17 +12,35 @@ export type OpeningTapResult = {
   followers: number;
   shoutOut: boolean;
   combo: number;
-  viralStarted: boolean;
   /** Followers paid by a Momentum fill this tap (0 if it didn't fill). */
   momentumBonus: number;
   /** Which bonus rolled, if the bar filled. */
   bonus: MomentumBonusResult | null;
 };
 
-export type BubblePopResult = { kind: BubbleKind; followers: number; coins: number } | null;
+export type BubblePopResult = {
+  kind: BubbleKind;
+  followers: number;
+  coins: number;
+  /** Which letter this was, for `viral_letter` pops. */
+  letter: ViralLetter | null;
+  /** Letters held AFTER this pop — empty once a completed set has fired VIRAL. */
+  letters: ViralLetter[];
+  /** This pop completed V·I·R·A·L and tipped the video over. */
+  viralStarted: boolean;
+} | null;
 
 // Monotonic bubble id — ephemeral, never persisted (the feed is rebuilt each session).
 let nextBubbleId = 1;
+
+/**
+ * Letters the player still needs. Spawning only from this set guarantees a run at the
+ * word converges — the challenge is catching erratic targets before the window lapses,
+ * not waiting for the algorithm to finally offer the letter you're missing.
+ */
+function missingViralLetters(collected: readonly ViralLetter[]): ViralLetter[] {
+  return VIRAL_LETTERS.filter(letter => !collected.includes(letter));
+}
 
 export type OnboardingSlice = {
   onboardingRevision: typeof ONBOARDING_REVISION;
@@ -35,6 +53,10 @@ export type OnboardingSlice = {
   openingCombo: number;
   openingLastTapAt: number;
   openingViralUntil: number;
+  /** V·I·R·A·L letters collected toward the current set (16 §2b). */
+  openingViralLetters: ViralLetter[];
+  /** Deadline for finishing the set; 0 when no set is in progress. */
+  openingLetterSetExpiresAt: number;
   openingBubbles: Bubble[];
   openingNextSpawnAt: number;
   /** Wall-clock rate limiter for Momentum fill (see engagement.maxFillPerSec). */
@@ -98,6 +120,8 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   openingCombo: 0,
   openingLastTapAt: 0,
   openingViralUntil: 0,
+  openingViralLetters: [],
+  openingLetterSetExpiresAt: 0,
   openingBubbles: [],
   openingNextSpawnAt: 0,
   openingFillWindowStart: 0,
@@ -146,19 +170,16 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   },
 
   // Every tap always hits — no timing/placement check. Combo heat (which decays while
-  // idle), a random Shout-Out crit, and the VIRAL payoff supply the excitement instead.
+  // idle) and a random Shout-Out crit supply the excitement. VIRAL is NOT triggered here:
+  // it is earned by collecting the V·I·R·A·L letters out of the feed (see popOpeningBubble).
   openingTap: (now = Date.now(), at) => {
     const state = get();
-    const blocked: OpeningTapResult = { followers: 0, shoutOut: false, combo: state.openingCombo, viralStarted: false, momentumBonus: 0, bonus: null };
+    const blocked: OpeningTapResult = { followers: 0, shoutOut: false, combo: state.openingCombo, momentumBonus: 0, bonus: null };
     if (state.session) return blocked;
     if (isRateLimited(state.openingLastTapAt, now)) return blocked; // anti-autoclicker: silent no-op
 
     const comboCap = BALANCE.onboarding.combo.cap;
-    const wasViral = state.openingViralUntil > now;
-    // While VIRAL the bar is pinned at cap; taps can't overfill and decay is paused.
-    const combo = wasViral ? comboCap : Math.min(comboCap, Math.floor(state.openingCombo) + 1);
-    // Filling the bar (not already viral) tips the video over.
-    const viralStarted = !wasViral && combo >= comboCap;
+    const combo = Math.min(comboCap, Math.floor(state.openingCombo) + 1);
 
     const pushActive = state.openingPushUntil > now;
     const shoutOutActive = isOnboardingFeatureAvailable("shout_out", state.completedOnboardingGoals);
@@ -174,7 +195,7 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     const tokensLeft = paid ? tokensAvailable - 1 : tokensAvailable;
 
     const base = openingFollowerAmount(state.openingUpgradeLevels.audience_reach);
-    const viralMult = viralStarted || wasViral ? BALANCE.onboarding.viral.mult : 1;
+    const viralMult = openingViralMult(state.openingViralUntil, now);
     const duetMult = state.openingDuetTaps > 0 ? BALANCE.onboarding.momentumBonuses.duetMult : 1;
     const followers = paid
       ? Math.max(1, Math.round(
@@ -224,22 +245,22 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       openingTokensAt: now,
       openingDuetTaps: bonus?.duetTaps ? bonus.duetTaps : Math.max(0, state.openingDuetTaps - 1),
       ...(bonus?.pushMs ? { openingPushUntil: now + bonus.pushMs } : {}),
-      ...(viralStarted ? { openingViralUntil: now + BALANCE.onboarding.viral.durationMs } : {}),
       // Advisory input-shape evidence only — never used to gate rewards client-side.
       ...(at ? { openingTapSamples: pushSample(state.openingTapSamples, { at: now, x: at.x, y: at.y }) } : {}),
     });
 
     // COMMENT STORM drops its bubbles immediately so the payoff is visible at once.
     if (bonus?.spawnBubbles) {
-      const kinds = availableBubbleKinds(get().completedOnboardingGoals);
-      const spawned = Array.from({ length: bonus.spawnBubbles }, () => makeBubble(nextBubbleId++, kinds, now));
-      set({ openingBubbles: [...get().openingBubbles, ...spawned] });
+      const next = get();
+      const kinds = availableBubbleKinds(next.completedOnboardingGoals);
+      const missing = missingViralLetters(next.openingViralLetters);
+      const spawned = Array.from({ length: bonus.spawnBubbles }, () => makeBubble(nextBubbleId++, kinds, now, missing));
+      set({ openingBubbles: [...next.openingBubbles, ...spawned] });
     }
 
     if (bonus) track("onboarding_momentum_fired", { bonus: bonus.id, followers: bonus.followers, coins: bonus.coins });
-    if (viralStarted) track("onboarding_viral_started", { combo });
     get().checkOnboardingGoal();
-    return { followers, shoutOut, combo, viralStarted, momentumBonus: bonus?.followers ?? 0, bonus };
+    return { followers, shoutOut, combo, momentumBonus: bonus?.followers ?? 0, bonus };
   },
 
   unlockMomentumBonus: id => {
@@ -259,16 +280,13 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
   readIntegritySignals: () => computeIntegritySignals(get().openingTapSamples),
 
   // Combo bleeds off after a short grace period, so the bar reflects what the player is
-  // doing right now instead of freezing at full forever (and VIRAL pauses the bleed).
+  // doing right now instead of freezing at full forever. VIRAL is a separate timed window
+  // now (earned from the letter set), so it neither pins nor pauses the combo.
   decayOpeningCombo: (dt) => {
     const { openingCombo, openingLastTapAt, openingViralUntil } = get();
     const now = Date.now();
-    if (openingViralUntil > 0 && now >= openingViralUntil) {
-      // VIRAL just ended — settle to a partial bar and resume normal decay.
-      set({ openingCombo: BALANCE.onboarding.viral.exitCombo, openingViralUntil: 0, openingLastTapAt: now });
-      return;
-    }
-    if (openingViralUntil > now) return;
+    // Zero the expired window so the VIRAL banner clears even if the player stops tapping.
+    if (openingViralUntil > 0 && now >= openingViralUntil) set({ openingViralUntil: 0 });
     if (openingCombo <= 0) return;
     if (now - openingLastTapAt < BALANCE.onboarding.combo.decayDelayMs) return;
     set({ openingCombo: Math.max(0, openingCombo - BALANCE.onboarding.combo.decayPerSec * dt) });
@@ -282,7 +300,11 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     // Video Studio) hides the feed entirely — in both cases stop the feed rather than
     // let unreachable haters quietly drain followers behind the overlay.
     if (state.session || state.openSheet !== null || state.activeTab !== "home") {
-      if (state.openingBubbles.length) set({ openingBubbles: [], openingNextSpawnAt: 0 });
+      // A half-collected word must not keep counting down behind an overlay the player
+      // can't tap through — drop the set with the feed.
+      if (state.openingBubbles.length || state.openingLetterSetExpiresAt) {
+        set({ openingBubbles: [], openingNextSpawnAt: 0, openingViralLetters: [], openingLetterSetExpiresAt: 0 });
+      }
       return;
     }
     const b = BALANCE.onboarding.bubbles;
@@ -297,6 +319,11 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       bubbles = bubbles.filter(bubble => bubble.expiresAt > now);
     }
 
+    // Set window ran out — wipe the collected letters and start over.
+    const setLapsed = state.openingLetterSetExpiresAt !== 0 && now >= state.openingLetterSetExpiresAt;
+    const letters = setLapsed ? [] : state.openingViralLetters;
+    if (setLapsed) track("onboarding_viral_set_lapsed", { collected: state.openingViralLetters.length });
+
     const kinds = availableBubbleKinds(state.completedOnboardingGoals);
     const viral = state.openingViralUntil > now;
     const pushing = state.openingPushUntil > now;
@@ -308,15 +335,16 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       nextSpawnAt = now + nextSpawnDelay(rateMult);
     } else if (now >= nextSpawnAt) {
       if (bubbles.length < b.maxActive) {
-        bubbles = [...bubbles, makeBubble(nextBubbleId++, kinds, now)];
+        bubbles = [...bubbles, makeBubble(nextBubbleId++, kinds, now, missingViralLetters(letters))];
       }
       nextSpawnAt = now + nextSpawnDelay(rateMult);
     }
 
-    if (bubbles === state.openingBubbles && nextSpawnAt === state.openingNextSpawnAt && followerLoss === 0) return;
+    if (bubbles === state.openingBubbles && nextSpawnAt === state.openingNextSpawnAt && followerLoss === 0 && !setLapsed) return;
     set({
       openingBubbles: bubbles,
       openingNextSpawnAt: nextSpawnAt,
+      ...(setLapsed ? { openingViralLetters: [], openingLetterSetExpiresAt: 0 } : {}),
       ...(followerLoss > 0 ? {
         wallet: { ...state.wallet, followers: Math.max(0, state.wallet.followers - followerLoss) },
       } : {}),
@@ -334,16 +362,13 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
 
     let followers = 0;
     let coins = 0;
-    let comboBonus = 0;
     let momentum = 0;
     switch (bubble.kind) {
-      case "like":
-        followers = Math.round(base * b.likeFollowerMult * viralMult);
-        comboBonus = b.likeComboBonus;
-        break;
       case "comment":
         followers = Math.round(base * b.commentFollowerMult * viralMult);
-        momentum = b.commentMomentum;
+        // Momentum isn't part of the loop until `buy_audience_reach`; don't quietly bank
+        // fill against a meter the player can't see yet.
+        momentum = isOpeningEngagementAvailable(state.completedOnboardingGoals) ? b.commentMomentum : 0;
         break;
       case "gift":
         coins = Math.round((b.giftCoins.min + Math.random() * (b.giftCoins.max - b.giftCoins.min)) * viralMult);
@@ -351,11 +376,30 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       case "hater":
         followers = Math.round(base * b.haterFollowerMult * viralMult);
         break;
+      case "viral_letter":
+        followers = Math.round(base * BALANCE.onboarding.viralLetters.followerMult * viralMult);
+        break;
+    }
+
+    // V·I·R·A·L set bookkeeping — completing the word is the only way to go viral.
+    let letters = state.openingViralLetters;
+    let setExpiresAt = state.openingLetterSetExpiresAt;
+    let viralStarted = false;
+    if (bubble.kind === "viral_letter" && bubble.letter && !letters.includes(bubble.letter)) {
+      letters = [...letters, bubble.letter];
+      // The countdown starts on the FIRST letter, not on each one.
+      if (letters.length === 1) setExpiresAt = now + BALANCE.onboarding.viralLetters.setWindowMs;
+      if (letters.length >= VIRAL_LETTERS.length) {
+        viralStarted = true;
+        letters = [];
+        setExpiresAt = 0;
+      }
     }
 
     const cap = BALANCE.onboarding.engagement.cap;
     set({
-      openingBubbles: state.openingBubbles.filter(item => item.id !== id),
+      // A completed word clears the letters still in flight, so the next set starts clean.
+      openingBubbles: state.openingBubbles.filter(item => item.id !== id && !(viralStarted && item.kind === "viral_letter")),
       wallet: {
         ...state.wallet,
         followers: state.wallet.followers + followers,
@@ -363,15 +407,15 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
         coins: state.wallet.coins + coins,
       },
       coinsEarned: state.coinsEarned + coins,
-      ...(comboBonus ? {
-        openingCombo: Math.min(BALANCE.onboarding.combo.cap, state.openingCombo + comboBonus),
-        openingLastTapAt: now,
-      } : {}),
+      openingViralLetters: letters,
+      openingLetterSetExpiresAt: setExpiresAt,
+      ...(viralStarted ? { openingViralUntil: now + BALANCE.onboarding.viral.durationMs } : {}),
       ...(momentum ? { engagementFill: Math.min(cap, state.engagementFill + momentum) } : {}),
     });
     track("onboarding_bubble_popped", { kind: bubble.kind, followers, coins });
+    if (viralStarted) track("onboarding_viral_started", { source: "letter_set" });
     get().checkOnboardingGoal();
-    return { kind: bubble.kind, followers, coins };
+    return { kind: bubble.kind, followers, coins, letter: bubble.letter, letters, viralStarted };
   },
 
   // Raid Squad passive income — ticks while onboarding is active (see channelSlice.tick).
@@ -466,6 +510,8 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     openingCombo: 0,
     openingLastTapAt: 0,
     openingViralUntil: 0,
+    openingViralLetters: [],
+    openingLetterSetExpiresAt: 0,
     openingBubbles: [],
     openingNextSpawnAt: 0,
     openingFillWindowStart: 0,

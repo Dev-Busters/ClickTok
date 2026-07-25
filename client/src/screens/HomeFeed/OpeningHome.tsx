@@ -6,7 +6,8 @@ import { formatCount } from "../../lib/format";
 import { useGameStore } from "../../store";
 import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
 import { EngagementBubbles } from "./EngagementBubbles";
-import { FypFrame } from "./FypFrame";
+import { FypFrame, FypTopBar } from "./FypFrame";
+import { ViralLetterTracker } from "./ViralLetterTracker";
 import { momentumBonusById } from "../../features/onboarding/momentumBonuses";
 
 const COMBO_R = 100;
@@ -29,7 +30,9 @@ function OpeningTeb() {
   const nextReactionId = useRef(0);
   const activePointer = useRef<number | null>(null);
   const activeKey = useRef(false);
-  const [tapReactions, setTapReactions] = useState<Array<{ id: number; kind: "normal" | "shout_out" | "momentum" | "viral"; followers: number; drift: number; label?: string; color?: string }>>([]);
+  // VIRAL no longer originates here — it fires from the letter set, and its burst is
+  // rendered by EngagementBubbles where the letter was actually tapped.
+  const [tapReactions, setTapReactions] = useState<Array<{ id: number; kind: "normal" | "shout_out" | "momentum"; followers: number; drift: number; label?: string; color?: string }>>([]);
   const [momentumPop, setMomentumPop] = useState(false);
   const momentumPopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduced = useReducedMotion();
@@ -55,15 +58,6 @@ function OpeningTeb() {
         setTapReactions(current => current.filter(reaction => reaction.id !== id));
         reactionTimers.current.delete(id);
       }, result.shoutOut ? 1400 : 1100);
-      reactionTimers.current.set(id, timer);
-    }
-    if (result.viralStarted) {
-      const id = nextReactionId.current++;
-      setTapReactions(current => [...current.slice(-5), { id, kind: "viral", followers: 0, drift: 0 }]);
-      const timer = setTimeout(() => {
-        setTapReactions(current => current.filter(reaction => reaction.id !== id));
-        reactionTimers.current.delete(id);
-      }, 1500);
       reactionTimers.current.set(id, timer);
     }
     if (result.bonus) {
@@ -239,24 +233,22 @@ function OpeningTeb() {
             pointerEvents: "none",
             whiteSpace: "nowrap",
             fontFamily: "var(--font-mono)",
-            fontSize: reaction.kind === "viral" ? 26 : reaction.kind === "shout_out" ? 20 : reaction.kind === "momentum" ? 17 : 18,
+            fontSize: reaction.kind === "shout_out" ? 20 : reaction.kind === "momentum" ? 17 : 18,
             fontWeight: 900,
             letterSpacing: ".06em",
-            color: reaction.color ?? (reaction.kind === "shout_out" || reaction.kind === "viral" ? "var(--gold)" : reaction.kind === "momentum" ? "var(--cyan)" : "#4dff9a"),
-            textShadow: reaction.kind === "shout_out" || reaction.kind === "viral"
+            color: reaction.color ?? (reaction.kind === "shout_out" ? "var(--gold)" : reaction.kind === "momentum" ? "var(--cyan)" : "#4dff9a"),
+            textShadow: reaction.kind === "shout_out"
               ? "0 0 26px currentColor,0 0 38px rgba(255,210,0,.92),0 0 10px rgba(255,210,0,.82),0 2px 4px rgba(0,0,0,.9)"
               : reaction.kind === "momentum"
                 ? "0 0 26px currentColor,0 0 10px rgba(37,244,238,.85),0 2px 4px rgba(0,0,0,.9)"
                 : "0 0 18px currentColor,0 2px 4px rgba(0,0,0,.9)",
           }}
         >
-          {reaction.kind === "viral"
-            ? "🔥 GOING VIRAL"
-            : reaction.kind === "shout_out"
-              ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>SHOUT-OUT!</span><span>+{formatCount(reaction.followers)}</span></span>
-              : reaction.label
-                ? reaction.label
-                : `+${formatCount(reaction.followers)}`}
+          {reaction.kind === "shout_out"
+            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span>SHOUT-OUT!</span><span>+{formatCount(reaction.followers)}</span></span>
+            : reaction.label
+              ? reaction.label
+              : `+${formatCount(reaction.followers)}`}
         </motion.div>)}
       </AnimatePresence>
 
@@ -307,6 +299,7 @@ function RevealCard() {
   if (!reveal || reveal.dismissed) return null;
   const copy = reveal.feature === "shout_out" ? ["SHOUT-OUTS UNLOCKED", "Lucky taps now trigger a big bonus"]
     : reveal.feature === "creator_studio" ? ["CREATOR STUDIO UNLOCKED", "Turn Coins into stronger taps"]
+    : reveal.feature === "virality" ? ["VIRALITY UNLOCKED", "Catch V·I·R·A·L in the feed before the timer runs out"]
     : reveal.feature === "engagement_meter" ? ["TAP THREE UNLOCKED", "Hold the button whenever it's ready"]
     : ["YOUR FYP IS READY", "Meet your audience"];
   const showReveal = () => {
@@ -319,7 +312,7 @@ function RevealCard() {
     setSheet("creatorStudio");
     completeTeach("studio_first_use");
   };
-  return <motion.div initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} style={{ position: "absolute", top: 76, right: 14, zIndex: 30, width: 238, padding: 14, borderRadius: 14, background: "rgba(8,10,15,.96)", border: "1px solid var(--cyan)", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
+  return <motion.div initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} style={{ position: "absolute", top: 86, right: 14, zIndex: 30, width: 238, padding: 14, borderRadius: 14, background: "rgba(8,10,15,.96)", border: "1px solid var(--cyan)", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
     <strong style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: ".06em" }}>{copy[0]}</strong>
     <span style={{ display: "block", margin: "4px 0 12px", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)" }}>{copy[1]}</span>
     <button onClick={showReveal} style={{ width: "100%", padding: "9px 12px", borderRadius: 999, border: 0, background: "var(--cyan)", color: "#050608", fontFamily: "var(--font-mono)", fontWeight: 800, letterSpacing: ".12em" }}>{reveal.feature === "creator_studio" ? "TAKE ME THERE" : "GOT IT"}</button>
@@ -343,6 +336,9 @@ export function OpeningHome() {
   const progress = requirementValue(goal.requirement, { viewsTotal, totalFollowers: wallet.totalFollowers, openingUpgradeLevels: levels, tapThreeCompletions });
   const studioReadyToClaim = goal.id === "unlock_studio" && progress.current >= progress.target;
   const shoutOutTeachActive = reveal?.feature === "shout_out" && !reveal.dismissed;
+  // Virality's teach completes on the first letter tapped, so the goal card has to keep
+  // pointing at the feed until that happens — not just until the card is dismissed.
+  const viralityTeachActive = reveal?.feature === "virality" && !teaches.virality_first_letter;
   const analyticsUnlocked = wallet.totalFollowers >= BALANCE.onboarding.analyticsFollowers;
   const analyticsOpened = teaches.analytics_first_open === true;
   const shoutOutReadyToClaim = goal.id === "meet_teb" && progress.current >= progress.target;
@@ -356,18 +352,22 @@ export function OpeningHome() {
 
   return <main data-onboarding="pre-video-home" style={{ position: "relative", height: "100%", minHeight: "100%", overflow: "hidden", background: "radial-gradient(circle at 50% 44%,rgba(37,244,238,.09),transparent 32%),linear-gradient(155deg,#11131a,#06070a 58%,#16070c)" }}>
     <motion.div aria-hidden animate={{ opacity: [.25, .5, .25], x: [-10, 12, -10] }} transition={{ duration: 9, repeat: Infinity }} style={{ position: "absolute", width: 250, height: 250, borderRadius: "50%", filter: "blur(70px)", background: "rgba(255,31,75,.16)", right: -100, bottom: 30 }} />
-    <header style={{ position: "absolute", inset: "0 0 auto", height: 66, padding: "14px 16px", zIndex: 10, display: "flex", alignItems: "baseline", gap: 8, background: "linear-gradient(rgba(0,0,0,.62),transparent)" }}>
-      <strong style={{ fontFamily: "var(--font-display)", fontSize: 32 }}>{formatCount(wallet.followers)}</strong>
+    {/* TikTok's own top row sits at the very top of the video, like the real app; the
+        game's resource readout drops in underneath it rather than replacing it. */}
+    {!rhythm && <FypTopBar />}
+    <header style={{ position: "absolute", top: 48, left: 0, right: 0, height: 32, padding: "0 14px", zIndex: 10, display: "flex", alignItems: "baseline", gap: 7 }}>
+      <strong style={{ fontFamily: "var(--font-display)", fontSize: 24, textShadow: "0 1px 4px rgba(0,0,0,.85)" }}>{formatCount(wallet.followers)}</strong>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)", letterSpacing: ".16em" }}>FOLLOWERS</span>
-      {studio && <><strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 24 }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>GOLD</span></>}
+      {studio && <><strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 20, textShadow: "0 1px 4px rgba(0,0,0,.85)" }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>GOLD</span></>}
     </header>
-    <div data-onboarding="goal" style={{ position: "absolute", top: 72, left: 14, right: studio || (reveal && !reveal.dismissed) ? 112 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
-      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: studioReadyToClaim || shoutOutReadyToClaim ? "var(--gold)" : "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "PLAY TAP THREE · REPEATABLE GOLD" : shoutOutTeachActive ? "SHOUT-OUTS UNLOCKED" : analyticsUnlocked && !analyticsOpened ? "ANALYTICS UNLOCKED · OPEN INBOX" : shoutOutReadyToClaim ? "CLAIM SHOUT-OUTS · INBOX → ANALYTICS" : studioReadyToClaim ? "CLAIM STUDIO · INBOX → ANALYTICS" : goal.label}</div>
-      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? "HOLD TEB WHEN READY" : shoutOutTeachActive ? "LUCKY TAPS NOW PAY A BIG BONUS" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: SHOUT-OUTS · +5 GOLD" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
+    <div data-onboarding="goal" style={{ position: "absolute", top: 82, left: 14, right: studio || (reveal && !reveal.dismissed) ? 112 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: studioReadyToClaim || shoutOutReadyToClaim ? "var(--gold)" : viralityTeachActive ? "var(--gold)" : "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "PLAY TAP THREE · REPEATABLE GOLD" : shoutOutTeachActive ? "SHOUT-OUTS UNLOCKED" : viralityTeachActive ? "CATCH A VIRAL LETTER" : analyticsUnlocked && !analyticsOpened ? "ANALYTICS UNLOCKED · OPEN INBOX" : shoutOutReadyToClaim ? "CLAIM SHOUT-OUTS · INBOX → ANALYTICS" : studioReadyToClaim ? "CLAIM STUDIO · INBOX → ANALYTICS" : goal.label}</div>
+      <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? "HOLD TEB WHEN READY" : shoutOutTeachActive ? "LUCKY TAPS NOW PAY A BIG BONUS" : viralityTeachActive ? "COLLECT V·I·R·A·L IN TIME TO GO VIRAL" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: SHOUT-OUTS · +5 GOLD" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
     </div>
-    {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 72, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
+    {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 82, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
     {!rhythm && <EngagementBubbles />}
     {!rhythm && <FypFrame />}
+    {!rhythm && <ViralLetterTracker />}
     {!rhythm && <OpeningTeb />}
     <AnimatePresence>{rhythm && <RhythmPlayfield />}</AnimatePresence>
     <RevealCard />

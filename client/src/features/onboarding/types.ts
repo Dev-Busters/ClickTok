@@ -14,6 +14,7 @@ export type OnboardingStepId =
 export type OnboardingFeatureId =
   | "shout_out"
   | "creator_studio"
+  | "virality"
   | "engagement_meter"
   | "tap_three"
   | "video_fyp";
