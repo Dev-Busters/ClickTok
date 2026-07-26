@@ -2282,6 +2282,18 @@ TikTok FYP chrome, stand up video chart authoring, and make automation economica
   > note: a right-hand lane is geometrically impossible — TEB's button is 188px and centred,
   > leaving ~2px between it and the rail at 320px wide. Single left lane is not a shortcut.
 
+- [x] **19.9 — The Virality economy (`18`).** New `wallet.virality` currency, minted only by
+  the V·I·R·A·L letter chain (1/letter, +6 on the word = 11 per word). New **Viral Lab** shop
+  sheet spending it on 5 repeatable upgrades — SIGNAL BOOST / AFTERGLOW / STICKY FEED /
+  PEAK REACH / CLOUT CHASER — drip-fed by total levels owned. Unlocks as one package with the
+  letter mechanic at `reach_700`. SAVE_VERSION 20→21.
+  > note: a new currency rather than reusing one, at the user's direction — Coins are the
+  > PREMIUM currency and Likes/Comments are reserved for player↔player transfer. `18` §0 has
+  > the full table; check it before making any future mechanic pay out.
+  > note: shop is a SHEET, not a 6th nav tab — locked decision #4 fixes the nav at TikTok's
+  > five. Creator Studio already set the shop-as-sheet precedent.
+  > note: all balance numbers are first-pass and unplaytested (`18` §6).
+
 **Phase 19 exit criteria:** the opening loop has multiple interacting layers with no precision
 requirement; docs describe what is actually built; automation earns less than honest play.
 

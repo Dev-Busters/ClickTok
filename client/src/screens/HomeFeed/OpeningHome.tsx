@@ -8,6 +8,8 @@ import { RhythmPlayfield } from "./rhythm/RhythmPlayfield";
 import { EngagementBubbles } from "./EngagementBubbles";
 import { FypFrame, FypTopBar } from "./FypFrame";
 import { ViralLetterTracker } from "./ViralLetterTracker";
+import { areViralLettersAvailable } from "../../features/onboarding/bubbles";
+import { viralDurationMs, viralMultiplier } from "../../features/virality/catalog";
 import { momentumBonusById } from "../../features/onboarding/momentumBonuses";
 
 const COMBO_R = 100;
@@ -25,6 +27,9 @@ function OpeningTeb() {
   const completeTeach = useGameStore(state => state.completeOnboardingTeach);
   const openingCombo = useGameStore(state => state.openingCombo);
   const viralUntil = useGameStore(state => state.openingViralUntil);
+  // Viral Lab levels feed the on-screen readouts, so the numbers never lie about
+  // what an upgraded VIRAL window is actually paying (docs/18 §3).
+  const viralLevels = useGameStore(state => state.viralityUpgradeLevels);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const nextReactionId = useRef(0);
@@ -44,7 +49,8 @@ function OpeningTeb() {
   const comboFraction = Math.min(1, openingCombo / BALANCE.onboarding.combo.cap);
   const momentumFraction = Math.min(1, fill / BALANCE.onboarding.engagement.cap);
   const isViral = viralUntil > Date.now();
-  const comboMult = openingComboMult(Math.floor(openingCombo)) * (isViral ? BALANCE.onboarding.viral.mult : 1);
+  const viralMult = viralMultiplier(viralLevels.viral_mult);
+  const comboMult = openingComboMult(Math.floor(openingCombo)) * (isViral ? viralMult : 1);
   const comboColor = isViral ? "var(--gold)" : "var(--cyan)";
 
   const start = useCallback((at?: { x: number; y: number }) => {
@@ -271,14 +277,14 @@ function OpeningTeb() {
             }}
           >
             <span style={{ fontFamily: "var(--font-display)", fontSize: 15, letterSpacing: ".1em", color: "var(--gold)", textShadow: "0 0 10px var(--gold)" }}>
-              🔥 VIRAL ×{BALANCE.onboarding.viral.mult}
+              🔥 VIRAL ×{viralMult.toFixed(2).replace(/\.00$/, "")}
             </span>
             <div style={{ width: 92, height: 3, borderRadius: 2, background: "rgba(255,255,255,.15)", overflow: "hidden" }}>
               <motion.div
                 key={viralUntil}
                 initial={{ width: "100%" }}
                 animate={{ width: "0%" }}
-                transition={{ duration: BALANCE.onboarding.viral.durationMs / 1000, ease: "linear" }}
+                transition={{ duration: viralDurationMs(viralLevels.viral_duration) / 1000, ease: "linear" }}
                 style={{ height: "100%", background: "var(--gold)" }}
               />
             </div>
@@ -299,7 +305,7 @@ function RevealCard() {
   if (!reveal || reveal.dismissed) return null;
   const copy = reveal.feature === "shout_out" ? ["SHOUT-OUTS UNLOCKED", "Lucky taps now trigger a big bonus"]
     : reveal.feature === "creator_studio" ? ["CREATOR STUDIO UNLOCKED", "Turn Coins into stronger taps"]
-    : reveal.feature === "virality" ? ["VIRALITY UNLOCKED", "Catch V·I·R·A·L in the feed before the timer runs out"]
+    : reveal.feature === "virality" ? ["VIRALITY UNLOCKED", "Catch V·I·R·A·L in order to go viral — then spend Virality in the Lab"]
     : reveal.feature === "engagement_meter" ? ["TAP THREE UNLOCKED", "Hold the button whenever it's ready"]
     : ["YOUR FYP IS READY", "Meet your audience"];
   const showReveal = () => {
@@ -332,6 +338,9 @@ export function OpeningHome() {
   const session = useGameStore(state => state.session);
   const rhythm = session?.phase === "count_in" || session?.phase === "playing" || session?.phase === "result";
   const studio = isOnboardingFeatureAvailable("creator_studio", completed);
+  // The Viral Lab appears with the letter mechanic itself — one unlock, two halves
+  // (the thing you do, and the shop where its currency goes).
+  const viralUnlocked = areViralLettersAvailable(completed);
   const goal = goalById(step);
   const progress = requirementValue(goal.requirement, { viewsTotal, totalFollowers: wallet.totalFollowers, openingUpgradeLevels: levels, tapThreeCompletions });
   const studioReadyToClaim = goal.id === "unlock_studio" && progress.current >= progress.target;
@@ -350,6 +359,13 @@ export function OpeningHome() {
     if (reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use) useGameStore.getState().completeOnboardingTeach("studio_first_use");
   };
 
+  // The Lab is not gated behind a teach — it's a shop, not a ladder rung. The flag
+  // only stops the button pulsing forever once it's been seen.
+  const openViralLab = () => {
+    setSheet("viralLab");
+    if (!teaches.viral_lab_opened) useGameStore.getState().markTeachSeen("viral_lab_opened");
+  };
+
   return <main data-onboarding="pre-video-home" style={{ position: "relative", height: "100%", minHeight: "100%", overflow: "hidden", background: "radial-gradient(circle at 50% 44%,rgba(37,244,238,.09),transparent 32%),linear-gradient(155deg,#11131a,#06070a 58%,#16070c)" }}>
     <motion.div aria-hidden animate={{ opacity: [.25, .5, .25], x: [-10, 12, -10] }} transition={{ duration: 9, repeat: Infinity }} style={{ position: "absolute", width: 250, height: 250, borderRadius: "50%", filter: "blur(70px)", background: "rgba(255,31,75,.16)", right: -100, bottom: 30 }} />
     {/* TikTok's own top row sits at the very top of the video, like the real app; the
@@ -358,13 +374,30 @@ export function OpeningHome() {
     <header style={{ position: "absolute", top: 48, left: 0, right: 0, height: 32, padding: "0 14px", zIndex: 10, display: "flex", alignItems: "baseline", gap: 7 }}>
       <strong style={{ fontFamily: "var(--font-display)", fontSize: 24, textShadow: "0 1px 4px rgba(0,0,0,.85)" }}>{formatCount(wallet.followers)}</strong>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)", letterSpacing: ".16em" }}>FOLLOWERS</span>
-      {studio && <><strong style={{ marginLeft: "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 20, textShadow: "0 1px 4px rgba(0,0,0,.85)" }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>GOLD</span></>}
+      {/* Virality reads before Gold because it's the currency of whatever the player
+          most recently unlocked, and the Lab is where they're headed. */}
+      {viralUnlocked && <><strong data-virality-readout style={{ marginLeft: "auto", color: "var(--red)", fontFamily: "var(--font-display)", fontSize: 20, textShadow: "0 0 12px rgba(255,31,75,.5)" }}>🔥 {formatCount(Math.floor(wallet.virality))}</strong></>}
+      {studio && <><strong style={{ marginLeft: viralUnlocked ? 10 : "auto", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: 20, textShadow: "0 1px 4px rgba(0,0,0,.85)" }}>{formatCount(wallet.coins)}</strong><span style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--gold)" }}>GOLD</span></>}
     </header>
     <div data-onboarding="goal" style={{ position: "absolute", top: 82, left: 14, right: studio || (reveal && !reveal.dismissed) ? 112 : 14, zIndex: 9, padding: "9px 11px", borderRadius: 10, background: "rgba(0,0,0,.48)", border: "1px solid rgba(255,255,255,.1)" }}>
       <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: studioReadyToClaim || shoutOutReadyToClaim ? "var(--gold)" : viralityTeachActive ? "var(--gold)" : "var(--cyan)", letterSpacing: ".1em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{openingChapterComplete ? "PLAY TAP THREE · REPEATABLE GOLD" : shoutOutTeachActive ? "SHOUT-OUTS UNLOCKED" : viralityTeachActive ? "CATCH A VIRAL LETTER" : analyticsUnlocked && !analyticsOpened ? "ANALYTICS UNLOCKED · OPEN INBOX" : shoutOutReadyToClaim ? "CLAIM SHOUT-OUTS · INBOX → ANALYTICS" : studioReadyToClaim ? "CLAIM STUDIO · INBOX → ANALYTICS" : goal.label}</div>
       <div style={{ marginTop: 3, fontFamily: "var(--font-mono)", fontSize: 8, color: "var(--dim)" }}>{openingChapterComplete ? "HOLD TEB WHEN READY" : shoutOutTeachActive ? "LUCKY TAPS NOW PAY A BIG BONUS" : viralityTeachActive ? "COLLECT V·I·R·A·L IN TIME TO GO VIRAL" : analyticsUnlocked && !analyticsOpened ? "FIRST ENTRY: SHOUT-OUTS · +5 GOLD" : `${Math.min(progress.current, progress.target).toLocaleString()} / ${progress.target.toLocaleString()}${goal.reward?.coins ? ` · +${goal.reward.coins} GOLD` : ""}`}</div>
     </div>
-    {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ position: "absolute", top: 82, right: 14, zIndex: 11, padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
+    {/* Shop entries stack top-right. Two shops, two currencies, two loops — the Lab
+        is a sheet rather than a 6th nav tab because the bottom nav is locked to
+        TikTok's five (design decision #4). */}
+    {(studio || viralUnlocked) && <div style={{ position: "absolute", top: 82, right: 14, zIndex: 11, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+      {studio && <motion.button data-onboarding="studio" animate={reveal?.feature === "creator_studio" && reveal.dismissed && !teaches.studio_first_use ? { boxShadow: ["0 0 0 var(--cyan)", "0 0 18px var(--cyan)", "0 0 0 var(--cyan)"] } : {}} transition={{ repeat: Infinity, duration: 1.8 }} onClick={openStudio} style={{ padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(37,244,238,.55)", background: "rgba(37,244,238,.12)", color: "var(--cyan)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em" }}>STUDIO</motion.button>}
+      {viralUnlocked && <motion.button
+        data-onboarding="viral-lab"
+        // Pulses until the player has actually opened it once, the same nudge the
+        // Studio button uses for its first visit.
+        animate={!teaches.viral_lab_opened ? { boxShadow: ["0 0 0 var(--red)", "0 0 18px var(--red)", "0 0 0 var(--red)"] } : {}}
+        transition={{ repeat: Infinity, duration: 1.8 }}
+        onClick={openViralLab}
+        style={{ padding: "10px 12px", borderRadius: 999, border: "1px solid rgba(255,31,75,.6)", background: "rgba(255,31,75,.14)", color: "var(--red)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".1em", whiteSpace: "nowrap" }}
+      >🔥 LAB</motion.button>}
+    </div>}
     {!rhythm && <EngagementBubbles />}
     {!rhythm && <FypFrame />}
     {!rhythm && <ViralLetterTracker />}

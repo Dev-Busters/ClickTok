@@ -55,6 +55,7 @@ export function persistedStatePatch(persisted: PersistedState): Partial<FullStat
     onboardingTeachesSeen: persisted.onboardingTeachesSeen,
     openingUpgradeLevels: persisted.openingUpgradeLevels,
     unlockedMomentumBonuses: persisted.unlockedMomentumBonuses,
+    viralityUpgradeLevels: persisted.viralityUpgradeLevels,
     engagementFill: persisted.engagementFill,
     tapThreeCompletions: persisted.tapThreeCompletions,
     onboardingStepStartedAt: persisted.onboardingStepStartedAt,

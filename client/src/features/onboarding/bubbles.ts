@@ -97,19 +97,38 @@ export function nextViralLetter(collected: readonly ViralLetter[]): ViralLetter 
   return VIRAL_LETTERS[collected.length] ?? null;
 }
 
+/**
+ * Viral Lab upgrades that reshape the feed (docs/18). Passed in rather than imported so
+ * this module stays a pure function of its inputs — the store owns the levels.
+ */
+export type FeedMods = {
+  /** `letterSpawnWeight(level)` — how heavily letters are weighted vs the ambient kinds. */
+  letterWeight: number;
+  /** `letterLifetimeMult(level)` — stretches how long a letter stays catchable. */
+  letterLifetimeMult: number;
+};
+
+export const DEFAULT_FEED_MODS: FeedMods = {
+  letterWeight: BALANCE.onboarding.viralLetters.spawnWeight,
+  letterLifetimeMult: 1,
+};
+
 /** Gifts and haters stay rare; comments carry the ambient rhythm, letters push ahead of both. */
-const KIND_WEIGHT: Record<BubbleKind, number> = {
+const KIND_WEIGHT: Record<Exclude<BubbleKind, "viral_letter">, number> = {
   comment: 44,
   gift: 12,
   hater: 10,
-  viral_letter: BALANCE.onboarding.viralLetters.spawnWeight,
 };
 
-function pickKind(kinds: BubbleKind[]): BubbleKind {
-  const total = kinds.reduce((sum, k) => sum + KIND_WEIGHT[k], 0);
+function weightOf(kind: BubbleKind, mods: FeedMods): number {
+  return kind === "viral_letter" ? mods.letterWeight : KIND_WEIGHT[kind];
+}
+
+function pickKind(kinds: BubbleKind[], mods: FeedMods): BubbleKind {
+  const total = kinds.reduce((sum, k) => sum + weightOf(k, mods), 0);
   let roll = Math.random() * total;
   for (const kind of kinds) {
-    roll -= KIND_WEIGHT[kind];
+    roll -= weightOf(kind, mods);
     if (roll <= 0) return kind;
   }
   return kinds[kinds.length - 1];
@@ -126,9 +145,15 @@ function pick<T>(items: readonly T[]): T {
  *
  * Returns null when nothing is unlocked yet — the caller must not spawn.
  */
-export function makeBubble(id: number, kinds: BubbleKind[], now: number, nextLetter: ViralLetter | null): Bubble | null {
+export function makeBubble(
+  id: number,
+  kinds: BubbleKind[],
+  now: number,
+  nextLetter: ViralLetter | null,
+  mods: FeedMods = DEFAULT_FEED_MODS,
+): Bubble | null {
   if (kinds.length === 0) return null;
-  const picked = pickKind(kinds);
+  const picked = pickKind(kinds, mods);
   const letterBlocked = picked === "viral_letter" && nextLetter === null;
   const fallback = kinds.find(k => k !== "viral_letter");
   const kind: BubbleKind = letterBlocked ? (fallback ?? picked) : picked;
@@ -137,7 +162,9 @@ export function makeBubble(id: number, kinds: BubbleKind[], now: number, nextLet
   const isLetter = kind === "viral_letter";
   const v = BALANCE.onboarding.viralLetters;
   const lifeMs = isLetter
-    ? BALANCE.onboarding.bubbles.lifetimeMs * (v.minLifetimeMult + Math.random() * (v.maxLifetimeMult - v.minLifetimeMult))
+    // STICKY FEED stretches the roll, so upgrades make letters genuinely easier to catch
+    // rather than just more frequent.
+    ? BALANCE.onboarding.bubbles.lifetimeMs * (v.minLifetimeMult + Math.random() * (v.maxLifetimeMult - v.minLifetimeMult)) * mods.letterLifetimeMult
     : BALANCE.onboarding.bubbles.lifetimeMs;
 
   return {

@@ -6,9 +6,11 @@ import type { ElementId } from "../../features/elements/types";
 import type { SequenceId } from "../../features/teb/types";
 import { ONBOARDING_REVISION, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
 import type { MomentumBonusId } from "../../features/onboarding/momentumBonuses";
+import type { ViralityUpgradeId } from "../../features/virality/types";
+import { FRESH_VIRALITY_LEVELS } from "./viralitySlice";
 import type { FullState } from "../index";
 
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 
 // Persisted (partialize) — durable slices only:
 //   handle, wallet, comments, tapPower, passiveFollowersPerSec, passiveCoinsPerSec,
@@ -161,7 +163,14 @@ export type PersistedV20 = Omit<PersistedV19, "version"> & {
   unlockedMomentumBonuses: MomentumBonusId[];
 };
 
-export type PersistedState = PersistedV20;
+// 21: the Virality economy (docs/18) — a new wallet currency minted only by the
+// V·I·R·A·L letter mechanic, plus the Viral Lab's owned upgrade levels.
+export type PersistedV21 = Omit<PersistedV20, "version"> & {
+  version: 21;
+  viralityUpgradeLevels: Record<ViralityUpgradeId, number>;
+};
+
+export type PersistedState = PersistedV21;
 
 // Single source of truth for "what gets saved" — used by the localStorage
 // `persist` middleware's `partialize` AND by the cloud sync push (4.5), so
@@ -203,6 +212,7 @@ export function toPersistedState(state: FullState): PersistedState {
     onboardingTeachesSeen: state.onboardingTeachesSeen,
     openingUpgradeLevels: state.openingUpgradeLevels,
     unlockedMomentumBonuses: state.unlockedMomentumBonuses,
+    viralityUpgradeLevels: state.viralityUpgradeLevels,
     engagementFill: state.engagementFill,
     tapThreeCompletions: state.tapThreeCompletions,
     onboardingStepStartedAt: state.onboardingStepStartedAt,
@@ -234,7 +244,7 @@ const MILESTONE_TO_METRIC: Record<number, string> = {
 };
 
 export function migrate(persistedState: unknown, version: number): PersistedState {
-  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17 | PersistedV18 | PersistedV19 | PersistedV20;
+  let state = persistedState as PersistedV1 | PersistedV2 | PersistedV3 | PersistedV4 | PersistedV5 | PersistedV6 | PersistedV7 | PersistedV8 | PersistedV9 | PersistedV10 | PersistedV11 | PersistedV12 | PersistedV13 | PersistedV14 | PersistedV15 | PersistedV16 | PersistedV17 | PersistedV18 | PersistedV19 | PersistedV20 | PersistedV21;
 
   if (version < 2) {
     const v1 = state as PersistedV1;
@@ -492,5 +502,19 @@ export function migrate(persistedState: unknown, version: number): PersistedStat
     };
   }
 
-  return state as PersistedState;
+  if (version < 21) {
+    const v20 = state as PersistedV20;
+    state = {
+      ...v20,
+      version: 21,
+      // v20 saves predate the Virality economy — nothing bought yet, and the wallet
+      // gains a `virality` balance of 0 (patched below, since Wallet is persisted whole).
+      viralityUpgradeLevels: { ...FRESH_VIRALITY_LEVELS },
+    };
+  }
+
+  const final = state as PersistedState;
+  // `wallet` is persisted as a whole object, so a save written before a currency existed
+  // is missing that key entirely. Backfill rather than trusting the shape.
+  return { ...final, wallet: { ...final.wallet, virality: final.wallet?.virality ?? 0 } };
 }

@@ -49,6 +49,7 @@ export const createChannelSlice: StateCreator<FullState, [], [], ChannelSlice> =
     totalFollowers: 0,
     coins: 0,
     diamonds: 0,
+    virality: 0,
     likes: 0,
   },
   comments: 0,

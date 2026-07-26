@@ -309,6 +309,27 @@ export const BALANCE = {
     // letters V·I·R·A·L out of the engagement feed (16 §2b). While it runs everything
     // pays double and the feed floods. The payoff moment of the tap loop.
     viral: { durationMs: 7000, mult: 2, spawnRateMult: 3 },
+    // ── Virality: the VIRAL system's own economy (docs/18) ────────────────────
+    // Earned ONLY by the letter mechanic, spent ONLY in the Viral Lab. It exists
+    // because no established currency fits (locked 2026-07-25):
+    //   · Coins are ClickTok's PREMIUM currency, mirroring real TikTok — they must
+    //     never be the reward for a core-loop mechanic.
+    //   · Likes and Comments are reserved for player↔player interaction (liking an
+    //     FYP video transfers the Like to that creator), so a solo mechanic must
+    //     not mint them.
+    // FIRST-PASS NUMBERS — a full word pays 11, which buys the first upgrade (8).
+    // Expect to tune after playtest; see `18` §5.
+    virality: {
+      perLetter: 1,   // each caught letter — a broken chain still paid something
+      perWord: 6,     // completing V·I·R·A·L — the actual payout
+      upgrades: {
+        letter_rate:    { baseCost: 8,  costGrowth: 1.55, weightPerLevel: 10 },
+        viral_duration: { baseCost: 10, costGrowth: 1.6,  msPerLevel: 1200 },
+        letter_dwell:   { baseCost: 14, costGrowth: 1.6,  lifetimePerLevel: 0.08 },
+        viral_mult:     { baseCost: 22, costGrowth: 1.75, multPerLevel: 0.25 },
+        virality_yield: { baseCost: 26, costGrowth: 1.7,  yieldPerLevel: 0.35 },
+      },
+    },
     // The V·I·R·A·L letter set — the only source of VIRAL, unlocked at `reach_700`.
     viralLetters: {
       // Letters must be caught IN ORDER (V→I→R→A→L), so only ONE letter is ever live.

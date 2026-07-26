@@ -11,6 +11,7 @@ import { Inbox } from "../screens/Inbox";
 import { Profile } from "../screens/Profile";
 import { CreateSheet } from "../screens/Create";
 import { CreatorStudio } from "../screens/CreatorStudio";
+import { ViralLab } from "../screens/ViralLab";
 import { VideoStudio } from "../screens/VideoStudio";
 import { BottomNav } from "../navigation/BottomNav";
 import { WelcomeBackSheet } from "../components/WelcomeBackSheet";
@@ -59,7 +60,7 @@ export function Shell() {
     const onboardingQa = params.get("onboardingQa");
     if (onboardingQa === "fresh") useGameStore.getState().resetOnboardingRevision();
     if (onboardingQa === "analyticsFive") useGameStore.setState({
-      wallet: { followers: 5, totalFollowers: 5, coins: 0, likes: 0, diamonds: 0 },
+      wallet: { followers: 5, totalFollowers: 5, coins: 0, likes: 0, diamonds: 0, virality: 0 },
       onboardingStep: "meet_teb",
       completedOnboardingGoals: [],
       activeOnboardingReveal: null,
@@ -67,7 +68,7 @@ export function Shell() {
       activeTab: "home",
     });
     if (onboardingQa === "zoneReady") useGameStore.setState({
-      wallet: { followers: 5, totalFollowers: 5, coins: 0, likes: 0, diamonds: 0 },
+      wallet: { followers: 5, totalFollowers: 5, coins: 0, likes: 0, diamonds: 0, virality: 0 },
       onboardingStep: "meet_teb",
       completedOnboardingGoals: [],
       activeOnboardingReveal: null,
@@ -75,7 +76,7 @@ export function Shell() {
       activeTab: "inbox",
     });
     if (onboardingQa === "modifier") useGameStore.setState({
-      wallet: { followers: 5, totalFollowers: 5, coins: 5, likes: 0, diamonds: 0 },
+      wallet: { followers: 5, totalFollowers: 5, coins: 5, likes: 0, diamonds: 0, virality: 0 },
       viewsTotal: 14,
       onboardingStep: "meet_teb",
       completedOnboardingGoals: ["meet_teb"],
@@ -83,7 +84,7 @@ export function Shell() {
       onboardingTeachesSeen: { analytics_first_open: true },
     });
     if (onboardingQa === "studio") useGameStore.setState({
-      wallet: { followers: 25, totalFollowers: 25, coins: 5, likes: 0, diamonds: 0 },
+      wallet: { followers: 25, totalFollowers: 25, coins: 5, likes: 0, diamonds: 0, virality: 0 },
       viewsTotal: 100,
       onboardingStep: "buy_audience_reach",
       completedOnboardingGoals: ["meet_teb", "unlock_studio"],
@@ -92,7 +93,7 @@ export function Shell() {
       openingUpgradeLevels: { audience_reach: 0, engagement_rate: 0, raid_squad: 0 },
     });
     if (onboardingQa === "analyticsReady") useGameStore.setState({
-      wallet: { followers: 25, totalFollowers: 25, coins: 0, likes: 0, diamonds: 0 },
+      wallet: { followers: 25, totalFollowers: 25, coins: 0, likes: 0, diamonds: 0, virality: 0 },
       viewsTotal: 100,
       onboardingStep: "unlock_studio",
       completedOnboardingGoals: ["meet_teb"],
@@ -102,7 +103,7 @@ export function Shell() {
       activeTab: "inbox",
     });
     if (onboardingQa === "rhythm") useGameStore.setState({
-      wallet: { followers: 2400, totalFollowers: 2400, coins: 40, likes: 0, diamonds: 0 },
+      wallet: { followers: 2400, totalFollowers: 2400, coins: 40, likes: 0, diamonds: 0, virality: 0 },
       viewsTotal: 1800,
       onboardingStep: "unlock_rhythm",
       completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm"],
@@ -112,7 +113,7 @@ export function Shell() {
       engagementFill: 100,
     });
     if (onboardingQa === "meterFull") useGameStore.setState({
-      wallet: { followers: 82, totalFollowers: 82, coins: 0, likes: 0, diamonds: 0 },
+      wallet: { followers: 82, totalFollowers: 82, coins: 0, likes: 0, diamonds: 0, virality: 0 },
       viewsTotal: 216,
       onboardingStep: "reach_700",
       completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach"],
@@ -123,7 +124,7 @@ export function Shell() {
       session: null,
     });
     if (onboardingQa === "complete") useGameStore.setState({
-      wallet: { followers: 2600, totalFollowers: 2600, coins: 60, likes: 0, diamonds: 0 },
+      wallet: { followers: 2600, totalFollowers: 2600, coins: 60, likes: 0, diamonds: 0, virality: 0 },
       viewsTotal: 2600,
       onboardingStep: "complete_first_rhythm",
       completedOnboardingGoals: ["meet_teb", "unlock_studio", "buy_audience_reach", "reach_700", "own_three_fyp_levels", "reach_1200", "unlock_rhythm", "complete_first_rhythm"],
@@ -199,6 +200,12 @@ export function Shell() {
           <AnimatePresence>
             {openSheet === 'creatorStudio' && (
               <CreatorStudio onClose={() => setSheet(null)} />
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {openSheet === 'viralLab' && (
+              <ViralLab onClose={() => setSheet(null)} />
             )}
           </AnimatePresence>
 

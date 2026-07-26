@@ -1,5 +1,6 @@
 import { BALANCE } from "../economy/balance";
 import { ONBOARDING_GOALS } from "./catalog";
+import { viralMultiplier } from "../virality/catalog";
 import type { GoalRequirement, OnboardingFeatureId, OnboardingStepId, OpeningUpgradeId } from "./types";
 
 export type OnboardingProgress = {
@@ -92,8 +93,12 @@ export function isOpeningViral(viralUntil: number, now: number): boolean {
   return viralUntil > now;
 }
 
-export function openingViralMult(viralUntil: number, now: number): number {
-  return isOpeningViral(viralUntil, now) ? BALANCE.onboarding.viral.mult : 1;
+/**
+ * `multLevel` is the Viral Lab's PEAK REACH level (docs/18 §3) — pass 0 for the
+ * un-upgraded ×2 baseline.
+ */
+export function openingViralMult(viralUntil: number, now: number, multLevel = 0): number {
+  return isOpeningViral(viralUntil, now) ? viralMultiplier(multLevel) : 1;
 }
 
 export function rollShoutOut(): boolean {

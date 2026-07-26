@@ -1,7 +1,8 @@
 import type { StateCreator } from "zustand";
 import { BALANCE } from "../../features/economy/balance";
 import { canClaimCreatorStudioAnalytics, canClaimShoutOutAnalytics, goalById, nextGoal, resolvableGoal, engagementPerTap, isRateLimited, openingComboMult, openingFollowerAmount, openingUpgradeCost, openingViralMult, isOpeningEngagementAvailable, isOnboardingFeatureAvailable, raidFollowersPerSec, rollShoutOut } from "../../features/onboarding/helpers";
-import { availableBubbleKinds, makeBubble, nextSpawnDelay, nextViralLetter, VIRAL_LETTERS, type Bubble, type BubbleKind, type ViralLetter } from "../../features/onboarding/bubbles";
+import { availableBubbleKinds, makeBubble, nextSpawnDelay, nextViralLetter, VIRAL_LETTERS, type Bubble, type BubbleKind, type FeedMods, type ViralLetter } from "../../features/onboarding/bubbles";
+import { letterLifetimeMult, letterSpawnWeight, viralDurationMs, viralityPerLetter, viralityPerWord } from "../../features/virality/catalog";
 import { momentumBonusById, resolveMomentumBonus, rollMomentumBonus, type MomentumBonusId, type MomentumBonusResult } from "../../features/onboarding/momentumBonuses";
 import { computeIntegritySignals, pushSample, type IntegritySignals, type TapSample } from "../../features/integrity/signals";
 import { ONBOARDING_REVISION, type OnboardingReveal, type OnboardingStepId, type OpeningUpgradeId } from "../../features/onboarding/types";
@@ -22,6 +23,8 @@ export type BubblePopResult = {
   kind: BubbleKind;
   followers: number;
   coins: number;
+  /** Virality minted by this pop — letters only (docs/18 §2). */
+  virality: number;
   /** Which letter this was, for `viral_letter` pops. */
   letter: ViralLetter | null;
   /** Letters held AFTER this pop — empty once a completed set has fired VIRAL. */
@@ -36,6 +39,14 @@ let nextBubbleId = 1;
 /** Push a freshly-made bubble onto a list, skipping the spawn if nothing is unlocked. */
 function withBubble(bubbles: Bubble[], made: Bubble | null): Bubble[] {
   return made ? [...bubbles, made] : bubbles;
+}
+
+/** Viral Lab levels resolved into the shape the bubble spawner wants (docs/18 §3). */
+function feedMods(state: FullState): FeedMods {
+  return {
+    letterWeight: letterSpawnWeight(state.viralityUpgradeLevels.letter_rate),
+    letterLifetimeMult: letterLifetimeMult(state.viralityUpgradeLevels.letter_dwell),
+  };
 }
 
 export type OnboardingSlice = {
@@ -72,6 +83,12 @@ export type OnboardingSlice = {
   checkOnboardingGoal: () => void;
   acknowledgeOnboardingReveal: () => void;
   completeOnboardingTeach: (teachId: string) => void;
+  /**
+   * Records a one-off "player has seen this" flag WITHOUT advancing the goal ladder.
+   * For UI nudges that aren't ladder rungs (e.g. the Viral Lab button's first-visit
+   * pulse) — `completeOnboardingTeach` would try to advance the current goal.
+   */
+  markTeachSeen: (teachId: string) => void;
   openingTap: (now?: number, at?: { x: number; y: number }) => OpeningTapResult;
   tickOpeningRaid: (dt: number) => void;
   decayOpeningCombo: (dt: number) => void;
@@ -148,6 +165,12 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     if (!reveal) advance(set, get);
   },
 
+  markTeachSeen: teachId => {
+    const seen = get().onboardingTeachesSeen;
+    if (seen[teachId]) return;
+    set({ onboardingTeachesSeen: { ...seen, [teachId]: true } });
+  },
+
   acknowledgeOnboardingReveal: () => {
     const reveal = get().activeOnboardingReveal;
     if (!reveal) return;
@@ -191,7 +214,7 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     const tokensLeft = paid ? tokensAvailable - 1 : tokensAvailable;
 
     const base = openingFollowerAmount(state.openingUpgradeLevels.audience_reach);
-    const viralMult = openingViralMult(state.openingViralUntil, now);
+    const viralMult = openingViralMult(state.openingViralUntil, now, state.viralityUpgradeLevels.viral_mult);
     const duetMult = state.openingDuetTaps > 0 ? BALANCE.onboarding.momentumBonuses.duetMult : 1;
     const followers = paid
       ? Math.max(1, Math.round(
@@ -252,9 +275,10 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       // Only ever one letter is live, so a storm drops ambient bubbles around it rather
       // than five copies of the same letter.
       const letter = next.openingBubbles.some(b => b.kind === "viral_letter") ? null : nextViralLetter(next.openingViralLetters);
+      const mods = feedMods(next);
       let spawned = next.openingBubbles;
       for (let i = 0; i < bonus.spawnBubbles; i++) {
-        spawned = withBubble(spawned, makeBubble(nextBubbleId++, kinds, now, i === 0 ? letter : null));
+        spawned = withBubble(spawned, makeBubble(nextBubbleId++, kinds, now, i === 0 ? letter : null, mods));
       }
       if (spawned !== next.openingBubbles) set({ openingBubbles: spawned });
     }
@@ -343,7 +367,7 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
       nextSpawnAt = now + nextSpawnDelay(rateMult);
     } else if (now >= nextSpawnAt) {
       if (bubbles.length < b.maxActive) {
-        bubbles = withBubble(bubbles, makeBubble(nextBubbleId++, kinds, now, offerLetter));
+        bubbles = withBubble(bubbles, makeBubble(nextBubbleId++, kinds, now, offerLetter, feedMods(state)));
       }
       nextSpawnAt = now + nextSpawnDelay(rateMult);
     }
@@ -366,7 +390,7 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     const b = BALANCE.onboarding.bubbles;
     const now = Date.now();
     const base = openingFollowerAmount(state.openingUpgradeLevels.audience_reach);
-    const viralMult = openingViralMult(state.openingViralUntil, now);
+    const viralMult = openingViralMult(state.openingViralUntil, now, state.viralityUpgradeLevels.viral_mult);
 
     let followers = 0;
     let coins = 0;
@@ -392,16 +416,22 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     // V·I·R·A·L set bookkeeping — spelling the word IN ORDER is the only way to go viral.
     // A letter only counts if it's the one the chain is actually waiting for; a stale
     // duplicate still pays its followers but doesn't advance the word.
+    //
+    // This is also the ONLY place Virality is minted (docs/18 §2).
+    const yieldLevel = state.viralityUpgradeLevels.virality_yield;
     let letters = state.openingViralLetters;
     let setExpiresAt = state.openingLetterSetExpiresAt;
     let viralStarted = false;
+    let virality = 0;
     if (bubble.kind === "viral_letter" && bubble.letter && bubble.letter === nextViralLetter(letters)) {
       letters = [...letters, bubble.letter];
+      virality += viralityPerLetter(yieldLevel);
       // Refreshed on EVERY catch — the clock measures the gap between letters, not the
       // length of the whole word, so a long chain is never punished for being long.
       setExpiresAt = now + BALANCE.onboarding.viralLetters.letterWindowMs;
       if (letters.length >= VIRAL_LETTERS.length) {
         viralStarted = true;
+        virality += viralityPerWord(yieldLevel);
         letters = [];
         setExpiresAt = 0;
       }
@@ -416,17 +446,19 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
         followers: state.wallet.followers + followers,
         totalFollowers: state.wallet.totalFollowers + followers,
         coins: state.wallet.coins + coins,
+        virality: state.wallet.virality + virality,
       },
       coinsEarned: state.coinsEarned + coins,
       openingViralLetters: letters,
       openingLetterSetExpiresAt: setExpiresAt,
-      ...(viralStarted ? { openingViralUntil: now + BALANCE.onboarding.viral.durationMs } : {}),
+      // AFTERGLOW lengthens the window the moment it's bought.
+      ...(viralStarted ? { openingViralUntil: now + viralDurationMs(state.viralityUpgradeLevels.viral_duration) } : {}),
       ...(momentum ? { engagementFill: Math.min(cap, state.engagementFill + momentum) } : {}),
     });
     track("onboarding_bubble_popped", { kind: bubble.kind, followers, coins });
-    if (viralStarted) track("onboarding_viral_started", { source: "letter_set" });
+    if (viralStarted) track("onboarding_viral_started", { source: "letter_set", virality });
     get().checkOnboardingGoal();
-    return { kind: bubble.kind, followers, coins, letter: bubble.letter, letters, viralStarted };
+    return { kind: bubble.kind, followers, coins, virality, letter: bubble.letter, letters, viralStarted };
   },
 
   // Raid Squad passive income — ticks while onboarding is active (see channelSlice.tick).
@@ -535,7 +567,7 @@ export const createOnboardingSlice: StateCreator<FullState, [], [], OnboardingSl
     engagementFill: 0,
     tapThreeCompletions: 0,
     onboardingStepStartedAt: Date.now(),
-    wallet: { followers: 0, totalFollowers: 0, coins: 0, diamonds: 0, likes: 0 },
+    wallet: { followers: 0, totalFollowers: 0, coins: 0, diamonds: 0, likes: 0, virality: 0 },
     viewsTotal: 0,
     coinsEarned: 0,
     metricsReached: [],

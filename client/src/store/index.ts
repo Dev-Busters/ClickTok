@@ -14,6 +14,7 @@ import { createFeedSlice, type FeedSlice } from "./slices/feedSlice";
 import { createElementsSlice, type ElementsSlice } from "./slices/elementsSlice";
 import { createTebSlice, type TebSlice } from "./slices/tebSlice";
 import { createOnboardingSlice, type OnboardingSlice } from "./slices/onboardingSlice";
+import { createViralitySlice, type ViralitySlice } from "./slices/viralitySlice";
 import { SAVE_VERSION, migrate, toPersistedState, type PersistedState } from "./slices/meta";
 
 // 3.2 adds InboxSlice; 4.2 adds SpectateSlice; 4.5 adds CloudSlice;
@@ -21,7 +22,7 @@ import { SAVE_VERSION, migrate, toPersistedState, type PersistedState } from "./
 // canonical FullState (same precedent as RunSlice/SocialSlice additions).
 export type FullState =
   ChannelSlice & UpgradesSlice & SkillsSlice & CatalogSlice &
-  RunSlice & SocialSlice & UiSlice & InboxSlice & SpectateSlice & CloudSlice & FeedSlice & ElementsSlice & TebSlice & OnboardingSlice;
+  RunSlice & SocialSlice & UiSlice & InboxSlice & SpectateSlice & CloudSlice & FeedSlice & ElementsSlice & TebSlice & OnboardingSlice & ViralitySlice;
 
 export const useGameStore = create<FullState>()(
   persist<FullState, [], [], PersistedState>(
@@ -40,6 +41,7 @@ export const useGameStore = create<FullState>()(
       ...createElementsSlice(set, get, api),
       ...createTebSlice(set, get, api),
       ...createOnboardingSlice(set, get, api),
+      ...createViralitySlice(set, get, api),
     }),
     {
       name: "clicktok-save",
@@ -80,6 +82,7 @@ export function createFreshPersistedState(): PersistedState {
     ...createElementsSlice(set, get, api),
     ...createTebSlice(set, get, api),
     ...createOnboardingSlice(set, get, api),
+    ...createViralitySlice(set, get, api),
   }));
   return toPersistedState(fresh.getState());
 }

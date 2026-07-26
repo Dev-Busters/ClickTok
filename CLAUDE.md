@@ -50,6 +50,9 @@ descriptions in 01/04/06/14):**
 7. `docs/16-teb-engagement-loop.md` — **the TEB loop as actually built.** The pulse/timing-zone
    system it replaced is deleted; do not reimplement it.
 8. `docs/17-video-charts.md` — authored chart format + Video Studio (built, not yet in the FYP).
+8b. `docs/18-virality-economy.md` — **the Virality currency + Viral Lab shop.** Read §0 before
+   proposing that ANY mechanic pay out in Coins or Likes — it explains why it almost certainly
+   must not, and why a new currency was added instead.
 9. `docs/15-integrity-and-anticheat.md` — anti-automation architecture. Read before anything
    competitive or leaderboard-shaped.
 

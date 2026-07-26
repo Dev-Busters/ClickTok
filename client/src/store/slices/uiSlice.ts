@@ -4,7 +4,7 @@ import type { Tab } from "../../navigation/tabs";
 
 export type UiSlice = {
   activeTab: Tab;
-  openSheet: "create" | "welcomeBack" | "runResults" | "creatorStudio" | "videoStudio" | null;
+  openSheet: "create" | "welcomeBack" | "runResults" | "creatorStudio" | "viralLab" | "videoStudio" | null;
   setTab: (t: Tab) => void;
   setSheet: (s: UiSlice["openSheet"]) => void;
 };
